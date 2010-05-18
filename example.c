@@ -20,12 +20,12 @@ int main(void) {
     freeReplyObject(reply);
 
     /* Set a key */
-    reply = redisCommand(fd,"SET %s %s\n", "foo", "hello world");
+    reply = redisCommand(fd,"SET %s %s", "foo", "hello world");
     printf("SET: %s\n", reply->reply);
     freeReplyObject(reply);
 
     /* Set a key using binary safe API */
-    reply = redisCommand(fd,"SET %b %b\n", "bar", 3, "hello", 5);
+    reply = redisCommand(fd,"SET %b %b", "bar", 3, "hello", 5);
     printf("SET (binary API): %s\n", reply->reply);
     freeReplyObject(reply);
 
