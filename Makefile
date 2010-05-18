@@ -15,24 +15,33 @@ CCOPT= $(CFLAGS) $(CCLINK) $(ARCH) $(PROF)
 DEBUG?= -g -rdynamic -ggdb 
 
 OBJ = anet.o hiredis.o sds.o example.o
+TESTOBJ = anet.o hiredis.o sds.o test.o
 
 PRGNAME = hiredis-example
+TESTNAME = hiredis-test
 
-all: hiredis-example
+all: hiredis-example hiredis-test
 
 # Deps (use make dep to generate this)
 anet.o: anet.c fmacros.h anet.h
+example.o: example.c hiredis.h sds.h
+test.o: test.c hiredis.h sds.h
 hiredis.o: hiredis.c hiredis.h sds.h anet.h
 sds.o: sds.c sds.h
+hiredis.o: hiredis.c hiredis.h sds.h anet.h
 
 hiredis-example: $(OBJ)
 	$(CC) -o $(PRGNAME) $(CCOPT) $(DEBUG) $(OBJ)
+
+hiredis-test: $(TESTOBJ)
+	$(CC) -o $(TESTNAME) $(CCOPT) $(DEBUG) $(TESTOBJ)
+	./hiredis-test
 
 .c.o:
 	$(CC) -c $(CFLAGS) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
-	rm -rf $(PRGNAME) *.o *.gcda *.gcno *.gcov
+	rm -rf $(PRGNAME) $(TESTNAME) *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
