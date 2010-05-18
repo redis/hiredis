@@ -6,6 +6,7 @@
 
 int main(void) {
     int fd;
+    unsigned int j;
     redisReply *reply;
 
     reply = redisConnect(&fd, "127.0.0.1", 6379);
@@ -27,6 +28,24 @@ int main(void) {
     /* Set a key using binary safe API */
     reply = redisCommand(fd,"SET %b %b", "bar", 3, "hello", 5);
     printf("SET (binary API): %s\n", reply->reply);
+    freeReplyObject(reply);
+
+    /* Create a list of numbers, from 0 to 9 */
+    for (j = 0; j < 10; j++) {
+        char buf[64];
+
+        snprintf(buf,64,"%d",j);
+        reply = redisCommand(fd,"LPUSH mylist element-%s", buf);
+        freeReplyObject(reply);
+    }
+
+    /* Let's check what we have inside the list */
+    reply = redisCommand(fd,"LRANGE mylist 0 -1");
+    if (reply->type == REDIS_REPLY_ARRAY) {
+        for (j = 0; j < reply->elements; j++) {
+            printf("%u) %s\n", j, reply->element[j]->reply);
+        }
+    }
     freeReplyObject(reply);
 
     return 0;
