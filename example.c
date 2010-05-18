@@ -30,7 +30,22 @@ int main(void) {
     printf("SET (binary API): %s\n", reply->reply);
     freeReplyObject(reply);
 
+    /* Try a GET and two INCR */
+    reply = redisCommand(fd,"GET foo");
+    printf("GET foo: %s\n", reply->reply);
+    freeReplyObject(reply);
+
+    reply = redisCommand(fd,"INCR counter");
+    printf("INCR counter: %lld\n", reply->integer);
+    freeReplyObject(reply);
+    /* again ... */
+    reply = redisCommand(fd,"INCR counter");
+    printf("INCR counter: %lld\n", reply->integer);
+    freeReplyObject(reply);
+
     /* Create a list of numbers, from 0 to 9 */
+    reply = redisCommand(fd,"DEL mylist");
+    freeReplyObject(reply);
     for (j = 0; j < 10; j++) {
         char buf[64];
 
