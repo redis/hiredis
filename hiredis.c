@@ -50,7 +50,7 @@ static void redisOOM(void) {
  * to the socket file descriptor. On error a redisReply object is returned
  * with reply->type set to REDIS_REPLY_ERROR and reply->string containing
  * the error message. This replyObject must be freed with redisFreeReply(). */
-redisReply *redisConnect(int *fd, char *ip, int port) {
+redisReply *redisConnect(int *fd, const char *ip, int port) {
     char err[ANET_ERR_LEN];
 
     *fd = anetTcpConnect(err,ip,port);
@@ -233,10 +233,10 @@ static void addArgument(sds a, char ***argv, int *argc) {
  * Finally when type is REDIS_REPLY_INTEGER the long long integer is
  * stored at reply->integer.
  */
-redisReply *redisCommand(int fd, char *format, ...) {
+redisReply *redisCommand(int fd, const char *format, ...) {
     va_list ap;
     size_t size;
-    char *arg, *c = format;
+    const char *arg, *c = format;
     sds cmd = sdsempty();     /* whole command buffer */
     sds current = sdsempty(); /* current argument */
     char **argv = NULL;

@@ -116,7 +116,7 @@ static sds sdsMakeRoomFor(sds s, size_t addlen) {
     return newsh->buf;
 }
 
-sds sdscatlen(sds s, void *t, size_t len) {
+sds sdscatlen(sds s, const void *t, size_t len) {
     struct sdshdr *sh;
     size_t curlen = sdslen(s);
 
@@ -130,7 +130,7 @@ sds sdscatlen(sds s, void *t, size_t len) {
     return s;
 }
 
-sds sdscat(sds s, char *t) {
+sds sdscat(sds s, const char *t) {
     return sdscatlen(s, t, strlen(t));
 }
 

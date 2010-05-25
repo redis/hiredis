@@ -47,8 +47,8 @@ typedef struct redisReply {
     struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
 } redisReply;
 
-redisReply *redisConnect(int *fd, char *ip, int port);
+redisReply *redisConnect(int *fd, const char *ip, int port);
 void freeReplyObject(redisReply *r);
-redisReply *redisCommand(int fd, char *format, ...);
+redisReply *redisCommand(int fd, const char *format, ...);
 
 #endif

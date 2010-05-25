@@ -125,7 +125,7 @@ int anetResolve(char *err, char *host, char *ipbuf)
 
 #define ANET_CONNECT_NONE 0
 #define ANET_CONNECT_NONBLOCK 1
-static int anetTcpGenericConnect(char *err, char *addr, int port, int flags)
+static int anetTcpGenericConnect(char *err, const char *addr, int port, int flags)
 {
     int s, on = 1;
     struct sockaddr_in sa;
@@ -167,7 +167,7 @@ static int anetTcpGenericConnect(char *err, char *addr, int port, int flags)
     return s;
 }
 
-int anetTcpConnect(char *err, char *addr, int port)
+int anetTcpConnect(char *err, const char *addr, int port)
 {
     return anetTcpGenericConnect(err,addr,port,ANET_CONNECT_NONE);
 }
