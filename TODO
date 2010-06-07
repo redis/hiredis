@@ -1,2 +1,2 @@
 - add redisCommandVector()
-- add tests
+- add support for pipelining
