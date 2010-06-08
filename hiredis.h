@@ -69,6 +69,10 @@
 #define REDIS_REPLY_NIL 4
 #define REDIS_REPLY_STATUS 5
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* This is the reply object returned by redisCommand() */
 typedef struct redisReply {
     int type; /* REDIS_REPLY_* */
@@ -153,5 +157,9 @@ void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const 
 void *redisvCommand(redisContext *c, const char *format, va_list ap);
 void *redisCommand(redisContext *c, const char *format, ...);
 void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
