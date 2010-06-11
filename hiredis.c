@@ -129,6 +129,7 @@ static redisReply *redisReadIntegerReply(int fd) {
     if (buf == NULL) return redisIOError();
     r->type = REDIS_REPLY_INTEGER;
     r->integer = strtoll(buf,NULL,10);
+    sdsfree(buf);
     return r;
 }
 
