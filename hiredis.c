@@ -126,7 +126,10 @@ static redisReply *redisReadIntegerReply(int fd) {
     redisReply *r = malloc(sizeof(*r));
 
     if (r == NULL) redisOOM();
-    if (buf == NULL) return redisIOError();
+    if (buf == NULL) {
+        free(r);
+        return redisIOError();
+    }
     r->type = REDIS_REPLY_INTEGER;
     r->integer = strtoll(buf,NULL,10);
     sdsfree(buf);
