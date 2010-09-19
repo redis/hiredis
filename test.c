@@ -9,13 +9,13 @@
 /* The following line is our testing "framework" :) */
 #define test_cond(_c) if(_c) printf("PASSED\n"); else {printf("FAILED\n"); fails++;}
 
-long long usec(void) {
+static long long usec(void) {
     struct timeval tv;
     gettimeofday(&tv,NULL);
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
-void connect(int *fd) {
+static void __connect(int *fd) {
     redisReply *reply = redisConnect(fd, "127.0.0.1", 6379);
     if (reply != NULL) {
         printf("Connection error: %s", reply->reply);
@@ -28,7 +28,7 @@ int main(void) {
     int i, fails = 0;
     long long t1, t2;
     redisReply *reply;
-    connect(&fd);
+    __connect(&fd);
 
     /* test 0 */
     printf("#0 Returns I/O error when the connection is lost: ");
@@ -36,7 +36,7 @@ int main(void) {
     test_cond(reply->type == REDIS_REPLY_ERROR &&
         strcasecmp(reply->reply,"i/o error") == 0);
     freeReplyObject(reply);
-    connect(&fd); /* reconnect */
+    __connect(&fd); /* reconnect */
 
     /* test 1 */
     printf("#1 Is able to deliver commands: ");
