@@ -2,15 +2,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/time.h>
 
 #include "hiredis.h"
 
 /* The following line is our testing "framework" :) */
 #define test_cond(_c) if(_c) printf("PASSED\n"); else {printf("FAILED\n"); fails++;}
 
+long long usec(void) {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
+}
+
 int main(void) {
     int fd;
-    int fails = 0;
+    int i, fails = 0;
+    long long t1, t2;
     redisReply *reply;
 
     reply = redisConnect(&fd, "127.0.0.1", 6379);
@@ -91,15 +99,31 @@ int main(void) {
               !memcmp(reply->element[1]->reply,"foo",3))
     freeReplyObject(reply);
 
-    /* Clean DB 9 */
-    reply = redisCommand(fd,"FLUSHDB");
-    freeReplyObject(reply);
-
     if (fails == 0) {
         printf("ALL TESTS PASSED\n");
     } else {
         printf("*** %d TESTS FAILED ***\n", fails);
     }
+
+    printf("\nSpeed tests:\n");
+    for (i = 0; i < 500; i++)
+        freeReplyObject(redisCommand(fd,"LPUSH mylist foo"));
+
+    t1 = usec();
+    for (i = 0; i < 1000; i++)
+        freeReplyObject(redisCommand(fd,"PING"));
+    t2 = usec();
+    printf("(1000x PING: %.2fs)\n", (t2-t1)/1000000.0);
+
+    t1 = usec();
+    for (i = 0; i < 1000; i++)
+        freeReplyObject(redisCommand(fd,"LRANGE mylist 0 499"));
+    t2 = usec();
+    printf("(1000x LRANGE with 500 elements: %.2fs)\n", (t2-t1)/1000000.0);
+
+    /* Clean DB 9 */
+    reply = redisCommand(fd,"FLUSHDB");
+    freeReplyObject(reply);
 
     return 0;
 }
