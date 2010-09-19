@@ -99,6 +99,23 @@ int main(void) {
               !memcmp(reply->element[1]->reply,"foo",3))
     freeReplyObject(reply);
 
+    /* test 9 (m/e with multi bulk reply *before* other reply).
+     * specifically test ordering of reply items to parse. */
+    printf("#10 can handle nested multi bulk replies: ");
+    freeReplyObject(redisCommand(fd,"MULTI"));
+    freeReplyObject(redisCommand(fd,"LRANGE mylist 0 -1"));
+    freeReplyObject(redisCommand(fd,"PING"));
+    reply = (redisCommand(fd,"EXEC"));
+    test_cond(reply->type == REDIS_REPLY_ARRAY &&
+              reply->elements == 2 &&
+              reply->element[0]->type == REDIS_REPLY_ARRAY &&
+              reply->element[0]->elements == 2 &&
+              !memcmp(reply->element[0]->element[0]->reply,"bar",3) &&
+              !memcmp(reply->element[0]->element[1]->reply,"foo",3) &&
+              reply->element[1]->type == REDIS_REPLY_STRING &&
+              strcasecmp(reply->element[1]->reply,"pong") == 0);
+    freeReplyObject(reply);
+
     if (fails == 0) {
         printf("ALL TESTS PASSED\n");
     } else {

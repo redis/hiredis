@@ -35,6 +35,7 @@
 #define REDIS_REPLY_ARRAY 2
 #define REDIS_REPLY_INTEGER 3
 #define REDIS_REPLY_NIL 4
+#define REDIS_REPLY_STATUS 5
 
 #include "sds.h"
 
