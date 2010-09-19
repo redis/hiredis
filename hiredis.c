@@ -274,6 +274,7 @@ static int processItem(redisReader *r) {
 
 #define READ_BUFFER_SIZE 2048
 static redisReply *redisReadReply(int fd) {
+    redisReply *reply;
     redisReader r;
     int bytes;
 
@@ -319,9 +320,10 @@ static redisReply *redisReadReply(int fd) {
             if (processItem(&r) < 0)
                 break;
     }
+    reply = r.rlist[0];
     free(r.buf);
     free(r.rlist);
-    return r.rlist[0];
+    return reply;
 }
 
 /* Helper function for redisCommand(). It's used to append the next argument
