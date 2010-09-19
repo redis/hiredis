@@ -43,6 +43,7 @@ int main(void) {
     reply = redisCommand(fd,"PING");
     test_cond(reply->type == REDIS_REPLY_STRING &&
         strcasecmp(reply->reply,"pong") == 0)
+    freeReplyObject(reply);
 
     /* Switch to DB 9 for testing, now that we know we can chat. */
     reply = redisCommand(fd,"SELECT 9");
