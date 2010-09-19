@@ -73,7 +73,7 @@ redisReply *redisConnect(int *fd, const char *ip, int port) {
 
 /* Create a reply object */
 static redisReply *createReplyObject(int type, sds reply) {
-    redisReply *r = malloc(sizeof(*r));
+    redisReply *r = calloc(sizeof(*r),1);
 
     if (!r) redisOOM();
     r->type = type;
@@ -94,7 +94,8 @@ void freeReplyObject(redisReply *r) {
         free(r->element);
         break;
     default:
-        sdsfree(r->reply);
+        if (r->reply != NULL)
+            sdsfree(r->reply);
         break;
     }
     free(r);
@@ -303,8 +304,13 @@ static redisReply *redisReadReply(int fd) {
         }
 
         /* read from socket into buffer */
-        if ((bytes = read(fd,r.buf+r.avail,READ_BUFFER_SIZE)) <= 0)
+        if ((bytes = read(fd,r.buf+r.avail,READ_BUFFER_SIZE)) <= 0) {
+            /* rlist[0] is the "root" reply object */
+            freeReplyObject(r.rlist[0]);
+            free(r.buf);
+            free(r.rlist);
             return redisIOError();
+        }
         r.avail += bytes;
         r.buf[r.avail] = '\0';
 

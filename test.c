@@ -15,20 +15,31 @@ long long usec(void) {
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
+void connect(int *fd) {
+    redisReply *reply = redisConnect(fd, "127.0.0.1", 6379);
+    if (reply != NULL) {
+        printf("Connection error: %s", reply->reply);
+        exit(1);
+    }
+}
+
 int main(void) {
     int fd;
     int i, fails = 0;
     long long t1, t2;
     redisReply *reply;
+    connect(&fd);
 
-    reply = redisConnect(&fd, "127.0.0.1", 6379);
-    if (reply != NULL) {
-        printf("Connection error: %s", reply->reply);
-        exit(1);
-    }
+    /* test 0 */
+    printf("#0 Returns I/O error when the connection is lost: ");
+    reply = redisCommand(fd,"QUIT");
+    test_cond(reply->type == REDIS_REPLY_ERROR &&
+        strcasecmp(reply->reply,"i/o error") == 0);
+    freeReplyObject(reply);
+    connect(&fd); /* reconnect */
 
     /* test 1 */
-    printf("\n#1 Is able to deliver commands: ");
+    printf("#1 Is able to deliver commands: ");
     reply = redisCommand(fd,"PING");
     test_cond(reply->type == REDIS_REPLY_STRING &&
         strcasecmp(reply->reply,"pong") == 0)
