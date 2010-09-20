@@ -33,7 +33,6 @@
 #include "sds.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -155,8 +154,8 @@ sds sdscpy(sds s, char *t) {
     return sdscpylen(s, t, strlen(t));
 }
 
-sds sdscatprintf(sds s, const char *fmt, ...) {
-    va_list ap;
+sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
+    va_list cpy;
     char *buf, *t;
     size_t buflen = 16;
 
@@ -168,9 +167,8 @@ sds sdscatprintf(sds s, const char *fmt, ...) {
         if (buf == NULL) return NULL;
 #endif
         buf[buflen-2] = '\0';
-        va_start(ap, fmt);
-        vsnprintf(buf, buflen, fmt, ap);
-        va_end(ap);
+        va_copy(cpy,ap);
+        vsnprintf(buf, buflen, fmt, cpy);
         if (buf[buflen-2] != '\0') {
             free(buf);
             buflen *= 2;
@@ -180,6 +178,15 @@ sds sdscatprintf(sds s, const char *fmt, ...) {
     }
     t = sdscat(s, buf);
     free(buf);
+    return t;
+}
+
+sds sdscatprintf(sds s, const char *fmt, ...) {
+    va_list ap;
+    char *t;
+    va_start(ap, fmt);
+    t = sdscatvprintf(s,fmt,ap);
+    va_end(ap);
     return t;
 }
 
@@ -200,7 +207,7 @@ sds sdstrim(sds s, const char *cset) {
     return s;
 }
 
-sds sdsrange(sds s, long start, long end) {
+sds sdsrange(sds s, int start, int end) {
     struct sdshdr *sh = (void*) (s-(sizeof(struct sdshdr)));
     size_t newlen, len = sdslen(s);
 
@@ -355,4 +362,118 @@ sds sdsfromlonglong(long long value) {
     if (value < 0) *p-- = '-';
     p++;
     return sdsnewlen(p,32-(p-buf));
+}
+
+sds sdscatrepr(sds s, char *p, size_t len) {
+    s = sdscatlen(s,"\"",1);
+    while(len--) {
+        switch(*p) {
+        case '\\':
+        case '"':
+            s = sdscatprintf(s,"\\%c",*p);
+            break;
+        case '\n': s = sdscatlen(s,"\\n",1); break;
+        case '\r': s = sdscatlen(s,"\\r",1); break;
+        case '\t': s = sdscatlen(s,"\\t",1); break;
+        case '\a': s = sdscatlen(s,"\\a",1); break;
+        case '\b': s = sdscatlen(s,"\\b",1); break;
+        default:
+            if (isprint(*p))
+                s = sdscatprintf(s,"%c",*p);
+            else
+                s = sdscatprintf(s,"\\x%02x",(unsigned char)*p);
+            break;
+        }
+        p++;
+    }
+    return sdscatlen(s,"\"",1);
+}
+
+/* Split a line into arguments, where every argument can be in the
+ * following programming-language REPL-alike form:
+ *
+ * foo bar "newline are supported\n" and "\xff\x00otherstuff"
+ *
+ * The number of arguments is stored into *argc, and an array
+ * of sds is returned. The caller should sdsfree() all the returned
+ * strings and finally free() the array itself.
+ *
+ * Note that sdscatrepr() is able to convert back a string into
+ * a quoted string in the same format sdssplitargs() is able to parse.
+ */
+sds *sdssplitargs(char *line, int *argc) {
+    char *p = line;
+    char *current = NULL;
+    char **vector = NULL;
+
+    *argc = 0;
+    while(1) {
+        /* skip blanks */
+        while(*p && isspace(*p)) p++;
+        if (*p) {
+            /* get a token */
+            int inq=0; /* set to 1 if we are in "quotes" */
+            int done=0;
+
+            if (current == NULL) current = sdsempty();
+            while(!done) {
+                if (inq) {
+                    if (*p == '\\' && *(p+1)) {
+                        char c;
+
+                        p++;
+                        switch(*p) {
+                        case 'n': c = '\n'; break;
+                        case 'r': c = '\r'; break;
+                        case 't': c = '\t'; break;
+                        case 'b': c = '\b'; break;
+                        case 'a': c = '\a'; break;
+                        default: c = *p; break;
+                        }
+                        current = sdscatlen(current,&c,1);
+                    } else if (*p == '"') {
+                        /* closing quote must be followed by a space */
+                        if (*(p+1) && !isspace(*(p+1))) goto err;
+                        done=1;
+                    } else if (!*p) {
+                        /* unterminated quotes */
+                        goto err;
+                    } else {
+                        current = sdscatlen(current,p,1);
+                    }
+                } else {
+                    switch(*p) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                    case '\0':
+                        done=1;
+                        break;
+                    case '"':
+                        inq=1;
+                        break;
+                    default:
+                        current = sdscatlen(current,p,1);
+                        break;
+                    }
+                }
+                if (*p) p++;
+            }
+            /* add the token to the vector */
+            vector = realloc(vector,((*argc)+1)*sizeof(char*));
+            vector[*argc] = current;
+            (*argc)++;
+            current = NULL;
+        } else {
+            return vector;
+        }
+    }
+
+err:
+    while((*argc)--)
+        sdsfree(vector[*argc]);
+    free(vector);
+    if (current) sdsfree(current);
+    return NULL;
 }
