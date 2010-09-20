@@ -39,6 +39,7 @@
 #include "sds.h"
 
 typedef struct redisReader {
+    struct redisReplyObjectFunctions *fn;
     void *reply; /* holds temporary reply */
 
     sds buf; /* read buffer */
@@ -57,6 +58,15 @@ static void *createArrayObject(redisReadTask *task, int elements);
 static void *createIntegerObject(redisReadTask *task, long long value);
 static void *createNilObject(redisReadTask *task);
 static void redisSetReplyReaderError(redisReader *r, void *obj);
+
+/* Default set of functions to build the reply. */
+static redisReplyFunctions defaultFunctions = {
+    createStringObject,
+    createArrayObject,
+    createIntegerObject,
+    createNilObject,
+    freeReplyObject
+};
 
 /* We simply abort on out of memory */
 static void redisOOM(void) {
@@ -89,7 +99,8 @@ static redisReply *createReplyObject(int type, sds reply) {
 }
 
 /* Free a reply object */
-void freeReplyObject(redisReply *r) {
+void freeReplyObject(void *reply) {
+    redisReply *r = reply;
     size_t j;
 
     switch(r->type) {
@@ -116,7 +127,12 @@ static void *createErrorObject(redisReader *context, const char *fmt, ...) {
     va_start(ap,fmt);
     err = sdscatvprintf(sdsempty(),fmt,ap);
     va_end(ap);
-    obj = createStringObject(&t,err,sdslen(err));
+
+    /* Use the context of the reader if it is provided. */
+    if (context)
+        obj = context->fn->createString(&t,err,sdslen(err));
+    else
+        obj = createStringObject(&t,err,sdslen(err));
     sdsfree(err);
     return obj;
 }
@@ -205,9 +221,9 @@ static int processLineItem(redisReader *r) {
 
     if ((p = readLine(r,&len)) != NULL) {
         if (cur->type == REDIS_REPLY_INTEGER) {
-            obj = createIntegerObject(cur,strtoll(p,NULL,10));
+            obj = r->fn->createInteger(cur,strtoll(p,NULL,10));
         } else {
-            obj = createStringObject(cur,p,len);
+            obj = r->fn->createString(cur,p,len);
         }
 
         /* If there is no root yet, register this object as root. */
@@ -235,12 +251,12 @@ static int processBulkItem(redisReader *r) {
 
         if (len < 0) {
             /* The nil object can always be created. */
-            obj = createNilObject(cur);
+            obj = r->fn->createNil(cur);
         } else {
             /* Only continue when the buffer contains the entire bulk item. */
             bytelen += len+2; /* include \r\n */
             if (r->pos+bytelen <= sdslen(r->buf)) {
-                obj = createStringObject(cur,s+2,len);
+                obj = r->fn->createString(cur,s+2,len);
             }
         }
 
@@ -265,9 +281,9 @@ static int processMultiBulkItem(redisReader *r) {
     if ((p = readLine(r,NULL)) != NULL) {
         elements = strtol(p,NULL,10);
         if (elements == -1) {
-            obj = createNilObject(cur);
+            obj = r->fn->createNil(cur);
         } else {
-            obj = createArrayObject(cur,elements);
+            obj = r->fn->createArray(cur,elements);
 
             /* Modify read list when there are more than 0 elements. */
             if (elements > 0) {
@@ -358,7 +374,7 @@ static int processItem(redisReader *r) {
 
 #define READ_BUFFER_SIZE 2048
 static redisReply *redisReadReply(int fd) {
-    void *reader = redisCreateReplyReader();
+    void *reader = redisCreateReplyReader(&defaultFunctions);
     redisReply *reply;
     char buf[1024];
     int nread;
@@ -376,17 +392,27 @@ static redisReply *redisReadReply(int fd) {
     return reply;
 }
 
-void *redisCreateReplyReader() {
+void *redisCreateReplyReader(redisReplyFunctions *fn) {
     redisReader *r = calloc(sizeof(redisReader),1);
+    r->fn = fn == NULL ? &defaultFunctions : fn;
     r->buf = sdsempty();
     r->rlist = malloc(sizeof(redisReadTask)*1);
     return r;
 }
 
+/* External libraries wrapping hiredis might need access to the temporary
+ * variable while the reply is built up. When the reader contains an
+ * object in between receiving some bytes to parse, this object might
+ * otherwise be free'd by garbage collection. */
+void *redisGetReplyObjectFromReplyReader(void *reader) {
+    redisReader *r = reader;
+    return r->reply;
+}
+
 void redisFreeReplyReader(void *reader) {
     redisReader *r = reader;
     if (r->reply != NULL)
-        freeReplyObject(r->reply);
+        r->fn->freeObject(r->reply);
     if (r->buf != NULL)
         sdsfree(r->buf);
     if (r->rlist != NULL)
@@ -403,7 +429,7 @@ int redisIsReplyReaderEmpty(void *reader) {
 
 static void redisSetReplyReaderError(redisReader *r, void *obj) {
     if (r->reply != NULL)
-        freeReplyObject(r->reply);
+        r->fn->freeObject(r->reply);
 
     /* Clear remaining buffer when we see a protocol error. */
     if (r->buf != NULL) {
@@ -456,7 +482,6 @@ void *redisFeedReplyReader(void *reader, char *buf, int len) {
     /* Emit a reply when there is one. */
     if (r->rpos == r->rlen) {
         void *reply = r->reply;
-        assert(reply != NULL);
         r->reply = NULL;
 
         /* Destroy the buffer when it is empty and is quite large. */

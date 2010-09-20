@@ -124,7 +124,7 @@ int main(void) {
     freeReplyObject(reply);
 
     test("Error handling in reply parser: ");
-    reader = redisCreateReplyReader();
+    reader = redisCreateReplyReader(NULL);
     reply = redisFeedReplyReader(reader,(char*)"@foo\r\n",6);
     test_cond(reply->type == REDIS_PROTOCOL_ERROR &&
               strcasecmp(reply->reply,"protocol error, got \"@\" as reply type byte") == 0);
@@ -134,7 +134,7 @@ int main(void) {
     /* when the reply already contains multiple items, they must be free'd
      * on an error. valgrind will bark when this doesn't happen. */
     test("Memory cleanup in reply parser: ");
-    reader = redisCreateReplyReader();
+    reader = redisCreateReplyReader(NULL);
     redisFeedReplyReader(reader,(char*)"*2\r\n",4);
     redisFeedReplyReader(reader,(char*)"$5\r\nhello\r\n",11);
     reply = redisFeedReplyReader(reader,(char*)"@foo\r\n",6);
