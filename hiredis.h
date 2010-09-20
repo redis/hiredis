@@ -49,6 +49,13 @@ typedef struct redisReply {
     struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
 } redisReply;
 
+
+typedef struct redisReadTask {
+    int type;
+    void *parent; /* optional pointer to parent object */
+    int idx; /* index in parent (array) object */
+} redisReadTask;
+
 redisReply *redisConnect(int *fd, const char *ip, int port);
 void freeReplyObject(redisReply *r);
 redisReply *redisCommand(int fd, const char *format, ...);
