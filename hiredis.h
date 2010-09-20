@@ -51,5 +51,8 @@ typedef struct redisReply {
 redisReply *redisConnect(int *fd, const char *ip, int port);
 void freeReplyObject(redisReply *r);
 redisReply *redisCommand(int fd, const char *format, ...);
+void *redisCreateReplyReader();
+void redisFreeReplyReader(void *ptr);
+void *redisFeedReplyReader(void *reader, char *buf, int len);
 
 #endif
