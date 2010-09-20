@@ -326,6 +326,15 @@ void redisFreeReplyReader(void *reader) {
     free(r);
 }
 
+int redisIsReplyReaderEmpty(void *reader) {
+    redisReader *r = reader;
+    if (r->buf != NULL && sdslen(r->buf) > 0)
+        return 0;
+    if (r->rlist != NULL && r->rpos < r->rlen)
+        return 0;
+    return 1;
+}
+
 static void redisSetReplyReaderError(redisReader *r, redisReply *error) {
     /* Clear remaining buffer when we see a protocol error. */
     if (r->buf != NULL) {

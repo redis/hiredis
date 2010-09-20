@@ -54,6 +54,7 @@ void freeReplyObject(redisReply *r);
 redisReply *redisCommand(int fd, const char *format, ...);
 void *redisCreateReplyReader();
 void redisFreeReplyReader(void *ptr);
+int redisIsReplyReaderEmpty(void *ptr);
 void *redisFeedReplyReader(void *reader, char *buf, int len);
 
 #endif
