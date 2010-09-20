@@ -48,6 +48,8 @@ typedef struct redisReader {
 
 static redisReply *redisReadReply(int fd);
 static redisReply *createReplyObject(int type, sds reply);
+static redisReply *createErrorObject(const char *fmt, ...);
+static void redisSetReplyReaderError(redisReader *r, redisReply *error);
 
 /* We simply abort on out of memory */
 static void redisOOM(void) {
@@ -64,7 +66,7 @@ redisReply *redisConnect(int *fd, const char *ip, int port) {
 
     *fd = anetTcpConnect(err,ip,port);
     if (*fd == ANET_ERR)
-        return createReplyObject(REDIS_REPLY_ERROR,sdsnew(err));
+        return createErrorObject(err);
     anetTcpNoDelay(NULL,*fd);
     return NULL;
 }
@@ -99,8 +101,19 @@ void freeReplyObject(redisReply *r) {
     free(r);
 }
 
+static redisReply *createErrorObject(const char *fmt, ...) {
+    va_list ap;
+    sds err;
+    redisReply *r;
+    va_start(ap,fmt);
+    err = sdscatvprintf(sdsempty(),fmt,ap);
+    va_end(ap);
+    r = createReplyObject(REDIS_PROTOCOL_ERROR,err);
+    return r;
+}
+
 static redisReply *redisIOError(void) {
-    return createReplyObject(REDIS_REPLY_ERROR,sdsnew("I/O error"));
+    return createErrorObject("I/O error");
 }
 
 static char *readBytes(redisReader *r, unsigned int bytes) {
@@ -224,6 +237,7 @@ static int processMultiBulkItem(redisReader *r) {
 static int processItem(redisReader *r) {
     redisReply *cur = r->rlist[r->rpos];
     char *p;
+    sds byte;
 
     /* check if we need to read type */
     if (cur->type < 0) {
@@ -245,8 +259,11 @@ static int processItem(redisReader *r) {
                 cur->type = REDIS_REPLY_ARRAY;
                 break;
             default:
-                printf("protocol error, got '%c' as reply type byte\n", p[0]);
-                exit(1);
+                byte = sdscatrepr(sdsempty(),p,1);
+                redisSetReplyReaderError(r,createErrorObject(
+                    "protocol error, got %s as reply type byte", byte));
+                sdsfree(byte);
+                return -1;
             }
         } else {
             /* could not consume 1 byte */
@@ -265,8 +282,9 @@ static int processItem(redisReader *r) {
     case REDIS_REPLY_ARRAY:
         return processMultiBulkItem(r);
     default:
-        printf("unknown item type: %d\n", cur->type);
-        exit(1);
+        redisSetReplyReaderError(r,createErrorObject(
+            "unknown item type '%d'", cur->type));
+        return -1;
     }
 }
 
@@ -306,6 +324,20 @@ void redisFreeReplyReader(void *reader) {
         free(r->rlist);
     }
     free(r);
+}
+
+static void redisSetReplyReaderError(redisReader *r, redisReply *error) {
+    /* Clear remaining buffer when we see a protocol error. */
+    if (r->buf != NULL) {
+        sdsfree(r->buf);
+        r->buf = sdsempty();
+        r->pos = 0;
+    }
+    /* Clear currently allocated objects. */
+    if (r->rlist[0] != NULL)
+        freeReplyObject(r->rlist[0]);
+    r->rlen = r->rpos = 1;
+    r->rlist[0] = error;
 }
 
 void *redisFeedReplyReader(void *reader, char *buf, int len) {
@@ -357,6 +389,7 @@ void *redisFeedReplyReader(void *reader, char *buf, int len) {
 
         /* Free list of items to process. */
         free(r->rlist);
+        r->rlist = NULL;
         r->rlen = r->rpos = 0;
         return reply;
     } else {

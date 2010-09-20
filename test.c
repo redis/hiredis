@@ -29,11 +29,12 @@ int main(void) {
     int i, tests = 0, fails = 0;
     long long t1, t2;
     redisReply *reply;
+    void *reader;
     __connect(&fd);
 
     test("Returns I/O error when the connection is lost: ");
     reply = redisCommand(fd,"QUIT");
-    test_cond(reply->type == REDIS_REPLY_ERROR &&
+    test_cond(reply->type == REDIS_PROTOCOL_ERROR &&
         strcasecmp(reply->reply,"i/o error") == 0);
     freeReplyObject(reply);
     __connect(&fd); /* reconnect */
@@ -121,6 +122,26 @@ int main(void) {
               reply->element[1]->type == REDIS_REPLY_STRING &&
               strcasecmp(reply->element[1]->reply,"pong") == 0);
     freeReplyObject(reply);
+
+    test("Error handling in reply parser: ");
+    reader = redisCreateReplyReader();
+    reply = redisFeedReplyReader(reader,(char*)"@foo\r\n",6);
+    test_cond(reply->type == REDIS_PROTOCOL_ERROR &&
+              strcasecmp(reply->reply,"protocol error, got \"@\" as reply type byte") == 0);
+    freeReplyObject(reply);
+    redisFreeReplyReader(reader);
+
+    /* when the reply already contains multiple items, they must be free'd
+     * on an error. valgrind will bark when this doesn't happen. */
+    test("Memory cleanup in reply parser: ");
+    reader = redisCreateReplyReader();
+    redisFeedReplyReader(reader,(char*)"*2\r\n",4);
+    redisFeedReplyReader(reader,(char*)"$5\r\nhello\r\n",11);
+    reply = redisFeedReplyReader(reader,(char*)"@foo\r\n",6);
+    test_cond(reply->type == REDIS_PROTOCOL_ERROR &&
+              strcasecmp(reply->reply,"protocol error, got \"@\" as reply type byte") == 0);
+    freeReplyObject(reply);
+    redisFreeReplyReader(reader);
 
     test("Throughput:\n");
     for (i = 0; i < 500; i++)
