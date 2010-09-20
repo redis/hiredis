@@ -51,8 +51,12 @@ typedef struct redisReader {
 
 static redisReply *redisReadReply(int fd);
 static redisReply *createReplyObject(int type, sds reply);
-static redisReply *createErrorObject(const char *fmt, ...);
-static void redisSetReplyReaderError(redisReader *r, redisReply *error);
+static void *createErrorObject(redisReader *context, const char *fmt, ...);
+static void *createStringObject(redisReadTask *task, char *str, size_t len);
+static void *createArrayObject(redisReadTask *task, int elements);
+static void *createIntegerObject(redisReadTask *task, long long value);
+static void *createNilObject(redisReadTask *task);
+static void redisSetReplyReaderError(redisReader *r, void *obj);
 
 /* We simply abort on out of memory */
 static void redisOOM(void) {
@@ -69,7 +73,7 @@ redisReply *redisConnect(int *fd, const char *ip, int port) {
 
     *fd = anetTcpConnect(err,ip,port);
     if (*fd == ANET_ERR)
-        return createErrorObject(err);
+        return (redisReply*)createErrorObject(NULL,err);
     anetTcpNoDelay(NULL,*fd);
     return NULL;
 }
@@ -104,24 +108,23 @@ void freeReplyObject(redisReply *r) {
     free(r);
 }
 
-static redisReply *createErrorObject(const char *fmt, ...) {
+static void *createErrorObject(redisReader *context, const char *fmt, ...) {
     va_list ap;
     sds err;
-    redisReply *r;
+    void *obj;
+    redisReadTask t = { REDIS_PROTOCOL_ERROR, NULL, -1 };
     va_start(ap,fmt);
     err = sdscatvprintf(sdsempty(),fmt,ap);
     va_end(ap);
-    r = createReplyObject(REDIS_PROTOCOL_ERROR,err);
-    return r;
-}
-
-static redisReply *redisIOError(void) {
-    return createErrorObject("I/O error");
+    obj = createStringObject(&t,err,sdslen(err));
+    sdsfree(err);
+    return obj;
 }
 
 static void *createStringObject(redisReadTask *task, char *str, size_t len) {
     redisReply *r = createReplyObject(task->type,sdsnewlen(str,len));
-    assert(task->type == REDIS_REPLY_ERROR ||
+    assert(task->type == REDIS_PROTOCOL_ERROR ||
+           task->type == REDIS_REPLY_ERROR ||
            task->type == REDIS_REPLY_STATUS ||
            task->type == REDIS_REPLY_STRING);
 
@@ -325,7 +328,7 @@ static int processItem(redisReader *r) {
                 break;
             default:
                 byte = sdscatrepr(sdsempty(),p,1);
-                redisSetReplyReaderError(r,createErrorObject(
+                redisSetReplyReaderError(r,createErrorObject(r,
                     "protocol error, got %s as reply type byte", byte));
                 sdsfree(byte);
                 return -1;
@@ -347,7 +350,7 @@ static int processItem(redisReader *r) {
     case REDIS_REPLY_ARRAY:
         return processMultiBulkItem(r);
     default:
-        redisSetReplyReaderError(r,createErrorObject(
+        redisSetReplyReaderError(r,createErrorObject(r,
             "unknown item type '%d'", cur->type));
         return -1;
     }
@@ -362,7 +365,7 @@ static redisReply *redisReadReply(int fd) {
 
     do {
         if ((nread = read(fd,buf,sizeof(buf))) <= 0) {
-            reply = redisIOError();
+            reply = createErrorObject(reader,"I/O error");
             break;
         } else {
             reply = redisFeedReplyReader(reader,buf,nread);
@@ -398,7 +401,7 @@ int redisIsReplyReaderEmpty(void *reader) {
     return 1;
 }
 
-static void redisSetReplyReaderError(redisReader *r, redisReply *error) {
+static void redisSetReplyReaderError(redisReader *r, void *obj) {
     if (r->reply != NULL)
         freeReplyObject(r->reply);
 
@@ -409,7 +412,7 @@ static void redisSetReplyReaderError(redisReader *r, redisReply *error) {
         r->pos = 0;
     }
     r->rlen = r->rpos = 0;
-    r->reply = error;
+    r->reply = obj;
 }
 
 void *redisFeedReplyReader(void *reader, char *buf, int len) {
