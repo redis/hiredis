@@ -12,16 +12,22 @@ ifeq ($(uname_S),SunOS)
   CCLINK?= -ldl -lnsl -lsocket -lm -lpthread
   DYLIBNAME?=libhiredis.so
   DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,${DYLIBNAME} -o ${DYLIBNAME} ${OBJ}
+  STLIBNAME?=libhiredis.a
+  STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
 else ifeq ($(uname_S),Darwin)
   CFLAGS?= -std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?= -lm -pthread
   DYLIBNAME?=libhiredis.dylib
   DYLIB_MAKE_CMD?=libtool -dynamic -o ${DYLIBNAME} -lm ${DEBUG} - ${OBJ}
+  STLIBNAME?=libhiredis.a
+  STLIB_MAKE_CMD?=libtool -static -o ${STLIBNAME} - ${OBJ}
 else
   CFLAGS?= -std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?= -lm -pthread
   DYLIBNAME?=libhiredis.so
   DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,${DYLIBNAME} -o ${DYLIBNAME} ${OBJ}
+  STLIBNAME?=libhiredis.a
+  STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
 endif
 CCOPT= $(CFLAGS) $(CCLINK) $(ARCH) $(PROF)
 DEBUG?= -g -ggdb 
@@ -39,6 +45,12 @@ hiredis.o: hiredis.c hiredis.h sds.h anet.h
 ${DYLIBNAME}: ${OBJ}
 	${DYLIB_MAKE_CMD}
 
+${STLIBNAME}: ${OBJ}
+	${STLIB_MAKE_CMD}
+
+dynamic: ${DYLIBNAME}
+static: ${STLIBNAME}
+
 # Binaries:
 hiredis-%: %.o ${DYLIBNAME}
 	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -l hiredis -Wl,-rpath,. $<
@@ -50,7 +62,7 @@ test: hiredis-test
 	$(CC) -c $(CFLAGS) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
-	rm -rf ${DYLIBNAME} $(BINS) *.o *.gcda *.gcno *.gcov
+	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
