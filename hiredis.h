@@ -66,10 +66,10 @@ typedef struct redisReplyObjectFunctions {
 redisReply *redisConnect(int *fd, const char *ip, int port);
 void freeReplyObject(void *reply);
 redisReply *redisCommand(int fd, const char *format, ...);
-void *redisCreateReplyReader(redisReplyFunctions *fn);
-void *redisGetReplyObjectFromReplyReader(void *reader);
-void redisFreeReplyReader(void *ptr);
-int redisIsReplyReaderEmpty(void *ptr);
-void *redisFeedReplyReader(void *reader, char *buf, int len);
+void *redisReplyReaderCreate(redisReplyFunctions *fn);
+void *redisReplyReaderGetObject(void *reader);
+void redisReplyReaderFree(void *ptr);
+void redisReplyReaderFeed(void *reader, char *buf, int len);
+void *redisReplyReaderGetReply(void *reader);
 
 #endif

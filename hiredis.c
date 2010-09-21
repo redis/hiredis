@@ -374,7 +374,7 @@ static int processItem(redisReader *r) {
 
 #define READ_BUFFER_SIZE 2048
 static redisReply *redisReadReply(int fd) {
-    void *reader = redisCreateReplyReader(&defaultFunctions);
+    void *reader = redisReplyReaderCreate(&defaultFunctions);
     redisReply *reply;
     char buf[1024];
     int nread;
@@ -384,15 +384,16 @@ static redisReply *redisReadReply(int fd) {
             reply = createErrorObject(reader,"I/O error");
             break;
         } else {
-            reply = redisFeedReplyReader(reader,buf,nread);
+            redisReplyReaderFeed(reader,buf,nread);
+            reply = redisReplyReaderGetReply(reader);
         }
     } while (reply == NULL);
 
-    redisFreeReplyReader(reader);
+    redisReplyReaderFree(reader);
     return reply;
 }
 
-void *redisCreateReplyReader(redisReplyFunctions *fn) {
+void *redisReplyReaderCreate(redisReplyFunctions *fn) {
     redisReader *r = calloc(sizeof(redisReader),1);
     r->fn = fn == NULL ? &defaultFunctions : fn;
     r->buf = sdsempty();
@@ -404,12 +405,12 @@ void *redisCreateReplyReader(redisReplyFunctions *fn) {
  * variable while the reply is built up. When the reader contains an
  * object in between receiving some bytes to parse, this object might
  * otherwise be free'd by garbage collection. */
-void *redisGetReplyObjectFromReplyReader(void *reader) {
+void *redisReplyReaderGetObject(void *reader) {
     redisReader *r = reader;
     return r->reply;
 }
 
-void redisFreeReplyReader(void *reader) {
+void redisReplyReaderFree(void *reader) {
     redisReader *r = reader;
     if (r->reply != NULL)
         r->fn->freeObject(r->reply);
@@ -418,13 +419,6 @@ void redisFreeReplyReader(void *reader) {
     if (r->rlist != NULL)
         free(r->rlist);
     free(r);
-}
-
-int redisIsReplyReaderEmpty(void *reader) {
-    redisReader *r = reader;
-    if ((r->buf != NULL && sdslen(r->buf) > 0) ||
-        (r->rpos < r->rlen)) return 0;
-    return 1;
 }
 
 static void redisSetReplyReaderError(redisReader *r, void *obj) {
@@ -441,16 +435,20 @@ static void redisSetReplyReaderError(redisReader *r, void *obj) {
     r->reply = obj;
 }
 
-void *redisFeedReplyReader(void *reader, char *buf, int len) {
+void redisReplyReaderFeed(void *reader, char *buf, int len) {
     redisReader *r = reader;
-
-    /* Check if we are able to do *something*. */
-    if (sdslen(r->buf) == 0 && (buf == NULL || len <= 0))
-        return NULL;
 
     /* Copy the provided buffer. */
     if (buf != NULL && len >= 1)
         r->buf = sdscatlen(r->buf,buf,len);
+}
+
+void *redisReplyReaderGetReply(void *reader) {
+    redisReader *r = reader;
+
+    /* When the buffer is empty, there will never be a reply. */
+    if (sdslen(r->buf) == 0)
+        return NULL;
 
     /* Create first item to process when the item list is empty. */
     if (r->rlen == 0) {
