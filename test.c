@@ -16,16 +16,16 @@ static long long usec(void) {
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
-static void __connect(int *fd) {
-    redisReply *reply = redisConnect(fd, "127.0.0.1", 6379);
-    if (reply != NULL) {
-        printf("Connection error: %s", reply->reply);
+static void __connect(redisContext **c) {
+    *c = redisConnect((char*)"127.0.0.1", 6379, NULL);
+    if ((*c)->error != NULL) {
+        printf("Connection error: %s", ((redisReply*)(*c)->error)->reply);
         exit(1);
     }
 }
 
 int main(void) {
-    int fd;
+    redisContext *fd;
     int i, tests = 0, fails = 0;
     long long t1, t2;
     redisReply *reply;
@@ -34,8 +34,8 @@ int main(void) {
 
     test("Returns I/O error when the connection is lost: ");
     reply = redisCommand(fd,"QUIT");
-    test_cond(reply->type == REDIS_PROTOCOL_ERROR &&
-        strcasecmp(reply->reply,"i/o error") == 0);
+    test_cond(reply->type == REDIS_ERROR &&
+        strcmp(reply->reply,"Server closed the connection") == 0);
     freeReplyObject(reply);
     __connect(&fd); /* reconnect */
 
@@ -127,7 +127,7 @@ int main(void) {
     reader = redisReplyReaderCreate(NULL);
     redisReplyReaderFeed(reader,(char*)"@foo\r\n",6);
     reply = redisReplyReaderGetReply(reader);
-    test_cond(reply->type == REDIS_PROTOCOL_ERROR &&
+    test_cond(reply->type == REDIS_ERROR &&
               strcasecmp(reply->reply,"protocol error, got \"@\" as reply type byte") == 0);
     freeReplyObject(reply);
     redisReplyReaderFree(reader);
@@ -140,7 +140,7 @@ int main(void) {
     redisReplyReaderFeed(reader,(char*)"$5\r\nhello\r\n",11);
     redisReplyReaderFeed(reader,(char*)"@foo\r\n",6);
     reply = redisReplyReaderGetReply(reader);
-    test_cond(reply->type == REDIS_PROTOCOL_ERROR &&
+    test_cond(reply->type == REDIS_ERROR &&
               strcasecmp(reply->reply,"protocol error, got \"@\" as reply type byte") == 0);
     freeReplyObject(reply);
     redisReplyReaderFree(reader);

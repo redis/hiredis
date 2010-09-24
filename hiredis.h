@@ -30,13 +30,20 @@
 #ifndef __HIREDIS_H
 #define __HIREDIS_H
 
+#define HIREDIS_ERR -1
+#define HIREDIS_OK 0
+
+/* Connection type can be blocking or non-blocking and is set in the
+ * least significant bit of the flags field in redisContext. */
+#define HIREDIS_BLOCK 0x1
+
+#define REDIS_ERROR -1
 #define REDIS_REPLY_ERROR 0
 #define REDIS_REPLY_STRING 1
 #define REDIS_REPLY_ARRAY 2
 #define REDIS_REPLY_INTEGER 3
 #define REDIS_REPLY_NIL 4
 #define REDIS_REPLY_STATUS 5
-#define REDIS_PROTOCOL_ERROR 6
 
 #include "sds.h"
 
@@ -56,6 +63,7 @@ typedef struct redisReadTask {
 } redisReadTask;
 
 typedef struct redisReplyObjectFunctions {
+    void *(*createError)(const char*, size_t);
     void *(*createString)(redisReadTask*, char*, size_t);
     void *(*createArray)(redisReadTask*, int);
     void *(*createInteger)(redisReadTask*, long long);
@@ -63,13 +71,29 @@ typedef struct redisReplyObjectFunctions {
     void (*freeObject)(void*);
 } redisReplyFunctions;
 
-redisReply *redisConnect(int *fd, const char *ip, int port);
+/* Context for a connection to Redis */
+typedef struct redisContext {
+    int fd;
+    int flags;
+    char *error; /* error object is set when in erronous state */
+    void *reader; /* reply reader */
+    sds obuf; /* output buffer */
+    redisReplyFunctions *fn; /* functions for reply buildup */
+} redisContext;
+
 void freeReplyObject(void *reply);
-redisReply *redisCommand(int fd, const char *format, ...);
 void *redisReplyReaderCreate(redisReplyFunctions *fn);
 void *redisReplyReaderGetObject(void *reader);
 void redisReplyReaderFree(void *ptr);
 void redisReplyReaderFeed(void *reader, char *buf, int len);
 void *redisReplyReaderGetReply(void *reader);
+
+redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn);
+redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn);
+int redisBufferRead(redisContext *c);
+int redisBufferWrite(redisContext *c, int *done);
+void *redisGetReply(redisContext *c);
+
+void *redisCommand(redisContext *c, const char *format, ...);
 
 #endif

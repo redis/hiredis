@@ -5,13 +5,13 @@
 #include "hiredis.h"
 
 int main(void) {
-    int fd;
+    redisContext *fd;
     unsigned int j;
     redisReply *reply;
 
-    reply = redisConnect(&fd, "127.0.0.1", 6379);
-    if (reply != NULL) {
-        printf("Connection error: %s", reply->reply);
+    fd = redisConnect((char*)"127.0.0.1", 6379, NULL);
+    if (fd->error != NULL) {
+        printf("Connection error: %s", ((redisReply*)fd->error)->reply);
         exit(1);
     }
 
