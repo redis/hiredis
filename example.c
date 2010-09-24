@@ -5,57 +5,57 @@
 #include "hiredis.h"
 
 int main(void) {
-    redisContext *fd;
     unsigned int j;
+    redisContext *c;
     redisReply *reply;
 
-    fd = redisConnect((char*)"127.0.0.1", 6379, NULL);
-    if (fd->error != NULL) {
-        printf("Connection error: %s", ((redisReply*)fd->error)->reply);
+    c = redisConnect((char*)"127.0.0.1", 6379, NULL);
+    if (c->error != NULL) {
+        printf("Connection error: %s", ((redisReply*)c->error)->reply);
         exit(1);
     }
 
     /* PING server */
-    reply = redisCommand(fd,"PING");
+    reply = redisCommand(c,"PING");
     printf("PONG: %s\n", reply->reply);
     freeReplyObject(reply);
 
     /* Set a key */
-    reply = redisCommand(fd,"SET %s %s", "foo", "hello world");
+    reply = redisCommand(c,"SET %s %s", "foo", "hello world");
     printf("SET: %s\n", reply->reply);
     freeReplyObject(reply);
 
     /* Set a key using binary safe API */
-    reply = redisCommand(fd,"SET %b %b", "bar", 3, "hello", 5);
+    reply = redisCommand(c,"SET %b %b", "bar", 3, "hello", 5);
     printf("SET (binary API): %s\n", reply->reply);
     freeReplyObject(reply);
 
     /* Try a GET and two INCR */
-    reply = redisCommand(fd,"GET foo");
+    reply = redisCommand(c,"GET foo");
     printf("GET foo: %s\n", reply->reply);
     freeReplyObject(reply);
 
-    reply = redisCommand(fd,"INCR counter");
+    reply = redisCommand(c,"INCR counter");
     printf("INCR counter: %lld\n", reply->integer);
     freeReplyObject(reply);
     /* again ... */
-    reply = redisCommand(fd,"INCR counter");
+    reply = redisCommand(c,"INCR counter");
     printf("INCR counter: %lld\n", reply->integer);
     freeReplyObject(reply);
 
     /* Create a list of numbers, from 0 to 9 */
-    reply = redisCommand(fd,"DEL mylist");
+    reply = redisCommand(c,"DEL mylist");
     freeReplyObject(reply);
     for (j = 0; j < 10; j++) {
         char buf[64];
 
         snprintf(buf,64,"%d",j);
-        reply = redisCommand(fd,"LPUSH mylist element-%s", buf);
+        reply = redisCommand(c,"LPUSH mylist element-%s", buf);
         freeReplyObject(reply);
     }
 
     /* Let's check what we have inside the list */
-    reply = redisCommand(fd,"LRANGE mylist 0 -1");
+    reply = redisCommand(c,"LRANGE mylist 0 -1");
     if (reply->type == REDIS_REPLY_ARRAY) {
         for (j = 0; j < reply->elements; j++) {
             printf("%u) %s\n", j, reply->element[j]->reply);

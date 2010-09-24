@@ -25,32 +25,32 @@ static void __connect(redisContext **c) {
 }
 
 int main(void) {
-    redisContext *fd;
     int i, tests = 0, fails = 0;
     long long t1, t2;
+    redisContext *c;
     redisReply *reply;
     void *reader;
-    __connect(&fd);
+    __connect(&c);
 
     test("Returns I/O error when the connection is lost: ");
-    reply = redisCommand(fd,"QUIT");
+    reply = redisCommand(c,"QUIT");
     test_cond(reply->type == REDIS_ERROR &&
         strcmp(reply->reply,"Server closed the connection") == 0);
     freeReplyObject(reply);
-    __connect(&fd); /* reconnect */
+    __connect(&c); /* reconnect */
 
     test("Is able to deliver commands: ");
-    reply = redisCommand(fd,"PING");
+    reply = redisCommand(c,"PING");
     test_cond(reply->type == REDIS_REPLY_STRING &&
         strcasecmp(reply->reply,"pong") == 0)
     freeReplyObject(reply);
 
     /* Switch to DB 9 for testing, now that we know we can chat. */
-    reply = redisCommand(fd,"SELECT 9");
+    reply = redisCommand(c,"SELECT 9");
     freeReplyObject(reply);
 
     /* Make sure the DB is emtpy */
-    reply = redisCommand(fd,"DBSIZE");
+    reply = redisCommand(c,"DBSIZE");
     if (reply->type != REDIS_REPLY_INTEGER ||
         reply->integer != 0) {
         printf("Sorry DB 9 is not empty, test can not continue\n");
@@ -61,23 +61,23 @@ int main(void) {
     freeReplyObject(reply);
 
     test("Is a able to send commands verbatim: ");
-    reply = redisCommand(fd,"SET foo bar");
+    reply = redisCommand(c,"SET foo bar");
     test_cond (reply->type == REDIS_REPLY_STRING &&
         strcasecmp(reply->reply,"ok") == 0)
     freeReplyObject(reply);
 
     test("%%s String interpolation works: ");
-    reply = redisCommand(fd,"SET %s %s","foo","hello world");
+    reply = redisCommand(c,"SET %s %s","foo","hello world");
     freeReplyObject(reply);
-    reply = redisCommand(fd,"GET foo");
+    reply = redisCommand(c,"GET foo");
     test_cond(reply->type == REDIS_REPLY_STRING &&
         strcmp(reply->reply,"hello world") == 0);
     freeReplyObject(reply);
 
     test("%%b String interpolation works: ");
-    reply = redisCommand(fd,"SET %b %b","foo",3,"hello\x00world",11);
+    reply = redisCommand(c,"SET %b %b","foo",3,"hello\x00world",11);
     freeReplyObject(reply);
-    reply = redisCommand(fd,"GET foo");
+    reply = redisCommand(c,"GET foo");
     test_cond(reply->type == REDIS_REPLY_STRING &&
         memcmp(reply->reply,"hello\x00world",11) == 0)
 
@@ -86,20 +86,20 @@ int main(void) {
     freeReplyObject(reply);
 
     test("Can parse nil replies: ");
-    reply = redisCommand(fd,"GET nokey");
+    reply = redisCommand(c,"GET nokey");
     test_cond(reply->type == REDIS_REPLY_NIL)
     freeReplyObject(reply);
 
     /* test 7 */
     test("Can parse integer replies: ");
-    reply = redisCommand(fd,"INCR mycounter");
+    reply = redisCommand(c,"INCR mycounter");
     test_cond(reply->type == REDIS_REPLY_INTEGER && reply->integer == 1)
     freeReplyObject(reply);
 
     test("Can parse multi bulk replies: ");
-    freeReplyObject(redisCommand(fd,"LPUSH mylist foo"));
-    freeReplyObject(redisCommand(fd,"LPUSH mylist bar"));
-    reply = redisCommand(fd,"LRANGE mylist 0 -1");
+    freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
+    freeReplyObject(redisCommand(c,"LPUSH mylist bar"));
+    reply = redisCommand(c,"LRANGE mylist 0 -1");
     test_cond(reply->type == REDIS_REPLY_ARRAY &&
               reply->elements == 2 &&
               !memcmp(reply->element[0]->reply,"bar",3) &&
@@ -109,10 +109,10 @@ int main(void) {
     /* m/e with multi bulk reply *before* other reply.
      * specifically test ordering of reply items to parse. */
     test("Can handle nested multi bulk replies: ");
-    freeReplyObject(redisCommand(fd,"MULTI"));
-    freeReplyObject(redisCommand(fd,"LRANGE mylist 0 -1"));
-    freeReplyObject(redisCommand(fd,"PING"));
-    reply = (redisCommand(fd,"EXEC"));
+    freeReplyObject(redisCommand(c,"MULTI"));
+    freeReplyObject(redisCommand(c,"LRANGE mylist 0 -1"));
+    freeReplyObject(redisCommand(c,"PING"));
+    reply = (redisCommand(c,"EXEC"));
     test_cond(reply->type == REDIS_REPLY_ARRAY &&
               reply->elements == 2 &&
               reply->element[0]->type == REDIS_REPLY_ARRAY &&
@@ -147,22 +147,22 @@ int main(void) {
 
     test("Throughput:\n");
     for (i = 0; i < 500; i++)
-        freeReplyObject(redisCommand(fd,"LPUSH mylist foo"));
+        freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
 
     t1 = usec();
     for (i = 0; i < 1000; i++)
-        freeReplyObject(redisCommand(fd,"PING"));
+        freeReplyObject(redisCommand(c,"PING"));
     t2 = usec();
     printf("\t(1000x PING: %.2fs)\n", (t2-t1)/1000000.0);
 
     t1 = usec();
     for (i = 0; i < 1000; i++)
-        freeReplyObject(redisCommand(fd,"LRANGE mylist 0 499"));
+        freeReplyObject(redisCommand(c,"LRANGE mylist 0 499"));
     t2 = usec();
     printf("\t(1000x LRANGE with 500 elements: %.2fs)\n", (t2-t1)/1000000.0);
 
     /* Clean DB 9 */
-    reply = redisCommand(fd,"FLUSHDB");
+    reply = redisCommand(c,"FLUSHDB");
     freeReplyObject(reply);
 
     if (fails == 0) {
