@@ -538,8 +538,7 @@ static void addArgument(sds a, char ***argv, int *argc) {
  * Finally when type is REDIS_REPLY_INTEGER the long long integer is
  * stored at reply->integer.
  */
-redisReply *redisCommand(int fd, const char *format, ...) {
-    va_list ap;
+static sds redisFormatCommand(const char *format, va_list ap) {
     size_t size;
     const char *arg, *c = format;
     sds cmd = sdsempty();     /* whole command buffer */
@@ -548,7 +547,6 @@ redisReply *redisCommand(int fd, const char *format, ...) {
     int argc = 0, j;
 
     /* Build the command string accordingly to protocol */
-    va_start(ap,format);
     while(*c != '\0') {
         if (*c != '%' || c[1] == '\0') {
             if (*c == ' ') {
@@ -578,7 +576,6 @@ redisReply *redisCommand(int fd, const char *format, ...) {
         }
         c++;
     }
-    va_end(ap);
 
     /* Add the last argument if needed */
     if (sdslen(current) != 0)
@@ -595,6 +592,14 @@ redisReply *redisCommand(int fd, const char *format, ...) {
         sdsfree(argv[j]);
     }
     free(argv);
+}
+
+redisReply *redisCommand(int fd, const char *format, ...) {
+    va_list ap;
+    sds cmd;
+    va_start(ap,format);
+    cmd = redisFormatCommand(format,ap);
+    va_end(ap);
 
     /* Send the command via socket */
     anetWrite(fd,cmd,sdslen(cmd));
