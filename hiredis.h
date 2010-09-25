@@ -70,11 +70,13 @@ typedef struct redisReplyObjectFunctions {
     void (*freeObject)(void*);
 } redisReplyFunctions;
 
-/* Callback prototype */
-struct redisContext; /* needs forward declaration of redisContext */
-typedef void redisCallbackFn(struct redisContext*, redisReply*, void*);
+struct redisContext; /* need forward declaration of redisContext */
 
-/* Callback container */
+/* Callbacks triggered on non-reply events. */
+typedef void (redisContextCallback)(struct redisContext*, void*);
+
+/* Reply callback prototype and container */
+typedef void redisCallbackFn(struct redisContext*, redisReply*, void*);
 typedef struct redisCallback {
     redisCallbackFn *fn;
     void *privdata;
@@ -86,8 +88,18 @@ typedef struct redisContext {
     int flags;
     sds error; /* Error object is set when in erronous state */
     sds obuf; /* Write buffer */
+
+    /* Function set for reply buildup and reply reader */
     redisReplyFunctions *fn;
     void *reader;
+
+    /* Non-reply callbacks */
+    redisContextCallback *cbCommand;
+    void *privdataCommand;
+    redisContextCallback *cbFree;
+    void *privdataFree;
+
+    /* Reply callbacks */
     redisCallback *callbacks;
     int cpos;
     int clen;
@@ -103,6 +115,8 @@ int redisReplyReaderGetReply(void *reader, void **reply);
 
 redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn);
 redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn);
+void redisSetCommandCallback(redisContext *c, redisContextCallback *fn, void *privdata);
+void redisSetFreeCallback(redisContext *c, redisContextCallback *fn, void *privdata);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);

@@ -575,7 +575,7 @@ static int redisContextConnect(redisContext *c, const char *ip, int port) {
 }
 
 static redisContext *redisContextInit(redisReplyFunctions *fn) {
-    redisContext *c = malloc(sizeof(*c));
+    redisContext *c = calloc(sizeof(redisContext),1);
     c->error = NULL;
     c->obuf = sdsempty();
     c->fn = fn == NULL ? &defaultFunctions : fn;
@@ -587,6 +587,8 @@ static redisContext *redisContextInit(redisReplyFunctions *fn) {
 }
 
 void redisFree(redisContext *c) {
+    if (c->cbFree != NULL)
+        c->cbFree(c,c->privdataFree);
     if (c->error != NULL)
         sdsfree(c->error);
     if (c->obuf != NULL)
@@ -612,6 +614,19 @@ redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions
     c->flags &= ~REDIS_BLOCK;
     redisContextConnect(c,ip,port);
     return c;
+}
+
+/* Register callback that is triggered when a command is put in the output
+ * buffer when the context is non-blocking. */
+void redisSetCommandCallback(redisContext *c, redisContextCallback *fn, void *privdata) {
+    c->cbCommand = fn;
+    c->privdataCommand = privdata;
+}
+
+/* Register callback that is triggered when the context is free'd. */
+void redisSetFreeCallback(redisContext *c, redisContextCallback *fn, void *privdata) {
+    c->cbFree = fn;
+    c->privdataFree = privdata;
 }
 
 /* Use this function to handle a read event on the descriptor. It will try
@@ -748,6 +763,10 @@ static int redisCommandWriteNonBlock(redisContext *c, redisCallback *cb, char *s
         memset(&c->callbacks[c->cpos],0,sizeof(redisCallback));
     }
     c->cpos++;
+
+    /* Fire write callback */
+    if (c->cbCommand != NULL)
+        c->cbCommand(c,c->privdataCommand);
 
     return REDIS_OK;
 }
