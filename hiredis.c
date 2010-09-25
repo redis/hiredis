@@ -572,13 +572,13 @@ static int redisContextConnect(redisContext *c, const char *ip, int port) {
 
     if (c->fd == ANET_ERR) {
         c->error = c->fn->createError(err,strlen(err));
-        return HIREDIS_ERR;
+        return REDIS_ERR;
     }
     if (anetTcpNoDelay(err,c->fd) == ANET_ERR) {
         c->error = c->fn->createError(err,strlen(err));
-        return HIREDIS_ERR;
+        return REDIS_ERR;
     }
-    return HIREDIS_OK;
+    return REDIS_OK;
 }
 
 static redisContext *redisContextInit(redisReplyFunctions *fn) {
@@ -625,16 +625,16 @@ int redisBufferRead(redisContext *c) {
             /* Set error in context */
             c->error = formatError(c->fn,
                 "Error reading from socket: %s", strerror(errno));
-            return HIREDIS_ERR;
+            return REDIS_ERR;
         }
     } else if (nread == 0) {
         c->error = formatError(c->fn,
             "Server closed the connection");
-        return HIREDIS_ERR;
+        return REDIS_ERR;
     } else {
         redisReplyReaderFeed(c->reader,buf,nread);
     }
-    return HIREDIS_OK;
+    return REDIS_OK;
 }
 
 static void redisPopCallback(redisContext *c) {
@@ -659,7 +659,7 @@ int redisProcessCallbacks(redisContext *c) {
             cb.fn(c,reply,cb.privdata);
         redisPopCallback(c);
     }
-    return HIREDIS_OK;
+    return REDIS_OK;
 }
 
 /* Use this function to try and write the entire output buffer to the
@@ -673,7 +673,7 @@ int redisBufferWrite(redisContext *c, int *done) {
             /* Set error in context */
             c->error = formatError(c->fn,
                 "Error writing to socket: %s", strerror(errno));
-            return HIREDIS_ERR;
+            return REDIS_ERR;
         }
     } else if (nwritten > 0) {
         if (nwritten == (signed)sdslen(c->obuf)) {
@@ -684,7 +684,7 @@ int redisBufferWrite(redisContext *c, int *done) {
         }
     }
     if (done != NULL) *done = (sdslen(c->obuf) == 0);
-    return HIREDIS_OK;
+    return REDIS_OK;
 }
 
 static void* redisCommandWrite(redisContext *c, redisCallback *cb, char *str, size_t len) {
@@ -695,12 +695,12 @@ static void* redisCommandWrite(redisContext *c, redisCallback *cb, char *str, si
     /* Read reply immediately when the context is blocking. */
     if (c->flags & HIREDIS_BLOCK) {
         do { /* Write until done. */
-            if (redisBufferWrite(c,&wdone) == HIREDIS_ERR)
+            if (redisBufferWrite(c,&wdone) == REDIS_ERR)
                 return c->error;
         } while (!wdone);
 
         do { /* Read until there is a reply. */
-            if (redisBufferRead(c) == HIREDIS_ERR)
+            if (redisBufferRead(c) == REDIS_ERR)
                 return c->error;
             reply = redisGetReply(c);
         } while (reply == NULL);

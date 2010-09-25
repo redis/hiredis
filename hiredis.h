@@ -30,8 +30,8 @@
 #ifndef __HIREDIS_H
 #define __HIREDIS_H
 
-#define HIREDIS_ERR -1
-#define HIREDIS_OK 0
+#define REDIS_ERR -1
+#define REDIS_OK 0
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
