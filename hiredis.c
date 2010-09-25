@@ -760,6 +760,7 @@ void *redisCommand(redisContext *c, const char *format, ...) {
 
     if (c->flags & REDIS_BLOCK) {
         if (redisCommandWriteBlock(c,&reply,cmd,sdslen(cmd)) == REDIS_OK) {
+            sdsfree(cmd);
             return reply;
         }
     } else {
