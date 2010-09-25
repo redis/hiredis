@@ -1,5 +1,6 @@
 /hiredis-test
 /hiredis-example
+/libevent-example
 /*.o
 /*.so
 /*.dylib

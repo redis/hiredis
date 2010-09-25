@@ -58,6 +58,9 @@ hiredis-%: %.o ${DYLIBNAME}
 test: hiredis-test
 	./hiredis-test
 
+libevent-example: libevent-example.c ${DYLIBNAME}
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -levent libevent-example.c
+
 .c.o:
 	$(CC) -c $(CFLAGS) $(DEBUG) $(COMPILE_TIME) $<
 
