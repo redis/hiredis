@@ -149,16 +149,20 @@ int main(void) {
     for (i = 0; i < 500; i++)
         freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
 
+    replies = malloc(sizeof(redisReply*)*1000);
     t1 = usec();
-    for (i = 0; i < 1000; i++)
-        freeReplyObject(redisCommand(c,"PING"));
+    for (i = 0; i < 1000; i++) replies[i] = redisCommand(c,"PING");
     t2 = usec();
+    for (i = 0; i < 1000; i++) freeReplyObject(replies[i]);
+    free(replies);
     printf("\t(1000x PING: %.2fs)\n", (t2-t1)/1000000.0);
 
+    replies = malloc(sizeof(redisReply*)*1000);
     t1 = usec();
-    for (i = 0; i < 1000; i++)
-        freeReplyObject(redisCommand(c,"LRANGE mylist 0 499"));
+    for (i = 0; i < 1000; i++) replies[i] = redisCommand(c,"LRANGE mylist 0 499");
     t2 = usec();
+    for (i = 0; i < 1000; i++) freeReplyObject(replies[i]);
+    free(replies);
     printf("\t(1000x LRANGE with 500 elements: %.2fs)\n", (t2-t1)/1000000.0);
 
     /* Clean DB 9 */
