@@ -28,16 +28,17 @@ int main(void) {
     int i, ret, tests = 0, fails = 0;
     long long t1, t2;
     redisContext *c;
-    redisReply *reply;
+    redisReply *reply, **replies;
     void *reader;
     char *err;
-    __connect(&c);
 
+    __connect(&c);
     test("Returns I/O error when the connection is lost: ");
     test_cond(redisCommand(c,"QUIT") == NULL &&
         strcmp(c->error,"Server closed the connection") == 0);
-    __connect(&c); /* reconnect */
+    redisFree(c);
 
+    __connect(&c); /* reconnect */
     test("Is able to deliver commands: ");
     reply = redisCommand(c,"PING");
     test_cond(reply->type == REDIS_REPLY_STRING &&
@@ -170,5 +171,6 @@ int main(void) {
         printf("*** %d TESTS FAILED ***\n", fails);
     }
 
+    redisFree(c);
     return 0;
 }

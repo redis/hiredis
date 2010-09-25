@@ -586,6 +586,17 @@ static redisContext *redisContextInit(redisReplyFunctions *fn) {
     return c;
 }
 
+void redisFree(redisContext *c) {
+    if (c->error != NULL)
+        sdsfree(c->error);
+    if (c->obuf != NULL)
+        sdsfree(c->obuf);
+    if (c->clen > 0)
+        free(c->callbacks);
+    redisReplyReaderFree(c->reader);
+    free(c);
+}
+
 /* Connect to a Redis instance. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */

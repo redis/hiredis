@@ -103,6 +103,7 @@ int redisReplyReaderGetReply(void *reader, void **reply);
 
 redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn);
 redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn);
+void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
 int redisGetReply(redisContext *c, void **reply);
