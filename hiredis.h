@@ -35,7 +35,7 @@
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
-#define HIREDIS_BLOCK 0x1
+#define REDIS_BLOCK 0x1
 
 #define REDIS_ERROR -1
 #define REDIS_REPLY_ERROR 0

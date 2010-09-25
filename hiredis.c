@@ -557,7 +557,7 @@ static sds redisFormatCommand(const char *format, va_list ap) {
 
 static int redisContextConnect(redisContext *c, const char *ip, int port) {
     char err[ANET_ERR_LEN];
-    if (c->flags & HIREDIS_BLOCK) {
+    if (c->flags & REDIS_BLOCK) {
         c->fd = anetTcpConnect(err,(char*)ip,port);
     } else {
         c->fd = anetTcpNonBlockConnect(err,(char*)ip,port);
@@ -591,14 +591,14 @@ static redisContext *redisContextInit(redisReplyFunctions *fn) {
  * When no set of reply functions is given, the default set will be used. */
 redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn) {
     redisContext *c = redisContextInit(fn);
-    c->flags |= HIREDIS_BLOCK;
+    c->flags |= REDIS_BLOCK;
     redisContextConnect(c,ip,port);
     return c;
 }
 
 redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn) {
     redisContext *c = redisContextInit(fn);
-    c->flags &= ~HIREDIS_BLOCK;
+    c->flags &= ~REDIS_BLOCK;
     redisContextConnect(c,ip,port);
     return c;
 }
@@ -696,7 +696,7 @@ int redisBufferWrite(redisContext *c, int *done) {
 static int redisCommandWriteBlock(redisContext *c, void **reply, char *str, size_t len) {
     int wdone = 0;
     void *aux = NULL;
-    assert(c->flags & HIREDIS_BLOCK);
+    assert(c->flags & REDIS_BLOCK);
     c->obuf = sdscatlen(c->obuf,str,len);
 
     /* Write until done. */
@@ -721,7 +721,7 @@ static int redisCommandWriteBlock(redisContext *c, void **reply, char *str, size
 }
 
 static int redisCommandWriteNonBlock(redisContext *c, redisCallback *cb, char *str, size_t len) {
-    assert(!(c->flags & HIREDIS_BLOCK));
+    assert(!(c->flags & REDIS_BLOCK));
     c->obuf = sdscatlen(c->obuf,str,len);
 
     /* Make sure there is space for the callback. */
@@ -758,7 +758,7 @@ void *redisCommand(redisContext *c, const char *format, ...) {
     cmd = redisFormatCommand(format,ap);
     va_end(ap);
 
-    if (c->flags & HIREDIS_BLOCK) {
+    if (c->flags & REDIS_BLOCK) {
         if (redisCommandWriteBlock(c,&reply,cmd,sdslen(cmd)) == REDIS_OK) {
             return reply;
         }
@@ -782,7 +782,7 @@ void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, void *privd
     redisCallback cb = { fn, privdata };
 
     /* This function may only be used in a non-blocking context. */
-    if (c->flags & HIREDIS_BLOCK) return NULL;
+    if (c->flags & REDIS_BLOCK) return NULL;
 
     va_start(ap,format);
     cmd = redisFormatCommand(format,ap);
