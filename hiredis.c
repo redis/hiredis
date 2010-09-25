@@ -685,8 +685,8 @@ static void* redisCommandWrite(redisContext *c, char *str, size_t len) {
 }
 
 /* Write a formatted command to the output buffer, and, if the context is a
- * non-blocking connection, read the reply and return it. When this function
- * is called from a blocking context, it will always return NULL. */
+ * blocking connection, read the reply and return it. When this function
+ * is called from a non-blocking context, it will always return NULL. */
 void *redisCommand(redisContext *c, const char *format, ...) {
     va_list ap;
     sds cmd;
