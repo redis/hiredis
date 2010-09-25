@@ -25,18 +25,17 @@ static void __connect(redisContext **c) {
 }
 
 int main(void) {
-    int i, tests = 0, fails = 0;
+    int i, ret, tests = 0, fails = 0;
     long long t1, t2;
     redisContext *c;
     redisReply *reply;
     void *reader;
+    char *err;
     __connect(&c);
 
     test("Returns I/O error when the connection is lost: ");
-    reply = redisCommand(c,"QUIT");
-    test_cond(reply->type == REDIS_ERROR &&
-        strcmp(reply->reply,"Server closed the connection") == 0);
-    freeReplyObject(reply);
+    test_cond(redisCommand(c,"QUIT") == NULL &&
+        strcmp(c->error,"Server closed the connection") == 0);
     __connect(&c); /* reconnect */
 
     test("Is able to deliver commands: ");
@@ -126,10 +125,10 @@ int main(void) {
     test("Error handling in reply parser: ");
     reader = redisReplyReaderCreate(NULL);
     redisReplyReaderFeed(reader,(char*)"@foo\r\n",6);
-    reply = redisReplyReaderGetReply(reader);
-    test_cond(reply->type == REDIS_ERROR &&
-              strcasecmp(reply->reply,"protocol error, got \"@\" as reply type byte") == 0);
-    freeReplyObject(reply);
+    ret = redisReplyReaderGetReply(reader,(void*)&reply);
+    err = redisReplyReaderGetError(reader);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(err,"protocol error, got \"@\" as reply type byte") == 0);
     redisReplyReaderFree(reader);
 
     /* when the reply already contains multiple items, they must be free'd
@@ -139,10 +138,10 @@ int main(void) {
     redisReplyReaderFeed(reader,(char*)"*2\r\n",4);
     redisReplyReaderFeed(reader,(char*)"$5\r\nhello\r\n",11);
     redisReplyReaderFeed(reader,(char*)"@foo\r\n",6);
-    reply = redisReplyReaderGetReply(reader);
-    test_cond(reply->type == REDIS_ERROR &&
-              strcasecmp(reply->reply,"protocol error, got \"@\" as reply type byte") == 0);
-    freeReplyObject(reply);
+    ret = redisReplyReaderGetReply(reader,(void*)&reply);
+    err = redisReplyReaderGetError(reader);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(err,"protocol error, got \"@\" as reply type byte") == 0);
     redisReplyReaderFree(reader);
 
     test("Throughput:\n");

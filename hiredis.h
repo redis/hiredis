@@ -63,7 +63,6 @@ typedef struct redisReadTask {
 } redisReadTask;
 
 typedef struct redisReplyObjectFunctions {
-    void *(*createError)(const char*, size_t);
     void *(*createString)(redisReadTask*, char*, size_t);
     void *(*createArray)(redisReadTask*, int);
     void *(*createInteger)(redisReadTask*, long long);
@@ -85,7 +84,7 @@ typedef struct redisCallback {
 typedef struct redisContext {
     int fd;
     int flags;
-    void *error; /* Error object is set when in erronous state */
+    sds error; /* Error object is set when in erronous state */
     sds obuf; /* Write buffer */
     redisReplyFunctions *fn;
     void *reader;
@@ -97,15 +96,16 @@ typedef struct redisContext {
 void freeReplyObject(void *reply);
 void *redisReplyReaderCreate(redisReplyFunctions *fn);
 void *redisReplyReaderGetObject(void *reader);
+char *redisReplyReaderGetError(void *reader);
 void redisReplyReaderFree(void *ptr);
 void redisReplyReaderFeed(void *reader, char *buf, int len);
-void *redisReplyReaderGetReply(void *reader);
+int redisReplyReaderGetReply(void *reader, void **reply);
 
 redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn);
 redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
-void *redisGetReply(redisContext *c);
+int redisGetReply(redisContext *c, void **reply);
 int redisProcessCallbacks(redisContext *c);
 
 void *redisCommand(redisContext *c, const char *format, ...);
