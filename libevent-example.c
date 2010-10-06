@@ -10,40 +10,39 @@
  * redisContext to the read and write handlers. */
 typedef struct redisEvents {
     redisContext *context;
-    struct event read;
-    struct event write;
+    struct event rev, wev;
 } redisEvents;
 
 void redisLibEventRead(int fd, short event, void *arg) {
     NOT_USED(fd); NOT_USED(event);
-    redisEvents *re = arg;
+    redisEvents *e = arg;
 
     /* Always re-schedule read events */
-    event_add(&re->read,NULL);
+    event_add(&e->rev,NULL);
 
-    if (redisBufferRead(re->context) == REDIS_ERR) {
+    if (redisBufferRead(e->context) == REDIS_ERR) {
         /* Handle error. */
-        printf("Read error: %s\n", re->context->error);
+        printf("Read error: %s\n", e->context->error);
     } else {
         /* Check replies. */
-        redisProcessCallbacks(re->context);
+        redisProcessCallbacks(e->context);
     }
 }
 
 void redisLibEventWrite(int fd, short event, void *arg) {
     NOT_USED(fd); NOT_USED(event);
-    redisEvents *re = arg;
+    redisEvents *e = arg;
     int done = 0;
 
-    if (redisBufferWrite(re->context, &done) == REDIS_ERR) {
+    if (redisBufferWrite(e->context, &done) == REDIS_ERR) {
         /* Handle error */
-        printf("Write error: %s\n", re->context->error);
+        printf("Write error: %s\n", e->context->error);
     } else {
         /* Schedule write event again when writing is not done. */
         if (!done) {
-            event_add(&re->write,NULL);
+            event_add(&e->wev,NULL);
         } else {
-            event_add(&re->read,NULL);
+            event_add(&e->rev,NULL);
         }
     }
 }
@@ -53,7 +52,7 @@ void redisLibEventWrite(int fd, short event, void *arg) {
 void redisLibEventOnWrite(redisContext *c, void *privdata) {
     NOT_USED(c);
     redisEvents *e = privdata;
-    event_add(&e->write,NULL);
+    event_add(&e->wev,NULL);
 }
 
 /* Free the redisEvents struct when the context is free'd. */
@@ -68,8 +67,8 @@ redisContext *redisLibEventConnect(const char *ip, int port) {
     e->context = redisConnectNonBlock(ip, port, NULL);
     redisSetCommandCallback(e->context, redisLibEventOnWrite, e);
     redisSetFreeCallback(e->context, redisLibEventOnFree, e);
-    event_set(&e->read, e->context->fd, EV_READ, redisLibEventRead, e);
-    event_set(&e->write, e->context->fd, EV_WRITE, redisLibEventWrite, e);
+    event_set(&e->rev, e->context->fd, EV_READ, redisLibEventRead, e);
+    event_set(&e->wev, e->context->fd, EV_WRITE, redisLibEventWrite, e);
     return e->context;
 }
 
