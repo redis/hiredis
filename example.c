@@ -11,7 +11,7 @@ int main(void) {
 
     c = redisConnect((char*)"127.0.0.1", 6379, NULL);
     if (c->error != NULL) {
-        printf("Connection error: %s", ((redisReply*)c->error)->reply);
+        printf("Connection error: %s", c->error);
         exit(1);
     }
 

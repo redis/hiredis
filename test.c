@@ -16,10 +16,11 @@ static long long usec(void) {
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
-static void __connect(redisContext **c) {
-    *c = redisConnect((char*)"127.0.0.1", 6379, NULL);
-    if ((*c)->error != NULL) {
-        printf("Connection error: %s", ((redisReply*)(*c)->error)->reply);
+static void __connect(redisContext **target) {
+    redisContext *c;
+    c = *target = redisConnect((char*)"127.0.0.1", 6379, NULL);
+    if (c->error != NULL) {
+        printf("Connection error: %s", c->error);
         exit(1);
     }
 }
