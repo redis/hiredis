@@ -85,7 +85,7 @@ int main (int argc, char **argv) {
 
     redisContext *c = redisLibEventConnect("127.0.0.1", 6379);
     if (c->error != NULL) {
-        printf("Connect error: %s\n", c->error);
+        printf("Connection error: %s\n", c->error);
         return 1;
     }
 

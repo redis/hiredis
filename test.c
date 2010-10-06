@@ -20,7 +20,7 @@ static void __connect(redisContext **target) {
     redisContext *c;
     c = *target = redisConnect((char*)"127.0.0.1", 6379, NULL);
     if (c->error != NULL) {
-        printf("Connection error: %s", c->error);
+        printf("Connection error: %s\n", c->error);
         exit(1);
     }
 }

@@ -643,12 +643,12 @@ int redisBufferRead(redisContext *c) {
         } else {
             /* Set error in context */
             c->error = sdscatprintf(sdsempty(),
-                "Error reading from socket: %s", strerror(errno));
+                "read: %s", strerror(errno));
             return REDIS_ERR;
         }
     } else if (nread == 0) {
         c->error = sdscatprintf(sdsempty(),
-            "Server closed the connection");
+            "read: Server closed the connection");
         return REDIS_ERR;
     } else {
         redisReplyReaderFeed(c->reader,buf,nread);
@@ -704,7 +704,7 @@ int redisBufferWrite(redisContext *c, int *done) {
         } else {
             /* Set error in context */
             c->error = sdscatprintf(sdsempty(),
-                "Error writing to socket: %s", strerror(errno));
+                "write: %s", strerror(errno));
             return REDIS_ERR;
         }
     } else if (nwritten > 0) {
