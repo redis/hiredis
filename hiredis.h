@@ -37,6 +37,10 @@
  * least significant bit of the flags field in redisContext. */
 #define REDIS_BLOCK 0x1
 
+/* Connection may be disconnected before being free'd. The second bit
+ * in the flags field is set when the context is connected. */
+#define REDIS_CONNECTED 0x2
+
 #define REDIS_ERROR -1
 #define REDIS_REPLY_ERROR 0
 #define REDIS_REPLY_STRING 1
@@ -94,6 +98,8 @@ typedef struct redisContext {
     void *reader;
 
     /* Non-reply callbacks */
+    redisContextCallback *cbDisconnect;
+    void *privdataDisconnect;
     redisContextCallback *cbCommand;
     void *privdataCommand;
     redisContextCallback *cbFree;
@@ -115,8 +121,10 @@ int redisReplyReaderGetReply(void *reader, void **reply);
 
 redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn);
 redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn);
+void redisSetDisconnectCallback(redisContext *c, redisContextCallback *fn, void *privdata);
 void redisSetCommandCallback(redisContext *c, redisContextCallback *fn, void *privdata);
 void redisSetFreeCallback(redisContext *c, redisContextCallback *fn, void *privdata);
+void redisDisconnect(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);

@@ -586,6 +586,13 @@ static redisContext *redisContextInit(redisReplyFunctions *fn) {
     return c;
 }
 
+void redisDisconnect(redisContext *c) {
+    if (c->cbDisconnect != NULL)
+        c->cbDisconnect(c,c->privdataDisconnect);
+    close(c->fd);
+    c->flags &= ~REDIS_CONNECTED;
+}
+
 void redisFree(redisContext *c) {
     if (c->cbFree != NULL)
         c->cbFree(c,c->privdataFree);
@@ -605,6 +612,7 @@ void redisFree(redisContext *c) {
 redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn) {
     redisContext *c = redisContextInit(fn);
     c->flags |= REDIS_BLOCK;
+    c->flags |= REDIS_CONNECTED;
     redisContextConnect(c,ip,port);
     return c;
 }
@@ -612,8 +620,15 @@ redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn) {
 redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn) {
     redisContext *c = redisContextInit(fn);
     c->flags &= ~REDIS_BLOCK;
+    c->flags |= REDIS_CONNECTED;
     redisContextConnect(c,ip,port);
     return c;
+}
+
+/* Register callback that is triggered when redisDisconnect is called. */
+void redisSetDisconnectCallback(redisContext *c, redisContextCallback *fn, void *privdata) {
+    c->cbDisconnect = fn;
+    c->privdataDisconnect = privdata;
 }
 
 /* Register callback that is triggered when a command is put in the output
