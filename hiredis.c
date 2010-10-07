@@ -594,6 +594,11 @@ void redisDisconnect(redisContext *c) {
 }
 
 void redisFree(redisContext *c) {
+    /* Disconnect before free'ing if not yet disconnected. */
+    if (c->flags & REDIS_CONNECTED)
+        redisDisconnect(c);
+
+    /* Fire free callback and clear all allocations. */
     if (c->cbFree != NULL)
         c->cbFree(c,c->privdataFree);
     if (c->error != NULL)
