@@ -76,10 +76,10 @@ struct redisContext; /* need forward declaration of redisContext */
 typedef void (redisContextCallback)(struct redisContext*, void*);
 
 /* Reply callback prototype and container */
-typedef void redisCallbackFn(struct redisContext*, redisReply*, void*);
+typedef void redisCallbackFn(struct redisContext*, redisReply*, const void*);
 typedef struct redisCallback {
     redisCallbackFn *fn;
-    void *privdata;
+    const void *privdata;
 } redisCallback;
 
 /* Context for a connection to Redis */
@@ -124,6 +124,6 @@ int redisGetReply(redisContext *c, void **reply);
 int redisProcessCallbacks(redisContext *c);
 
 void *redisCommand(redisContext *c, const char *format, ...);
-void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, void *privdata, const char *format, ...);
+void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, const void *privdata, const char *format, ...);
 
 #endif
