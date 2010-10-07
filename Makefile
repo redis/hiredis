@@ -58,14 +58,14 @@ hiredis-%: %.o ${DYLIBNAME}
 test: hiredis-test
 	./hiredis-test
 
-libevent-example: libevent-example.c ${DYLIBNAME}
-	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -levent libevent-example.c
+libevent-example: extra/hiredis/libevent.h libevent-example.c ${DYLIBNAME}
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -I. -Iextra -L. -lhiredis -levent libevent-example.c
 
 .c.o:
 	$(CC) -c $(CFLAGS) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
-	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) *.o *.gcda *.gcno *.gcov
+	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) libevent-example *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
