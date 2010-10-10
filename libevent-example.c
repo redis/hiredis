@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <hiredis/libevent.h>
+#include <signal.h>
 
 void getCallback(redisContext *c, redisReply *reply, const void *privdata) {
     printf("argv[%s]: %s\n", (const char*)privdata, reply->reply);
@@ -26,7 +27,7 @@ int main (int argc, char **argv) {
 
     redisCommand(c, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
     redisCommandWithCallback(c, getCallback, "end-1", "GET key");
-    event_dispatch();
+    redisLibEventDispatch(c);
     redisFree(c);
     return 0;
 }

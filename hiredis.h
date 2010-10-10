@@ -75,6 +75,7 @@ typedef struct redisReplyObjectFunctions {
 } redisReplyFunctions;
 
 struct redisContext; /* need forward declaration of redisContext */
+struct redisEvents; /* need forward declaration of redisEvents */
 
 /* Callbacks triggered on non-reply events. */
 typedef void (redisContextCallback)(struct redisContext*, void*);
@@ -109,6 +110,10 @@ typedef struct redisContext {
     redisCallback *callbacks;
     int cpos;
     int clen;
+
+    /* Libevent context */
+    struct redisEvents *events;
+
 } redisContext;
 
 void freeReplyObject(void *reply);

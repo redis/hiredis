@@ -1,3 +1,4 @@
+typedef unsigned char u_char; /* libevents needs u_char */
 #include <event.h>
 #include <hiredis.h>
 
@@ -10,6 +11,7 @@ typedef struct redisEvents {
     redisContext *context;
     redisErrorCallback *err;
     struct event rev, wev;
+    struct event_base *base;
 } redisEvents;
 
 void redisLibEventRead(int fd, short event, void *arg) {
@@ -72,6 +74,14 @@ void redisLibEventOnFree(redisContext *c, void *privdata) {
     free(e);
 }
 
+/* Dispatch libevent loop. */
+int redisLibEventDispatch(redisContext *c) {
+    if (!c->events) {
+        return -1;
+    }
+    return event_base_dispatch(c->events->base);
+}
+
 redisContext *redisLibEventConnect(const char *ip, int port, redisErrorCallback *err) {
     redisEvents *e;
     redisContext *c = redisConnectNonBlock(ip, port, NULL);
@@ -84,12 +94,16 @@ redisContext *redisLibEventConnect(const char *ip, int port, redisErrorCallback 
     e = malloc(sizeof(*e));
     e->context = c;
     e->err = err;
+    e->base = event_base_new();
+    c->events = e;
 
     /* Register callbacks and events */
     redisSetDisconnectCallback(e->context, redisLibEventOnDisconnect, e);
     redisSetCommandCallback(e->context, redisLibEventOnWrite, e);
     redisSetFreeCallback(e->context, redisLibEventOnFree, e);
     event_set(&e->rev, e->context->fd, EV_READ, redisLibEventRead, e);
+    event_base_set(e->base, &e->rev);
     event_set(&e->wev, e->context->fd, EV_WRITE, redisLibEventWrite, e);
-    return e->context;
+    event_base_set(e->base, &e->wev);
+    return c;
 }
