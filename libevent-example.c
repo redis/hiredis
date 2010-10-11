@@ -20,14 +20,14 @@ void errorCallback(redisContext *c) {
 
 int main (int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
-    event_init();
+    struct event_base *base = event_base_new();
 
-    redisContext *c = redisLibEventConnect("127.0.0.1", 6379, errorCallback);
+    redisContext *c = redisLibEventConnect("127.0.0.1", 6379, errorCallback, base);
     if (c == NULL) return 1;
 
     redisCommand(c, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
     redisCommandWithCallback(c, getCallback, "end-1", "GET key");
-    redisLibEventDispatch(c);
+    event_base_dispatch(base);
     redisFree(c);
     return 0;
 }
