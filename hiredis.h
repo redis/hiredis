@@ -121,9 +121,6 @@ int redisReplyReaderGetReply(void *reader, void **reply);
 
 redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn);
 redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn);
-void redisSetDisconnectCallback(redisContext *c, redisContextCallback *fn, void *privdata);
-void redisSetCommandCallback(redisContext *c, redisContextCallback *fn, void *privdata);
-void redisSetFreeCallback(redisContext *c, redisContextCallback *fn, void *privdata);
 void redisDisconnect(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
@@ -131,7 +128,37 @@ int redisBufferWrite(redisContext *c, int *done);
 int redisGetReply(redisContext *c, void **reply);
 int redisProcessCallbacks(redisContext *c);
 
+/* The disconnect callback is called *immediately* when redisDisconnect()
+ * is called. It is called only once for every redisContext (since hiredis
+ * currently does not support reconnecting an existing context). */
+void redisSetDisconnectCallback(redisContext *c, redisContextCallback *fn, void *privdata);
+
+/* The command callback is called every time redisCommand() is called in a
+ * non-blocking context. It is called *after* the formatted command has been
+ * appended to the write buffer. */
+void redisSetCommandCallback(redisContext *c, redisContextCallback *fn, void *privdata);
+
+/* The free callback is called *before* all allocations are free'd. Use it to
+ * release resources that depend/use the redisContext that is being free'd. */
+void redisSetFreeCallback(redisContext *c, redisContextCallback *fn, void *privdata);
+
+/* Issue a command to Redis. In a blocking context, it returns the reply. When
+ * an error occurs, it returns NULL and you should read redisContext->error
+ * to find out what's wrong. In a non-blocking context, it has the same effect
+ * as calling redisCommandWithCallback() with a NULL callback, and will always
+ * return NULL.
+ *
+ * Note: using a NULL reply for an error might conflict with custom reply
+ * reader functions that have NULL as a valid return value (e.g. for the nil
+ * return value). Therefore, it is recommended never to return NULL from your
+ * custom reply object functions. */
 void *redisCommand(redisContext *c, const char *format, ...);
+
+/* Issue a command to Redis from a non-blocking context. The formatted command
+ * is appended to the write buffer and the provided callback is registered.
+ *
+ * Note: when called with a blocking context, this function will not do
+ * anything and immediately returns NULL. */
 void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, const void *privdata, const char *format, ...);
 
 #endif
