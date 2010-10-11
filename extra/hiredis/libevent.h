@@ -1,4 +1,4 @@
-typedef unsigned char u_char; /* libevents needs u_char */
+#include <sys/types.h>
 #include <event.h>
 #include <hiredis.h>
 
