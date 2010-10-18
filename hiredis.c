@@ -676,15 +676,7 @@ int redisBufferRead(redisContext *c) {
     return REDIS_OK;
 }
 
-static void redisPopCallback(redisContext *c) {
-    if (c->cpos > 1) {
-        memmove(&c->callbacks[0],&c->callbacks[1],(c->cpos-1)*sizeof(redisCallback));
-    }
-    c->cpos--;
-}
-
 int redisGetReply(redisContext *c, void **reply) {
-    redisPopCallback(c);
     if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
         /* Copy the (protocol) error from the reader to the context. */
         c->error = sdsnew(((redisReader*)c->reader)->error);
@@ -693,24 +685,35 @@ int redisGetReply(redisContext *c, void **reply) {
     return REDIS_OK;
 }
 
+static void redisPopCallback(redisContext *c) {
+    assert(c->cpos > 0);
+    if (c->cpos > 1)
+        memmove(&c->callbacks[0],&c->callbacks[1],(c->cpos-1)*sizeof(redisCallback));
+    c->cpos--;
+}
+
 int redisProcessCallbacks(redisContext *c) {
     void *reply = NULL;
     redisCallback cb;
 
-    do {
+    /* Continue while there are callbacks */
+    while(c->cpos > 0) {
         cb = c->callbacks[0];
         if (redisGetReply(c,&reply) == REDIS_ERR)
             return REDIS_ERR;
 
-        /* Fire callback when there is a reply. */
         if (reply != NULL) {
+            redisPopCallback(c);
             if (cb.fn != NULL) {
                 cb.fn(c,reply,cb.privdata);
             } else {
                 c->fn->freeObject(reply);
             }
+        } else {
+            /* Stop trying */
+            break;
         }
-    } while (reply != NULL);
+    }
     return REDIS_OK;
 }
 

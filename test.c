@@ -202,6 +202,15 @@ static void __test_callback(redisContext *c, const void *privdata) {
     __test_callback_flags |= (long)privdata;
 }
 
+static long __test_reply_callback_flags = 0;
+static void __test_reply_callback(redisContext *c, redisReply *reply, const void *privdata) {
+    ((void)c);
+    /* Shift to detect execution order */
+    __test_reply_callback_flags <<= 8;
+    __test_reply_callback_flags |= (long)privdata;
+    freeReplyObject(reply);
+}
+
 static void test_nonblocking_connection() {
     redisContext *c;
     int wdone = 0;
@@ -248,6 +257,29 @@ static void test_nonblocking_connection() {
     redisDisconnect(c);
     test_cond(redisBufferWrite(c,NULL) == REDIS_ERR &&
               strncmp(c->error,"write:",6) == 0);
+    redisFree(c);
+
+    wdone = __test_reply_callback_flags = 0;
+    test("Process callbacks in the right sequence: ");
+    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    redisCommandWithCallback(c,__test_reply_callback,(const void*)1,"PING");
+    redisCommandWithCallback(c,__test_reply_callback,(const void*)2,"PING");
+    redisCommandWithCallback(c,__test_reply_callback,(const void*)3,"PING");
+
+    /* Write output buffer */
+    while(!wdone) {
+        usleep(500);
+        redisBufferWrite(c,&wdone);
+    }
+
+    /* Read until at least one callback is executed (the 3 replies will
+     * arrive in a single packet, causing all callbacks to be executed in
+     * a single pass). */
+    while(__test_reply_callback_flags == 0) {
+        assert(redisBufferRead(c) == REDIS_OK);
+        redisProcessCallbacks(c);
+    }
+    test_cond(__test_reply_callback_flags == 0x010203);
     redisFree(c);
 }
 
