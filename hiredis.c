@@ -587,8 +587,8 @@ static redisContext *redisContextInit(redisReplyFunctions *fn) {
 }
 
 void redisDisconnect(redisContext *c) {
-    if (c->cbDisconnect != NULL)
-        c->cbDisconnect(c,c->privdataDisconnect);
+    if (c->cbDisconnect.fn != NULL)
+        c->cbDisconnect.fn(c,c->cbDisconnect.privdata);
     close(c->fd);
     c->flags &= ~REDIS_CONNECTED;
 }
@@ -599,8 +599,8 @@ void redisFree(redisContext *c) {
         redisDisconnect(c);
 
     /* Fire free callback and clear all allocations. */
-    if (c->cbFree != NULL)
-        c->cbFree(c,c->privdataFree);
+    if (c->cbFree.fn != NULL)
+        c->cbFree.fn(c,c->cbFree.privdata);
     if (c->error != NULL)
         sdsfree(c->error);
     if (c->obuf != NULL)
@@ -631,22 +631,22 @@ redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions
 }
 
 /* Register callback that is triggered when redisDisconnect is called. */
-void redisSetDisconnectCallback(redisContext *c, redisContextCallback *fn, void *privdata) {
-    c->cbDisconnect = fn;
-    c->privdataDisconnect = privdata;
+void redisSetDisconnectCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata) {
+    c->cbDisconnect.fn = fn;
+    c->cbDisconnect.privdata = privdata;
 }
 
 /* Register callback that is triggered when a command is put in the output
  * buffer when the context is non-blocking. */
-void redisSetCommandCallback(redisContext *c, redisContextCallback *fn, void *privdata) {
-    c->cbCommand = fn;
-    c->privdataCommand = privdata;
+void redisSetCommandCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata) {
+    c->cbCommand.fn = fn;
+    c->cbCommand.privdata = privdata;
 }
 
 /* Register callback that is triggered when the context is free'd. */
-void redisSetFreeCallback(redisContext *c, redisContextCallback *fn, void *privdata) {
-    c->cbFree = fn;
-    c->privdataFree = privdata;
+void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata) {
+    c->cbFree.fn = fn;
+    c->cbFree.privdata = privdata;
 }
 
 /* Use this function to handle a read event on the descriptor. It will try
@@ -785,8 +785,8 @@ static int redisCommandWriteNonBlock(redisContext *c, redisCallback *cb, char *s
     c->cpos++;
 
     /* Fire write callback */
-    if (c->cbCommand != NULL)
-        c->cbCommand(c,c->privdataCommand);
+    if (c->cbCommand.fn != NULL)
+        c->cbCommand.fn(c,c->cbCommand.privdata);
 
     return REDIS_OK;
 }
