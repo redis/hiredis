@@ -193,9 +193,46 @@ static void cleanup() {
     redisFree(c);
 }
 
+static long __test_callback_flags = 0;
+static void __test_callback(redisContext *c, const void *privdata) {
+    ((void)c);
+    /* Shift to detect execution order */
+    __test_callback_flags <<= 8;
+    __test_callback_flags |= (long)privdata;
+}
+
+static void test_nonblocking_connection() {
+    redisContext *c;
+
+    __test_callback_flags = 0;
+    test("Calls command callback when command is issued: ");
+    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    redisSetCommandCallback(c,__test_callback,(const void*)1);
+    redisCommand(c,"PING");
+    test_cond(__test_callback_flags == 1);
+    redisFree(c);
+
+    __test_callback_flags = 0;
+    test("Calls disconnect callback on redisDisconnect: ");
+    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    redisSetDisconnectCallback(c,__test_callback,(const void*)2);
+    redisDisconnect(c);
+    test_cond(__test_callback_flags == 2);
+    redisFree(c);
+
+    __test_callback_flags = 0;
+    test("Calls disconnect callback and free callback on redisFree: ");
+    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    redisSetDisconnectCallback(c,__test_callback,(const void*)2);
+    redisSetFreeCallback(c,__test_callback,(const void*)4);
+    redisFree(c);
+    test_cond(__test_callback_flags == ((2 << 8) | 4));
+}
+
 int main(void) {
     test_blocking_connection();
     test_reply_reader();
+    test_nonblocking_connection();
     test_throughput();
     cleanup();
 
