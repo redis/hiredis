@@ -35,8 +35,11 @@ int main(void) {
 
     __connect(&c);
     test("Returns I/O error when the connection is lost: ");
-    test_cond(redisCommand(c,"QUIT") == NULL &&
-        strcmp(c->error,"Server closed the connection") == 0);
+    reply = redisCommand(c,"QUIT");
+    test_cond(redisCommand(c,"PING") == NULL &&
+        strcasecmp(reply->reply,"OK") == 0 &&
+        strcmp(c->error,"read: Server closed the connection") == 0);
+    freeReplyObject(reply);
     redisFree(c);
 
     __connect(&c); /* reconnect */
