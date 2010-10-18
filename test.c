@@ -3,10 +3,12 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/time.h>
+#include <assert.h>
 
 #include "hiredis.h"
 
 /* The following lines make up our testing "framework" :) */
+static int tests = 0, fails = 0;
 #define test(_s) { printf("#%02d ", ++tests); printf(_s); }
 #define test_cond(_c) if(_c) printf("PASSED\n"); else {printf("FAILED\n"); fails++;}
 
@@ -16,22 +18,18 @@ static long long usec(void) {
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
+static redisContext *blocking_context = NULL;
 static void __connect(redisContext **target) {
-    redisContext *c;
-    c = *target = redisConnect((char*)"127.0.0.1", 6379, NULL);
-    if (c->error != NULL) {
-        printf("Connection error: %s\n", c->error);
+    *target = blocking_context = redisConnect((char*)"127.0.0.1", 6379, NULL);
+    if (blocking_context->error != NULL) {
+        printf("Connection error: %s\n", blocking_context->error);
         exit(1);
     }
 }
 
-int main(void) {
-    int i, ret, tests = 0, fails = 0;
-    long long t1, t2;
+static void test_blocking_connection() {
     redisContext *c;
-    redisReply *reply, **replies;
-    void *reader;
-    char *err;
+    redisReply *reply;
 
     __connect(&c);
     test("Returns I/O error when the connection is lost: ");
@@ -126,11 +124,17 @@ int main(void) {
               reply->element[1]->type == REDIS_REPLY_STRING &&
               strcasecmp(reply->element[1]->reply,"pong") == 0);
     freeReplyObject(reply);
+}
+
+static void test_reply_reader() {
+    void *reader;
+    char *err;
+    int ret;
 
     test("Error handling in reply parser: ");
     reader = redisReplyReaderCreate(NULL);
     redisReplyReaderFeed(reader,(char*)"@foo\r\n",6);
-    ret = redisReplyReaderGetReply(reader,(void*)&reply);
+    ret = redisReplyReaderGetReply(reader,NULL);
     err = redisReplyReaderGetError(reader);
     test_cond(ret == REDIS_ERR &&
               strcasecmp(err,"protocol error, got \"@\" as reply type byte") == 0);
@@ -143,11 +147,18 @@ int main(void) {
     redisReplyReaderFeed(reader,(char*)"*2\r\n",4);
     redisReplyReaderFeed(reader,(char*)"$5\r\nhello\r\n",11);
     redisReplyReaderFeed(reader,(char*)"@foo\r\n",6);
-    ret = redisReplyReaderGetReply(reader,(void*)&reply);
+    ret = redisReplyReaderGetReply(reader,NULL);
     err = redisReplyReaderGetError(reader);
     test_cond(ret == REDIS_ERR &&
               strcasecmp(err,"protocol error, got \"@\" as reply type byte") == 0);
     redisReplyReaderFree(reader);
+}
+
+static void test_throughput() {
+    int i;
+    long long t1, t2;
+    redisContext *c = blocking_context;
+    redisReply **replies;
 
     test("Throughput:\n");
     for (i = 0; i < 500; i++)
@@ -168,17 +179,30 @@ int main(void) {
     for (i = 0; i < 1000; i++) freeReplyObject(replies[i]);
     free(replies);
     printf("\t(1000x LRANGE with 500 elements: %.2fs)\n", (t2-t1)/1000000.0);
+}
 
-    /* Clean DB 9 */
+static void cleanup() {
+    redisContext *c = blocking_context;
+    redisReply *reply;
+
+    /* Make sure we're on DB 9 */
+    reply = redisCommand(c,"SELECT 9");
+    assert(reply != NULL); freeReplyObject(reply);
     reply = redisCommand(c,"FLUSHDB");
-    freeReplyObject(reply);
+    assert(reply != NULL); freeReplyObject(reply);
+    redisFree(c);
+}
+
+int main(void) {
+    test_blocking_connection();
+    test_reply_reader();
+    test_throughput();
+    cleanup();
 
     if (fails == 0) {
         printf("ALL TESTS PASSED\n");
     } else {
         printf("*** %d TESTS FAILED ***\n", fails);
     }
-
-    redisFree(c);
     return 0;
 }
