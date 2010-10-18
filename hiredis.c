@@ -714,25 +714,35 @@ int redisProcessCallbacks(redisContext *c) {
     return REDIS_OK;
 }
 
-/* Use this function to try and write the entire output buffer to the
- * descriptor. Returns 1 when the entire buffer was written, 0 otherwise. */
+/* Write the output buffer to the socket.
+ *
+ * Returns REDIS_OK when the buffer is empty, or (a part of) the buffer was
+ * succesfully written to the socket. When the buffer is empty after the
+ * write operation, "wdone" is set to 1 (if given).
+ *
+ * Returns REDIS_ERR if an error occured trying to write and sets
+ * c->error to hold the appropriate error string.
+ */
 int redisBufferWrite(redisContext *c, int *done) {
-    int nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
-    if (nwritten == -1) {
-        if (errno == EAGAIN) {
-            /* Try again later */
-        } else {
-            /* Set error in context */
-            c->error = sdscatprintf(sdsempty(),
-                "write: %s", strerror(errno));
-            return REDIS_ERR;
-        }
-    } else if (nwritten > 0) {
-        if (nwritten == (signed)sdslen(c->obuf)) {
-            sdsfree(c->obuf);
-            c->obuf = sdsempty();
-        } else {
-            c->obuf = sdsrange(c->obuf,nwritten,-1);
+    int nwritten;
+    if (sdslen(c->obuf) > 0) {
+        nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
+        if (nwritten == -1) {
+            if (errno == EAGAIN) {
+                /* Try again later */
+            } else {
+                /* Set error in context */
+                c->error = sdscatprintf(sdsempty(),
+                    "write: %s", strerror(errno));
+                return REDIS_ERR;
+            }
+        } else if (nwritten > 0) {
+            if (nwritten == (signed)sdslen(c->obuf)) {
+                sdsfree(c->obuf);
+                c->obuf = sdsempty();
+            } else {
+                c->obuf = sdsrange(c->obuf,nwritten,-1);
+            }
         }
     }
     if (done != NULL) *done = (sdslen(c->obuf) == 0);

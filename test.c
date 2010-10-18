@@ -4,6 +4,7 @@
 #include <strings.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "hiredis.h"
 
@@ -203,6 +204,7 @@ static void __test_callback(redisContext *c, const void *privdata) {
 
 static void test_nonblocking_connection() {
     redisContext *c;
+    int wdone = 0;
 
     __test_callback_flags = 0;
     test("Calls command callback when command is issued: ");
@@ -227,6 +229,26 @@ static void test_nonblocking_connection() {
     redisSetFreeCallback(c,__test_callback,(const void*)4);
     redisFree(c);
     test_cond(__test_callback_flags == ((2 << 8) | 4));
+
+    test("redisBufferWrite against empty write buffer: ");
+    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    test_cond(redisBufferWrite(c,&wdone) == REDIS_OK && wdone == 1);
+    redisFree(c);
+
+    test("redisBufferWrite against not yet connected fd: ");
+    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    redisCommand(c,"PING");
+    test_cond(redisBufferWrite(c,NULL) == REDIS_ERR &&
+              strncmp(c->error,"write:",6) == 0);
+    redisFree(c);
+
+    test("redisBufferWrite against closed fd: ");
+    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    redisCommand(c,"PING");
+    redisDisconnect(c);
+    test_cond(redisBufferWrite(c,NULL) == REDIS_ERR &&
+              strncmp(c->error,"write:",6) == 0);
+    redisFree(c);
 }
 
 int main(void) {
