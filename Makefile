@@ -61,11 +61,14 @@ test: hiredis-test
 libevent-example: extra/hiredis/libevent.h libevent-example.c ${DYLIBNAME}
 	$(CC) -o $@ $(CCOPT) $(DEBUG) -I. -Iextra -L. -lhiredis -levent libevent-example.c
 
+libev-example: extra/hiredis/libev.h libev-example.c ${DYLIBNAME}
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -I. -Iextra -L. -lhiredis -lev libev-example.c
+
 .c.o:
 	$(CC) -c $(CFLAGS) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
-	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) libevent-example *.o *.gcda *.gcno *.gcov
+	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) *-example *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
