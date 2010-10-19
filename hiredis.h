@@ -80,7 +80,7 @@ struct redisContext; /* need forward declaration of redisContext */
 typedef void (redisContextCallbackFn)(struct redisContext*, void*);
 
 /* Reply callback prototype and container */
-typedef void (redisCallbackFn)(struct redisContext*, redisReply*, const void*);
+typedef void (redisCallbackFn)(struct redisContext*, redisReply*, void*);
 
 /* Callback containers */
 typedef struct redisContextCallback {
@@ -90,7 +90,7 @@ typedef struct redisContextCallback {
 
 typedef struct redisCallback {
     redisCallbackFn *fn;
-    const void *privdata;
+    void *privdata;
 } redisCallback;
 
 /* Context for a connection to Redis */
@@ -163,6 +163,6 @@ void *redisCommand(redisContext *c, const char *format, ...);
  *
  * Note: when called with a blocking context, this function will not do
  * anything and immediately returns NULL. */
-void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, const void *privdata, const char *format, ...);
+void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, void *privdata, const char *format, ...);
 
 #endif

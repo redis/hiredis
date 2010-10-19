@@ -203,7 +203,7 @@ static void __test_callback(redisContext *c, void *privdata) {
 }
 
 static long __test_reply_callback_flags = 0;
-static void __test_reply_callback(redisContext *c, redisReply *reply, const void *privdata) {
+static void __test_reply_callback(redisContext *c, redisReply *reply, void *privdata) {
     ((void)c);
     /* Shift to detect execution order */
     __test_reply_callback_flags <<= 8;

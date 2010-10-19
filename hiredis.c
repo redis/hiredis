@@ -839,7 +839,7 @@ void *redisCommand(redisContext *c, const char *format, ...) {
  * Always returns NULL. In a non-blocking context this will never fail because
  * this function does not do any I/O. In a blocking context this function will
  * have no effect (a callback in a blocking context makes no sense). */
-void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, const void *privdata, const char *format, ...) {
+void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, void *privdata, const char *format, ...) {
     va_list ap;
     sds cmd;
     int status;
