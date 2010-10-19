@@ -11,18 +11,15 @@ void getCallback(redisContext *c, redisReply *reply, const void *privdata) {
     redisDisconnect(c);
 }
 
-void errorCallback(redisContext *c) {
+void errorCallback(const redisContext *c) {
     printf("Error: %s\n", c->error);
-
-    /* Clean up the context when there was an error */
-    redisFree(c);
 }
 
 int main (int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     struct event_base *base = event_base_new();
 
-    redisContext *c = redisLibEventConnect("127.0.0.1", 6379, errorCallback, base);
+    redisContext *c = redisLibEventConnect(base, errorCallback, "127.0.0.1", 6379);
     if (c == NULL) return 1;
 
     redisCommand(c, "SET key %b", argv[argc-1], strlen(argv[argc-1]));

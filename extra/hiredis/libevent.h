@@ -3,7 +3,7 @@
 #include <hiredis.h>
 
 /* Prototype for the error callback. */
-typedef void (redisErrorCallback)(redisContext*);
+typedef void (redisErrorCallback)(const redisContext*);
 
 /* This struct enables us to pass both the events and the
  * redisContext to the read and write handlers. */
@@ -73,11 +73,12 @@ void redisLibEventOnFree(redisContext *c, void *privdata) {
     free(e);
 }
 
-redisContext *redisLibEventConnect(const char *ip, int port, redisErrorCallback *err, struct event_base *base) {
+redisContext *redisLibEventConnect(struct event_base *base, redisErrorCallback *err, const char *ip, int port) {
     redisEvents *e;
     redisContext *c = redisConnectNonBlock(ip, port, NULL);
     if (c->error != NULL) {
         err(c);
+        redisFree(c);
         return NULL;
     }
 
