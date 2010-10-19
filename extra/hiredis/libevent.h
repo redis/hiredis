@@ -19,9 +19,11 @@ void libeventRedisReadEvent(int fd, short event, void *arg) {
     event_add(&e->rev,NULL);
 
     if (redisBufferRead(e->context) == REDIS_ERR) {
+        redisDisconnect(e->context);
         e->err(e->context);
     } else {
         if (redisProcessCallbacks(e->context) == REDIS_ERR) {
+            redisDisconnect(e->context);
             e->err(e->context);
         }
     }
@@ -33,7 +35,7 @@ void libeventRedisWriteEvent(int fd, short event, void *arg) {
     int done = 0;
 
     if (redisBufferWrite(e->context,&done) == REDIS_ERR) {
-        /* Handle error */
+        redisDisconnect(e->context);
         e->err(e->context);
     } else {
         /* Schedule write event again when writing is not done. */

@@ -17,9 +17,11 @@ void libevRedisReadEvent(struct ev_loop *loop, ev_io *watcher, int revents) {
     libevRedisEvents *e = watcher->data;
 
     if (redisBufferRead(e->context) == REDIS_ERR) {
+        redisDisconnect(e->context);
         e->err(e->context);
     } else {
         if (redisProcessCallbacks(e->context) == REDIS_ERR) {
+            redisDisconnect(e->context);
             e->err(e->context);
         }
     }
@@ -31,7 +33,7 @@ void libevRedisWriteEvent(struct ev_loop *loop, ev_io *watcher, int revents) {
     int done = 0;
 
     if (redisBufferWrite(e->context, &done) == REDIS_ERR) {
-        ev_io_stop(e->loop,&e->wev);
+        redisDisconnect(e->context);
         e->err(e->context);
     } else {
         /* Stop firing the write event when done */
