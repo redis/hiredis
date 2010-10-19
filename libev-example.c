@@ -4,8 +4,8 @@
 #include <hiredis/libev.h>
 #include <signal.h>
 
-void getCallback(redisContext *c, redisReply *reply, const void *privdata) {
-    printf("argv[%s]: %s\n", (const char*)privdata, reply->reply);
+void getCallback(redisContext *c, redisReply *reply, void *privdata) {
+    printf("argv[%s]: %s\n", (char*)privdata, reply->reply);
 
     /* Disconnect after receiving the reply to GET */
     redisDisconnect(c);
@@ -23,7 +23,7 @@ int main (int argc, char **argv) {
     if (c == NULL) return 1;
 
     redisCommand(c, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
-    redisCommandWithCallback(c, getCallback, "end-1", "GET key");
+    redisCommandWithCallback(c, getCallback, (char*)"end-1", "GET key");
     ev_loop(loop, 0);
     redisFree(c);
     return 0;
