@@ -72,9 +72,9 @@ redisContext *libevRedisConnect(struct ev_loop *loop, redisErrorCallback *err, c
 
     /* Create container for context and r/w events */
     e = malloc(sizeof(*e));
-    e->loop = loop;
     e->context = c;
     e->err = err;
+    e->loop = loop;
     e->rev.data = e;
     e->wev.data = e;
 

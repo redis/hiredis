@@ -5,39 +5,34 @@
 /* Prototype for the error callback. */
 typedef void (redisErrorCallback)(const redisContext*);
 
-/* This struct enables us to pass both the events and the
- * redisContext to the read and write handlers. */
-typedef struct redisEvents {
+typedef struct libeventRedisEvents {
     redisContext *context;
     redisErrorCallback *err;
     struct event rev, wev;
-} redisEvents;
+} libeventRedisEvents;
 
-void redisLibEventRead(int fd, short event, void *arg) {
+void libeventRedisReadEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
-    redisEvents *e = arg;
+    libeventRedisEvents *e = arg;
 
     /* Always re-schedule read events */
     event_add(&e->rev,NULL);
 
     if (redisBufferRead(e->context) == REDIS_ERR) {
-        /* Handle error. */
         e->err(e->context);
     } else {
-        /* If processing the replies/callbacks results in an error,
-         * invoke the error callback and abort. */
         if (redisProcessCallbacks(e->context) == REDIS_ERR) {
             e->err(e->context);
         }
     }
 }
 
-void redisLibEventWrite(int fd, short event, void *arg) {
+void libeventRedisWriteEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
-    redisEvents *e = arg;
+    libeventRedisEvents *e = arg;
     int done = 0;
 
-    if (redisBufferWrite(e->context, &done) == REDIS_ERR) {
+    if (redisBufferWrite(e->context,&done) == REDIS_ERR) {
         /* Handle error */
         e->err(e->context);
     } else {
@@ -52,30 +47,30 @@ void redisLibEventWrite(int fd, short event, void *arg) {
 
 /* Schedule to be notified on a write event, so the outgoing buffer
  * can be flushed to the socket. */
-void redisLibEventOnWrite(redisContext *c, void *privdata) {
+void libeventRedisCommandCallback(redisContext *c, void *privdata) {
     ((void)c);
-    redisEvents *e = privdata;
+    libeventRedisEvents *e = privdata;
     event_add(&e->wev,NULL);
 }
 
 /* Remove event handlers when the context gets disconnected. */
-void redisLibEventOnDisconnect(redisContext *c, void *privdata) {
+void libeventRedisDisconnectCallback(redisContext *c, void *privdata) {
     ((void)c);
-    redisEvents *e = privdata;
+    libeventRedisEvents *e = privdata;
     event_del(&e->rev);
     event_del(&e->wev);
 }
 
-/* Free the redisEvents struct when the context is free'd. */
-void redisLibEventOnFree(redisContext *c, void *privdata) {
+/* Free the libeventRedisEvents struct when the context is free'd. */
+void libeventRedisFreeCallback(redisContext *c, void *privdata) {
     ((void)c);
-    redisEvents *e = privdata;
+    libeventRedisEvents *e = privdata;
     free(e);
 }
 
-redisContext *redisLibEventConnect(struct event_base *base, redisErrorCallback *err, const char *ip, int port) {
-    redisEvents *e;
-    redisContext *c = redisConnectNonBlock(ip, port, NULL);
+redisContext *libeventRedisConnect(struct event_base *base, redisErrorCallback *err, const char *ip, int port) {
+    libeventRedisEvents *e;
+    redisContext *c = redisConnectNonBlock(ip,port,NULL);
     if (c->error != NULL) {
         err(c);
         redisFree(c);
@@ -87,13 +82,15 @@ redisContext *redisLibEventConnect(struct event_base *base, redisErrorCallback *
     e->context = c;
     e->err = err;
 
-    /* Register callbacks and events */
-    redisSetDisconnectCallback(e->context, redisLibEventOnDisconnect, e);
-    redisSetCommandCallback(e->context, redisLibEventOnWrite, e);
-    redisSetFreeCallback(e->context, redisLibEventOnFree, e);
-    event_set(&e->rev, e->context->fd, EV_READ, redisLibEventRead, e);
-    event_set(&e->wev, e->context->fd, EV_WRITE, redisLibEventWrite, e);
-    event_base_set(base, &e->rev);
-    event_base_set(base, &e->wev);
+    /* Register callbacks */
+    redisSetDisconnectCallback(c,libeventRedisDisconnectCallback,e);
+    redisSetCommandCallback(c,libeventRedisCommandCallback,e);
+    redisSetFreeCallback(c,libeventRedisFreeCallback,e);
+
+    /* Initialize and install read/write events */
+    event_set(&e->rev,c->fd,EV_READ,libeventRedisReadEvent,e);
+    event_set(&e->wev,c->fd,EV_WRITE,libeventRedisWriteEvent,e);
+    event_base_set(base,&e->rev);
+    event_base_set(base,&e->wev);
     return c;
 }
