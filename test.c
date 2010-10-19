@@ -195,7 +195,7 @@ static void cleanup() {
 }
 
 static long __test_callback_flags = 0;
-static void __test_callback(redisContext *c, const void *privdata) {
+static void __test_callback(redisContext *c, void *privdata) {
     ((void)c);
     /* Shift to detect execution order */
     __test_callback_flags <<= 8;
@@ -218,7 +218,7 @@ static void test_nonblocking_connection() {
     __test_callback_flags = 0;
     test("Calls command callback when command is issued: ");
     c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
-    redisSetCommandCallback(c,__test_callback,(const void*)1);
+    redisSetCommandCallback(c,__test_callback,(void*)1);
     redisCommand(c,"PING");
     test_cond(__test_callback_flags == 1);
     redisFree(c);
@@ -226,7 +226,7 @@ static void test_nonblocking_connection() {
     __test_callback_flags = 0;
     test("Calls disconnect callback on redisDisconnect: ");
     c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
-    redisSetDisconnectCallback(c,__test_callback,(const void*)2);
+    redisSetDisconnectCallback(c,__test_callback,(void*)2);
     redisDisconnect(c);
     test_cond(__test_callback_flags == 2);
     redisFree(c);
@@ -234,8 +234,8 @@ static void test_nonblocking_connection() {
     __test_callback_flags = 0;
     test("Calls disconnect callback and free callback on redisFree: ");
     c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
-    redisSetDisconnectCallback(c,__test_callback,(const void*)2);
-    redisSetFreeCallback(c,__test_callback,(const void*)4);
+    redisSetDisconnectCallback(c,__test_callback,(void*)2);
+    redisSetFreeCallback(c,__test_callback,(void*)4);
     redisFree(c);
     test_cond(__test_callback_flags == ((2 << 8) | 4));
 
@@ -262,9 +262,9 @@ static void test_nonblocking_connection() {
     wdone = __test_reply_callback_flags = 0;
     test("Process callbacks in the right sequence: ");
     c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
-    redisCommandWithCallback(c,__test_reply_callback,(const void*)1,"PING");
-    redisCommandWithCallback(c,__test_reply_callback,(const void*)2,"PING");
-    redisCommandWithCallback(c,__test_reply_callback,(const void*)3,"PING");
+    redisCommandWithCallback(c,__test_reply_callback,(void*)1,"PING");
+    redisCommandWithCallback(c,__test_reply_callback,(void*)2,"PING");
+    redisCommandWithCallback(c,__test_reply_callback,(void*)3,"PING");
 
     /* Write output buffer */
     while(!wdone) {

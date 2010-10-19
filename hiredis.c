@@ -631,20 +631,20 @@ redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions
 }
 
 /* Register callback that is triggered when redisDisconnect is called. */
-void redisSetDisconnectCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata) {
+void redisSetDisconnectCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata) {
     c->cbDisconnect.fn = fn;
     c->cbDisconnect.privdata = privdata;
 }
 
 /* Register callback that is triggered when a command is put in the output
  * buffer when the context is non-blocking. */
-void redisSetCommandCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata) {
+void redisSetCommandCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata) {
     c->cbCommand.fn = fn;
     c->cbCommand.privdata = privdata;
 }
 
 /* Register callback that is triggered when the context is free'd. */
-void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata) {
+void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata) {
     c->cbFree.fn = fn;
     c->cbFree.privdata = privdata;
 }

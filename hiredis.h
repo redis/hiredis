@@ -77,7 +77,7 @@ typedef struct redisReplyObjectFunctions {
 struct redisContext; /* need forward declaration of redisContext */
 
 /* Callbacks triggered on non-reply events. */
-typedef void (redisContextCallbackFn)(struct redisContext*, const void*);
+typedef void (redisContextCallbackFn)(struct redisContext*, void*);
 
 /* Reply callback prototype and container */
 typedef void (redisCallbackFn)(struct redisContext*, redisReply*, const void*);
@@ -85,7 +85,7 @@ typedef void (redisCallbackFn)(struct redisContext*, redisReply*, const void*);
 /* Callback containers */
 typedef struct redisContextCallback {
     redisContextCallbackFn *fn;
-    const void *privdata;
+    void *privdata;
 } redisContextCallback;
 
 typedef struct redisCallback {
@@ -135,16 +135,16 @@ int redisProcessCallbacks(redisContext *c);
 /* The disconnect callback is called *immediately* when redisDisconnect()
  * is called. It is called only once for every redisContext (since hiredis
  * currently does not support reconnecting an existing context). */
-void redisSetDisconnectCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata);
+void redisSetDisconnectCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata);
 
 /* The command callback is called every time redisCommand() is called in a
  * non-blocking context. It is called *after* the formatted command has been
  * appended to the write buffer. */
-void redisSetCommandCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata);
+void redisSetCommandCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata);
 
 /* The free callback is called *before* all allocations are free'd. Use it to
  * release resources that depend/use the redisContext that is being free'd. */
-void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, const void *privdata);
+void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata);
 
 /* Issue a command to Redis. In a blocking context, it returns the reply. When
  * an error occurs, it returns NULL and you should read redisContext->error
