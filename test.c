@@ -211,62 +211,65 @@ static void __test_reply_callback(redisContext *c, redisReply *reply, void *priv
     freeReplyObject(reply);
 }
 
+static redisContext *__connect_nonblock() {
+    /* Reset callback flags */
+    __test_callback_flags = __test_reply_callback_flags = 0;
+    return redisConnectNonBlock("127.0.0.1", 6379, NULL);
+}
+
 static void test_nonblocking_connection() {
     redisContext *c;
     int wdone = 0;
 
-    __test_callback_flags = 0;
     test("Calls command callback when command is issued: ");
-    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    c = __connect_nonblock();
     redisSetCommandCallback(c,__test_callback,(void*)1);
     redisCommand(c,"PING");
     test_cond(__test_callback_flags == 1);
     redisFree(c);
 
-    __test_callback_flags = 0;
     test("Calls disconnect callback on redisDisconnect: ");
-    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    c = __connect_nonblock();
     redisSetDisconnectCallback(c,__test_callback,(void*)2);
     redisDisconnect(c);
     test_cond(__test_callback_flags == 2);
     redisFree(c);
 
-    __test_callback_flags = 0;
     test("Calls disconnect callback and free callback on redisFree: ");
-    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    c = __connect_nonblock();
     redisSetDisconnectCallback(c,__test_callback,(void*)2);
     redisSetFreeCallback(c,__test_callback,(void*)4);
     redisFree(c);
     test_cond(__test_callback_flags == ((2 << 8) | 4));
 
     test("redisBufferWrite against empty write buffer: ");
-    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    c = __connect_nonblock();
     test_cond(redisBufferWrite(c,&wdone) == REDIS_OK && wdone == 1);
     redisFree(c);
 
     test("redisBufferWrite against not yet connected fd: ");
-    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    c = __connect_nonblock();
     redisCommand(c,"PING");
     test_cond(redisBufferWrite(c,NULL) == REDIS_ERR &&
               strncmp(c->error,"write:",6) == 0);
     redisFree(c);
 
     test("redisBufferWrite against closed fd: ");
-    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    c = __connect_nonblock();
     redisCommand(c,"PING");
     redisDisconnect(c);
     test_cond(redisBufferWrite(c,NULL) == REDIS_ERR &&
               strncmp(c->error,"write:",6) == 0);
     redisFree(c);
 
-    wdone = __test_reply_callback_flags = 0;
     test("Process callbacks in the right sequence: ");
-    c = redisConnectNonBlock("127.0.0.1", 6379, NULL);
+    c = __connect_nonblock();
     redisCommandWithCallback(c,__test_reply_callback,(void*)1,"PING");
     redisCommandWithCallback(c,__test_reply_callback,(void*)2,"PING");
     redisCommandWithCallback(c,__test_reply_callback,(void*)3,"PING");
 
     /* Write output buffer */
+    wdone = 0;
     while(!wdone) {
         usleep(500);
         redisBufferWrite(c,&wdone);
