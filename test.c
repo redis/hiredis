@@ -202,18 +202,17 @@ static void __test_callback(redisContext *c, void *privdata) {
     __test_callback_flags |= (long)privdata;
 }
 
-static long __test_reply_callback_flags = 0;
 static void __test_reply_callback(redisContext *c, redisReply *reply, void *privdata) {
     ((void)c);
     /* Shift to detect execution order */
-    __test_reply_callback_flags <<= 8;
-    __test_reply_callback_flags |= (long)privdata;
-    freeReplyObject(reply);
+    __test_callback_flags <<= 8;
+    __test_callback_flags |= (long)privdata;
+    if (reply) freeReplyObject(reply);
 }
 
 static redisContext *__connect_nonblock() {
     /* Reset callback flags */
-    __test_callback_flags = __test_reply_callback_flags = 0;
+    __test_callback_flags = 0;
     return redisConnectNonBlock("127.0.0.1", 6379, NULL);
 }
 
@@ -278,11 +277,19 @@ static void test_nonblocking_connection() {
     /* Read until at least one callback is executed (the 3 replies will
      * arrive in a single packet, causing all callbacks to be executed in
      * a single pass). */
-    while(__test_reply_callback_flags == 0) {
+    while(__test_callback_flags == 0) {
         assert(redisBufferRead(c) == REDIS_OK);
         redisProcessCallbacks(c);
     }
-    test_cond(__test_reply_callback_flags == 0x010203);
+    test_cond(__test_callback_flags == 0x010203);
+    redisFree(c);
+
+    test("redisDisconnect executes pending callbacks with NULL reply: ");
+    c = __connect_nonblock();
+    redisSetDisconnectCallback(c,__test_callback,(void*)1);
+    redisCommandWithCallback(c,__test_reply_callback,(void*)2,"PING");
+    redisDisconnect(c);
+    test_cond(__test_callback_flags == 0x0201);
     redisFree(c);
 }
 

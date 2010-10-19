@@ -5,6 +5,7 @@
 #include <signal.h>
 
 void getCallback(redisContext *c, redisReply *reply, void *privdata) {
+    if (reply == NULL) return; /* Error */
     printf("argv[%s]: %s\n", (const char*)privdata, reply->reply);
 
     /* Disconnect after receiving the reply to GET */

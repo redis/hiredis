@@ -587,6 +587,21 @@ static redisContext *redisContextInit(redisReplyFunctions *fn) {
 }
 
 void redisDisconnect(redisContext *c) {
+    int i;
+    redisCallback cb;
+
+    /* Non-blocking context: call pending callbacks with the NULL reply */
+    if (!(c->flags & REDIS_BLOCK)) {
+        for (i = 0; i < c->cpos; i++) {
+            cb = c->callbacks[i];
+            if (cb.fn != NULL) {
+                cb.fn(c,NULL,cb.privdata);
+            }
+        }
+        /* Reset callback index */
+        c->cpos = 0;
+    }
+
     if (c->cbDisconnect.fn != NULL)
         c->cbDisconnect.fn(c,c->cbDisconnect.privdata);
     close(c->fd);
