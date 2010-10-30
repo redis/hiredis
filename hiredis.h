@@ -72,7 +72,7 @@ typedef struct redisReplyObjectFunctions {
     void *(*createInteger)(redisReadTask*, long long);
     void *(*createNil)(redisReadTask*);
     void (*freeObject)(void*);
-} redisReplyFunctions;
+} redisReplyObjectFunctions;
 
 struct redisContext; /* need forward declaration of redisContext */
 
@@ -101,7 +101,7 @@ typedef struct redisContext {
     sds obuf; /* Write buffer */
 
     /* Function set for reply buildup and reply reader */
-    redisReplyFunctions *fn;
+    redisReplyObjectFunctions *fn;
     void *reader;
 
     /* Non-reply callbacks */
@@ -116,15 +116,15 @@ typedef struct redisContext {
 } redisContext;
 
 void freeReplyObject(void *reply);
-void *redisReplyReaderCreate(redisReplyFunctions *fn);
+void *redisReplyReaderCreate(redisReplyObjectFunctions *fn);
 void *redisReplyReaderGetObject(void *reader);
 char *redisReplyReaderGetError(void *reader);
 void redisReplyReaderFree(void *ptr);
 void redisReplyReaderFeed(void *reader, char *buf, int len);
 int redisReplyReaderGetReply(void *reader, void **reply);
 
-redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn);
-redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn);
+redisContext *redisConnect(const char *ip, int port, redisReplyObjectFunctions *fn);
+redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyObjectFunctions *fn);
 void redisDisconnect(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);

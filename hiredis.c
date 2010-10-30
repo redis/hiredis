@@ -60,7 +60,7 @@ static void *createNilObject(redisReadTask *task);
 static void redisSetReplyReaderError(redisReader *r, sds err);
 
 /* Default set of functions to build the reply. */
-static redisReplyFunctions defaultFunctions = {
+static redisReplyObjectFunctions defaultFunctions = {
     createStringObject,
     createArrayObject,
     createIntegerObject,
@@ -339,7 +339,7 @@ static int processItem(redisReader *r) {
     }
 }
 
-void *redisReplyReaderCreate(redisReplyFunctions *fn) {
+void *redisReplyReaderCreate(redisReplyObjectFunctions *fn) {
     redisReader *r = calloc(sizeof(redisReader),1);
     r->error = NULL;
     r->fn = fn == NULL ? &defaultFunctions : fn;
@@ -574,7 +574,7 @@ static int redisContextConnect(redisContext *c, const char *ip, int port) {
     return REDIS_OK;
 }
 
-static redisContext *redisContextInit(redisReplyFunctions *fn) {
+static redisContext *redisContextInit(redisReplyObjectFunctions *fn) {
     redisContext *c = calloc(sizeof(redisContext),1);
     c->error = NULL;
     c->obuf = sdsempty();
@@ -629,7 +629,7 @@ void redisFree(redisContext *c) {
 /* Connect to a Redis instance. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
-redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn) {
+redisContext *redisConnect(const char *ip, int port, redisReplyObjectFunctions *fn) {
     redisContext *c = redisContextInit(fn);
     c->flags |= REDIS_BLOCK;
     c->flags |= REDIS_CONNECTED;
@@ -637,7 +637,7 @@ redisContext *redisConnect(const char *ip, int port, redisReplyFunctions *fn) {
     return c;
 }
 
-redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyFunctions *fn) {
+redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyObjectFunctions *fn) {
     redisContext *c = redisContextInit(fn);
     c->flags &= ~REDIS_BLOCK;
     c->flags |= REDIS_CONNECTED;
