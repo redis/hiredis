@@ -44,7 +44,7 @@ static void test_blocking_connection() {
     __connect(&c); /* reconnect */
     test("Is able to deliver commands: ");
     reply = redisCommand(c,"PING");
-    test_cond(reply->type == REDIS_REPLY_STRING &&
+    test_cond(reply->type == REDIS_REPLY_STATUS &&
         strcasecmp(reply->str,"pong") == 0)
     freeReplyObject(reply);
 
@@ -65,7 +65,7 @@ static void test_blocking_connection() {
 
     test("Is a able to send commands verbatim: ");
     reply = redisCommand(c,"SET foo bar");
-    test_cond (reply->type == REDIS_REPLY_STRING &&
+    test_cond (reply->type == REDIS_REPLY_STATUS &&
         strcasecmp(reply->str,"ok") == 0)
     freeReplyObject(reply);
 
@@ -122,7 +122,7 @@ static void test_blocking_connection() {
               reply->element[0]->elements == 2 &&
               !memcmp(reply->element[0]->element[0]->str,"bar",3) &&
               !memcmp(reply->element[0]->element[1]->str,"foo",3) &&
-              reply->element[1]->type == REDIS_REPLY_STRING &&
+              reply->element[1]->type == REDIS_REPLY_STATUS &&
               strcasecmp(reply->element[1]->str,"pong") == 0);
     freeReplyObject(reply);
 }

@@ -118,10 +118,6 @@ static void *createStringObject(redisReadTask *task, char *str, size_t len) {
     r->str = value;
     r->len = len;
 
-    /* for API compat, set STATUS to STRING */
-    if (task->type == REDIS_REPLY_STATUS)
-        r->type = REDIS_REPLY_STRING;
-
     if (task->parent) {
         redisReply *parent = task->parent;
         assert(parent->type == REDIS_REPLY_ARRAY);
