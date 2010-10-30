@@ -36,7 +36,7 @@ static void test_blocking_connection() {
     test("Returns I/O error when the connection is lost: ");
     reply = redisCommand(c,"QUIT");
     test_cond(redisCommand(c,"PING") == NULL &&
-        strcasecmp(reply->reply,"OK") == 0 &&
+        strcasecmp(reply->str,"OK") == 0 &&
         strcmp(c->error,"read: Server closed the connection") == 0);
     freeReplyObject(reply);
     redisFree(c);
@@ -45,7 +45,7 @@ static void test_blocking_connection() {
     test("Is able to deliver commands: ");
     reply = redisCommand(c,"PING");
     test_cond(reply->type == REDIS_REPLY_STRING &&
-        strcasecmp(reply->reply,"pong") == 0)
+        strcasecmp(reply->str,"pong") == 0)
     freeReplyObject(reply);
 
     /* Switch to DB 9 for testing, now that we know we can chat. */
@@ -66,7 +66,7 @@ static void test_blocking_connection() {
     test("Is a able to send commands verbatim: ");
     reply = redisCommand(c,"SET foo bar");
     test_cond (reply->type == REDIS_REPLY_STRING &&
-        strcasecmp(reply->reply,"ok") == 0)
+        strcasecmp(reply->str,"ok") == 0)
     freeReplyObject(reply);
 
     test("%%s String interpolation works: ");
@@ -74,7 +74,7 @@ static void test_blocking_connection() {
     freeReplyObject(reply);
     reply = redisCommand(c,"GET foo");
     test_cond(reply->type == REDIS_REPLY_STRING &&
-        strcmp(reply->reply,"hello world") == 0);
+        strcmp(reply->str,"hello world") == 0);
     freeReplyObject(reply);
 
     test("%%b String interpolation works: ");
@@ -82,10 +82,10 @@ static void test_blocking_connection() {
     freeReplyObject(reply);
     reply = redisCommand(c,"GET foo");
     test_cond(reply->type == REDIS_REPLY_STRING &&
-        memcmp(reply->reply,"hello\x00world",11) == 0)
+        memcmp(reply->str,"hello\x00world",11) == 0)
 
     test("Binary reply length is correct: ");
-    test_cond(sdslen(reply->reply) == 11)
+    test_cond(reply->len == 11)
     freeReplyObject(reply);
 
     test("Can parse nil replies: ");
@@ -105,8 +105,8 @@ static void test_blocking_connection() {
     reply = redisCommand(c,"LRANGE mylist 0 -1");
     test_cond(reply->type == REDIS_REPLY_ARRAY &&
               reply->elements == 2 &&
-              !memcmp(reply->element[0]->reply,"bar",3) &&
-              !memcmp(reply->element[1]->reply,"foo",3))
+              !memcmp(reply->element[0]->str,"bar",3) &&
+              !memcmp(reply->element[1]->str,"foo",3))
     freeReplyObject(reply);
 
     /* m/e with multi bulk reply *before* other reply.
@@ -120,10 +120,10 @@ static void test_blocking_connection() {
               reply->elements == 2 &&
               reply->element[0]->type == REDIS_REPLY_ARRAY &&
               reply->element[0]->elements == 2 &&
-              !memcmp(reply->element[0]->element[0]->reply,"bar",3) &&
-              !memcmp(reply->element[0]->element[1]->reply,"foo",3) &&
+              !memcmp(reply->element[0]->element[0]->str,"bar",3) &&
+              !memcmp(reply->element[0]->element[1]->str,"foo",3) &&
               reply->element[1]->type == REDIS_REPLY_STRING &&
-              strcasecmp(reply->element[1]->reply,"pong") == 0);
+              strcasecmp(reply->element[1]->str,"pong") == 0);
     freeReplyObject(reply);
 }
 

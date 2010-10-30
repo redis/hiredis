@@ -49,13 +49,12 @@
 #define REDIS_REPLY_NIL 4
 #define REDIS_REPLY_STATUS 5
 
-#include "sds.h"
-
 /* This is the reply object returned by redisCommand() */
 typedef struct redisReply {
     int type; /* REDIS_REPLY_* */
     long long integer; /* The integer when type is REDIS_REPLY_INTEGER */
-    char *reply; /* Used for both REDIS_REPLY_ERROR and REDIS_REPLY_STRING */
+    int len; /* Length of string */
+    char *str; /* Used for both REDIS_REPLY_ERROR and REDIS_REPLY_STRING */
     size_t elements; /* number of elements, for REDIS_REPLY_ARRAY */
     struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
 } redisReply;
@@ -97,8 +96,8 @@ typedef struct redisCallback {
 typedef struct redisContext {
     int fd;
     int flags;
-    sds error; /* Error object is set when in erronous state */
-    sds obuf; /* Write buffer */
+    char *error; /* Error object is set when in erronous state */
+    char *obuf; /* Write buffer */
 
     /* Function set for reply buildup and reply reader */
     redisReplyObjectFunctions *fn;

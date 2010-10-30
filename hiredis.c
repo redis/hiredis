@@ -52,7 +52,7 @@ typedef struct redisReader {
     unsigned int rpos; /* list cursor */
 } redisReader;
 
-static redisReply *createReplyObject(int type, sds reply);
+static redisReply *createReplyObject(int type);
 static void *createStringObject(redisReadTask *task, char *str, size_t len);
 static void *createArrayObject(redisReadTask *task, int elements);
 static void *createIntegerObject(redisReadTask *task, long long value);
@@ -75,12 +75,11 @@ static void redisOOM(void) {
 }
 
 /* Create a reply object */
-static redisReply *createReplyObject(int type, sds reply) {
+static redisReply *createReplyObject(int type) {
     redisReply *r = calloc(sizeof(*r),1);
 
     if (!r) redisOOM();
     r->type = type;
-    r->reply = reply;
     return r;
 }
 
@@ -98,18 +97,26 @@ void freeReplyObject(void *reply) {
         free(r->element);
         break;
     default:
-        if (r->reply != NULL)
-            sdsfree(r->reply);
+        if (r->str != NULL)
+            free(r->str);
         break;
     }
     free(r);
 }
 
 static void *createStringObject(redisReadTask *task, char *str, size_t len) {
-    redisReply *r = createReplyObject(task->type,sdsnewlen(str,len));
+    redisReply *r = createReplyObject(task->type);
+    char *value = malloc(len+1);
+    if (!value) redisOOM();
     assert(task->type == REDIS_REPLY_ERROR ||
            task->type == REDIS_REPLY_STATUS ||
            task->type == REDIS_REPLY_STRING);
+
+    /* Copy string value */
+    memcpy(value,str,len);
+    value[len] = '\0';
+    r->str = value;
+    r->len = len;
 
     /* for API compat, set STATUS to STRING */
     if (task->type == REDIS_REPLY_STATUS)
@@ -124,7 +131,7 @@ static void *createStringObject(redisReadTask *task, char *str, size_t len) {
 }
 
 static void *createArrayObject(redisReadTask *task, int elements) {
-    redisReply *r = createReplyObject(REDIS_REPLY_ARRAY,NULL);
+    redisReply *r = createReplyObject(REDIS_REPLY_ARRAY);
     r->elements = elements;
     if ((r->element = calloc(sizeof(redisReply*),elements)) == NULL)
         redisOOM();
@@ -137,7 +144,7 @@ static void *createArrayObject(redisReadTask *task, int elements) {
 }
 
 static void *createIntegerObject(redisReadTask *task, long long value) {
-    redisReply *r = createReplyObject(REDIS_REPLY_INTEGER,NULL);
+    redisReply *r = createReplyObject(REDIS_REPLY_INTEGER);
     r->integer = value;
     if (task->parent) {
         redisReply *parent = task->parent;
@@ -148,7 +155,7 @@ static void *createIntegerObject(redisReadTask *task, long long value) {
 }
 
 static void *createNilObject(redisReadTask *task) {
-    redisReply *r = createReplyObject(REDIS_REPLY_NIL,NULL);
+    redisReply *r = createReplyObject(REDIS_REPLY_NIL);
     if (task->parent) {
         redisReply *parent = task->parent;
         assert(parent->type == REDIS_REPLY_ARRAY);
