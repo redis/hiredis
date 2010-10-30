@@ -460,61 +460,49 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
     return REDIS_OK;
 }
 
-/* Helper function for redisCommand(). It's used to append the next argument
- * to the argument vector. */
-static void addArgument(sds a, char ***argv, int *argc) {
+/* Calculate the number of bytes needed to represent an integer as string. */
+static int intlen(int i) {
+    int len = 0;
+    if (i < 0) {
+        len++;
+        i = -i;
+    }
+    do {
+        len++;
+        i /= 10;
+    } while(i);
+    return len;
+}
+
+/* Helper function for redisvFormatCommand(). */
+static void addArgument(sds a, char ***argv, int *argc, int *totlen) {
     (*argc)++;
     if ((*argv = realloc(*argv, sizeof(char*)*(*argc))) == NULL) redisOOM();
+    if (totlen) *totlen = *totlen+1+intlen(sdslen(a))+2+sdslen(a)+2;
     (*argv)[(*argc)-1] = a;
 }
 
-/* Execute a command. This function is printf alike:
- *
- * %s represents a C nul terminated string you want to interpolate
- * %b represents a binary safe string
- *
- * When using %b you need to provide both the pointer to the string
- * and the length in bytes. Examples:
- *
- * redisCommand("GET %s", mykey);
- * redisCommand("SET %s %b", mykey, somevalue, somevalue_len);
- *
- * RETURN VALUE:
- *
- * The returned value is a redisReply object that must be freed using the
- * redisFreeReply() function.
- *
- * given a redisReply "reply" you can test if there was an error in this way:
- *
- * if (reply->type == REDIS_REPLY_ERROR) {
- *     printf("Error in request: %s\n", reply->reply);
- * }
- *
- * The replied string itself is in reply->reply if the reply type is
- * a REDIS_REPLY_STRING. If the reply is a multi bulk reply then
- * reply->type is REDIS_REPLY_ARRAY and you can access all the elements
- * in this way:
- *
- * for (i = 0; i < reply->elements; i++)
- *     printf("%d: %s\n", i, reply->element[i]);
- *
- * Finally when type is REDIS_REPLY_INTEGER the long long integer is
- * stored at reply->integer.
- */
-static sds redisFormatCommand(const char *format, va_list ap) {
+int redisvFormatCommand(char **target, const char *format, va_list ap) {
     size_t size;
     const char *arg, *c = format;
-    sds cmd = sdsempty();     /* whole command buffer */
-    sds current = sdsempty(); /* current argument */
+    char *cmd = NULL; /* final command */
+    int pos; /* position in final command */
+    sds current; /* current argument */
     char **argv = NULL;
     int argc = 0, j;
+    int totlen = 0;
+
+    /* Abort if there is not target to set */
+    if (target == NULL)
+        return -1;
 
     /* Build the command string accordingly to protocol */
+    current = sdsempty();
     while(*c != '\0') {
         if (*c != '%' || c[1] == '\0') {
             if (*c == ' ') {
                 if (sdslen(current) != 0) {
-                    addArgument(current, &argv, &argc);
+                    addArgument(current, &argv, &argc, &totlen);
                     current = sdsempty();
                 }
             } else {
@@ -541,21 +529,53 @@ static sds redisFormatCommand(const char *format, va_list ap) {
     }
 
     /* Add the last argument if needed */
-    if (sdslen(current) != 0)
-        addArgument(current, &argv, &argc);
-    else
+    if (sdslen(current) != 0) {
+        addArgument(current, &argv, &argc, &totlen);
+    } else {
         sdsfree(current);
+    }
+
+    /* Add bytes needed to hold multi bulk count */
+    totlen += 1+intlen(argc)+2;
 
     /* Build the command at protocol level */
-    cmd = sdscatprintf(cmd,"*%d\r\n",argc);
+    cmd = malloc(totlen+1);
+    if (!cmd) redisOOM();
+    pos = sprintf(cmd,"*%d\r\n",argc);
     for (j = 0; j < argc; j++) {
-        cmd = sdscatprintf(cmd,"$%zu\r\n",sdslen(argv[j]));
-        cmd = sdscatlen(cmd,argv[j],sdslen(argv[j]));
-        cmd = sdscatlen(cmd,"\r\n",2);
+        pos += sprintf(cmd+pos,"$%zu\r\n",sdslen(argv[j]));
+        memcpy(cmd+pos,argv[j],sdslen(argv[j]));
+        pos += sdslen(argv[j]);
         sdsfree(argv[j]);
+        cmd[pos++] = '\r';
+        cmd[pos++] = '\n';
     }
+    assert(pos == totlen);
     free(argv);
-    return cmd;
+    cmd[totlen] = '\0';
+    *target = cmd;
+    return totlen;
+}
+
+/* Format a command according to the Redis protocol. This function
+ * takes a format similar to printf:
+ *
+ * %s represents a C null terminated string you want to interpolate
+ * %b represents a binary safe string
+ *
+ * When using %b you need to provide both the pointer to the string
+ * and the length in bytes. Examples:
+ *
+ * len = redisFormatCommand(target, "GET %s", mykey);
+ * len = redisFormatCommand(target, "SET %s %b", mykey, myval, myvallen);
+ */
+int redisFormatCommand(char **target, const char *format, ...) {
+    va_list ap;
+    int len;
+    va_start(ap,format);
+    len = redisvFormatCommand(target,format,ap);
+    va_end(ap);
+    return len;
 }
 
 static int redisContextConnect(redisContext *c, const char *ip, int port) {
@@ -833,21 +853,22 @@ static int redisCommandWriteNonBlock(redisContext *c, redisCallback *cb, char *s
  * the error field in the context will be set. */
 void *redisCommand(redisContext *c, const char *format, ...) {
     va_list ap;
-    sds cmd;
+    char *cmd;
+    int len;
     void *reply = NULL;
     va_start(ap,format);
-    cmd = redisFormatCommand(format,ap);
+    len = redisvFormatCommand(&cmd,format,ap);
     va_end(ap);
 
     if (c->flags & REDIS_BLOCK) {
-        if (redisCommandWriteBlock(c,&reply,cmd,sdslen(cmd)) == REDIS_OK) {
-            sdsfree(cmd);
+        if (redisCommandWriteBlock(c,&reply,cmd,len) == REDIS_OK) {
+            free(cmd);
             return reply;
         }
     } else {
-        redisCommandWriteNonBlock(c,NULL,cmd,sdslen(cmd));
+        redisCommandWriteNonBlock(c,NULL,cmd,len);
     }
-    sdsfree(cmd);
+    free(cmd);
     return NULL;
 }
 
@@ -859,7 +880,8 @@ void *redisCommand(redisContext *c, const char *format, ...) {
  * have no effect (a callback in a blocking context makes no sense). */
 void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, void *privdata, const char *format, ...) {
     va_list ap;
-    sds cmd;
+    char *cmd;
+    int len;
     int status;
     redisCallback cb = { fn, privdata };
 
@@ -867,10 +889,10 @@ void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, void *privd
     if (c->flags & REDIS_BLOCK) return NULL;
 
     va_start(ap,format);
-    cmd = redisFormatCommand(format,ap);
+    len = redisvFormatCommand(&cmd,format,ap);
     va_end(ap);
 
-    status = redisCommandWriteNonBlock(c,&cb,cmd,sdslen(cmd));
-    sdsfree(cmd);
+    status = redisCommandWriteNonBlock(c,&cb,cmd,len);
+    free(cmd);
     return NULL;
 }
