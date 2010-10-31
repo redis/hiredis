@@ -639,28 +639,10 @@ static redisContext *redisContextInit(redisReplyObjectFunctions *fn) {
     c->obuf = sdsempty();
     c->fn = fn == NULL ? &defaultFunctions : fn;
     c->reader = redisReplyReaderCreate(c->fn);
-    c->callbacks = calloc(sizeof(redisCallback),1);
-    c->clen = 1;
-    c->cpos = 0;
     return c;
 }
 
 void redisDisconnect(redisContext *c) {
-    int i;
-    redisCallback cb;
-
-    /* Non-blocking context: call pending callbacks with the NULL reply */
-    if (!(c->flags & REDIS_BLOCK)) {
-        for (i = 0; i < c->cpos; i++) {
-            cb = c->callbacks[i];
-            if (cb.fn != NULL) {
-                cb.fn(c,NULL,cb.privdata);
-            }
-        }
-        /* Reset callback index */
-        c->cpos = 0;
-    }
-
     if (c->cbDisconnect.fn != NULL)
         c->cbDisconnect.fn(c,c->cbDisconnect.privdata);
     close(c->fd);
@@ -679,8 +661,6 @@ void redisFree(redisContext *c) {
         sdsfree(c->error);
     if (c->obuf != NULL)
         sdsfree(c->obuf);
-    if (c->clen > 0)
-        free(c->callbacks);
     redisReplyReaderFree(c->reader);
     free(c);
 }
@@ -759,38 +739,6 @@ int redisGetReply(redisContext *c, void **reply) {
     return REDIS_OK;
 }
 
-static void redisPopCallback(redisContext *c) {
-    assert(c->cpos > 0);
-    if (c->cpos > 1)
-        memmove(&c->callbacks[0],&c->callbacks[1],(c->cpos-1)*sizeof(redisCallback));
-    c->cpos--;
-}
-
-int redisProcessCallbacks(redisContext *c) {
-    void *reply = NULL;
-    redisCallback cb;
-
-    /* Continue while there are callbacks */
-    while(c->cpos > 0) {
-        cb = c->callbacks[0];
-        if (redisGetReply(c,&reply) == REDIS_ERR)
-            return REDIS_ERR;
-
-        if (reply != NULL) {
-            redisPopCallback(c);
-            if (cb.fn != NULL) {
-                cb.fn(c,reply,cb.privdata);
-            } else {
-                c->fn->freeObject(reply);
-            }
-        } else {
-            /* Stop trying */
-            break;
-        }
-    }
-    return REDIS_OK;
-}
-
 /* Write the output buffer to the socket.
  *
  * Returns REDIS_OK when the buffer is empty, or (a part of) the buffer was
@@ -853,23 +801,9 @@ static int redisCommandWriteBlock(redisContext *c, void **reply, char *str, size
     return REDIS_OK;
 }
 
-static int redisCommandWriteNonBlock(redisContext *c, redisCallback *cb, char *str, size_t len) {
+static int redisCommandWriteNonBlock(redisContext *c, char *str, size_t len) {
     assert(!(c->flags & REDIS_BLOCK));
     c->obuf = sdscatlen(c->obuf,str,len);
-
-    /* Make sure there is space for the callback. */
-    assert(c->cpos <= c->clen);
-    if (c->cpos == c->clen) {
-        c->clen++;
-        c->callbacks = realloc(c->callbacks,c->clen*sizeof(redisCallback));
-    }
-
-    if (cb != NULL) {
-        c->callbacks[c->cpos] = *cb;
-    } else {
-        memset(&c->callbacks[c->cpos],0,sizeof(redisCallback));
-    }
-    c->cpos++;
 
     /* Fire write callback */
     if (c->cbCommand.fn != NULL)
@@ -880,13 +814,12 @@ static int redisCommandWriteNonBlock(redisContext *c, redisCallback *cb, char *s
 
 /* Write a formatted command to the output buffer. If the given context is
  * blocking, immediately read the reply into the "reply" pointer. When the
- * context is non-blocking, the "reply" pointer will not be used and a
- * NULL callback will be appended to the list of callbacks.
+ * context is non-blocking, the "reply" pointer will not be used and the
+ * command is simply appended to the write buffer.
  *
  * Returns the reply when a reply was succesfully retrieved. Returns NULL
- * otherwise. When NULL is returned in a blocking context, provided that
- * the reply build functions did not return NULL when building the reply,
- * the error field in the context will be set. */
+ * otherwise. When NULL is returned in a blocking context, the error field
+ * in the context will be set. */
 void *redisCommand(redisContext *c, const char *format, ...) {
     va_list ap;
     char *cmd;
@@ -902,33 +835,8 @@ void *redisCommand(redisContext *c, const char *format, ...) {
             return reply;
         }
     } else {
-        redisCommandWriteNonBlock(c,NULL,cmd,len);
+        redisCommandWriteNonBlock(c,cmd,len);
     }
-    free(cmd);
-    return NULL;
-}
-
-/* Write a formatted command to the output buffer. Registers the provided
- * callback function and argument in the callback list.
- *
- * Always returns NULL. In a non-blocking context this will never fail because
- * this function does not do any I/O. In a blocking context this function will
- * have no effect (a callback in a blocking context makes no sense). */
-void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, void *privdata, const char *format, ...) {
-    va_list ap;
-    char *cmd;
-    int len;
-    int status;
-    redisCallback cb = { fn, privdata };
-
-    /* This function may only be used in a non-blocking context. */
-    if (c->flags & REDIS_BLOCK) return NULL;
-
-    va_start(ap,format);
-    len = redisvFormatCommand(&cmd,format,ap);
-    va_end(ap);
-
-    status = redisCommandWriteNonBlock(c,&cb,cmd,len);
     free(cmd);
     return NULL;
 }

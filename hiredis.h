@@ -78,19 +78,11 @@ struct redisContext; /* need forward declaration of redisContext */
 /* Callbacks triggered on non-reply events. */
 typedef void (redisContextCallbackFn)(struct redisContext*, void*);
 
-/* Reply callback prototype and container */
-typedef void (redisCallbackFn)(struct redisContext*, redisReply*, void*);
-
 /* Callback containers */
 typedef struct redisContextCallback {
     redisContextCallbackFn *fn;
     void *privdata;
 } redisContextCallback;
-
-typedef struct redisCallback {
-    redisCallbackFn *fn;
-    void *privdata;
-} redisCallback;
 
 /* Context for a connection to Redis */
 typedef struct redisContext {
@@ -107,11 +99,6 @@ typedef struct redisContext {
     redisContextCallback cbDisconnect;
     redisContextCallback cbCommand;
     redisContextCallback cbFree;
-
-    /* Reply callbacks */
-    redisCallback *callbacks;
-    int cpos;
-    int clen;
 } redisContext;
 
 void freeReplyObject(void *reply);
@@ -134,7 +121,6 @@ void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
 int redisGetReply(redisContext *c, void **reply);
-int redisProcessCallbacks(redisContext *c);
 
 /* The disconnect callback is called *immediately* when redisDisconnect()
  * is called. It is called only once for every redisContext (since hiredis
@@ -154,19 +140,7 @@ void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, void *pri
  * an error occurs, it returns NULL and you should read redisContext->error
  * to find out what's wrong. In a non-blocking context, it has the same effect
  * as calling redisCommandWithCallback() with a NULL callback, and will always
- * return NULL.
- *
- * Note: using a NULL reply for an error might conflict with custom reply
- * reader functions that have NULL as a valid return value (e.g. for the nil
- * return value). Therefore, it is recommended never to return NULL from your
- * custom reply object functions. */
+ * return NULL. */
 void *redisCommand(redisContext *c, const char *format, ...);
-
-/* Issue a command to Redis from a non-blocking context. The formatted command
- * is appended to the write buffer and the provided callback is registered.
- *
- * Note: when called with a blocking context, this function will not do
- * anything and immediately returns NULL. */
-void *redisCommandWithCallback(redisContext *c, redisCallbackFn *fn, void *privdata, const char *format, ...);
 
 #endif
