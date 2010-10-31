@@ -800,15 +800,11 @@ int redisGetReply(redisContext *c, void **reply) {
     void *aux = NULL;
 
     /* Try to read pending replies */
-    if (__redisGetReply(c,&aux) == REDIS_ERR) {
+    if (__redisGetReply(c,&aux) == REDIS_ERR)
         return REDIS_ERR;
-    } else {
-        /* Return immediately if there was a pending reply */
-        if (aux != NULL) return REDIS_OK;
-    }
 
     /* For the blocking context, flush output buffer and read reply */
-    if (c->flags & REDIS_BLOCK) {
+    if (aux == NULL && c->flags & REDIS_BLOCK) {
         /* Write until done */
         do {
             if (redisBufferWrite(c,&wdone) == REDIS_ERR)
@@ -822,10 +818,10 @@ int redisGetReply(redisContext *c, void **reply) {
             if (__redisGetReply(c,&aux) == REDIS_ERR)
                 return REDIS_ERR;
         } while (aux == NULL);
-
-        /* Set reply object */
-        if (reply != NULL) *reply = aux;
     }
+
+    /* Set reply object */
+    if (reply != NULL) *reply = aux;
     return REDIS_OK;
 }
 
