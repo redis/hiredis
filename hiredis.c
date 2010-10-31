@@ -47,9 +47,8 @@ typedef struct redisReader {
     sds buf; /* read buffer */
     unsigned int pos; /* buffer cursor */
 
-    redisReadTask *rlist; /* list of items to process */
-    unsigned int rlen; /* list length */
-    unsigned int rpos; /* list cursor */
+    redisReadTask rstack[3]; /* stack of read tasks */
+    int ridx; /* index of stack */
 } redisReader;
 
 static redisReply *createReplyObject(int type);
@@ -183,8 +182,33 @@ static char *readLine(redisReader *r, int *_len) {
     return NULL;
 }
 
+static void moveToNextTask(redisReader *r) {
+    redisReadTask *cur, *prv;
+    assert(r->ridx >= 0);
+
+    /* Return a.s.a.p. when the stack is now empty. */
+    if (r->ridx == 0) {
+        r->ridx--;
+        return;
+    }
+
+    cur = &(r->rstack[r->ridx]);
+    prv = &(r->rstack[r->ridx-1]);
+    assert(prv->type == REDIS_REPLY_ARRAY);
+    if (cur->idx == prv->elements-1) {
+        r->ridx--;
+        moveToNextTask(r);
+    } else {
+        /* Reset the type because the next item can be anything */
+        assert(cur->idx < prv->elements);
+        cur->type = -1;
+        cur->elements = -1;
+        cur->idx++;
+    }
+}
+
 static int processLineItem(redisReader *r) {
-    redisReadTask *cur = &(r->rlist[r->rpos]);
+    redisReadTask *cur = &(r->rstack[r->ridx]);
     void *obj;
     char *p;
     int len;
@@ -199,14 +223,14 @@ static int processLineItem(redisReader *r) {
         /* If there is no root yet, register this object as root. */
         if (r->reply == NULL)
             r->reply = obj;
-        r->rpos++;
+        moveToNextTask(r);
         return 0;
     }
     return -1;
 }
 
 static int processBulkItem(redisReader *r) {
-    redisReadTask *cur = &(r->rlist[r->rpos]);
+    redisReadTask *cur = &(r->rstack[r->ridx]);
     void *obj = NULL;
     char *p, *s;
     long len;
@@ -235,7 +259,7 @@ static int processBulkItem(redisReader *r) {
             r->pos += bytelen;
             if (r->reply == NULL)
                 r->reply = obj;
-            r->rpos++;
+            moveToNextTask(r);
             return 0;
         }
     }
@@ -243,53 +267,42 @@ static int processBulkItem(redisReader *r) {
 }
 
 static int processMultiBulkItem(redisReader *r) {
-    redisReadTask *cur = &(r->rlist[r->rpos]);
+    redisReadTask *cur = &(r->rstack[r->ridx]);
     void *obj;
     char *p;
-    long elements, j;
+    long elements;
 
     if ((p = readLine(r,NULL)) != NULL) {
         elements = strtol(p,NULL,10);
         if (elements == -1) {
             obj = r->fn->createNil(cur);
+            moveToNextTask(r);
         } else {
             obj = r->fn->createArray(cur,elements);
 
-            /* Modify read list when there are more than 0 elements. */
+            /* Modify task stack when there are more than 0 elements. */
             if (elements > 0) {
-                /* Append elements to the read list. */
-                r->rlen += elements;
-                if ((r->rlist = realloc(r->rlist,sizeof(redisReadTask)*r->rlen)) == NULL)
-                    redisOOM();
-
-                /* Move existing items backwards. */
-                memmove(&(r->rlist[r->rpos+1+elements]),
-                        &(r->rlist[r->rpos+1]),
-                        (r->rlen-(r->rpos+1+elements))*sizeof(redisReadTask));
-
-                /* Populate new read items. */
-                redisReadTask *t;
-                for (j = 0; j < elements; j++) {
-                    t = &(r->rlist[r->rpos+1+j]);
-                    t->type = -1;
-                    t->parent = obj;
-                    t->idx = j;
-                }
+                cur->elements = elements;
+                r->ridx++;
+                r->rstack[r->ridx].type = -1;
+                r->rstack[r->ridx].elements = -1;
+                r->rstack[r->ridx].parent = obj;
+                r->rstack[r->ridx].idx = 0;
+            } else {
+                moveToNextTask(r);
             }
         }
 
-        if (obj != NULL) {
-            if (r->reply == NULL)
-                r->reply = obj;
-            r->rpos++;
-            return 0;
-        }
+        /* Object was created, so we can always continue. */
+        if (r->reply == NULL)
+            r->reply = obj;
+        return 0;
     }
     return -1;
 }
 
 static int processItem(redisReader *r) {
-    redisReadTask *cur = &(r->rlist[r->rpos]);
+    redisReadTask *cur = &(r->rstack[r->ridx]);
     char *p;
     sds byte;
 
@@ -347,7 +360,7 @@ void *redisReplyReaderCreate(redisReplyObjectFunctions *fn) {
     r->error = NULL;
     r->fn = fn == NULL ? &defaultFunctions : fn;
     r->buf = sdsempty();
-    r->rlist = malloc(sizeof(redisReadTask)*1);
+    r->ridx = -1;
     return r;
 }
 
@@ -368,8 +381,6 @@ void redisReplyReaderFree(void *reader) {
         r->fn->freeObject(r->reply);
     if (r->buf != NULL)
         sdsfree(r->buf);
-    if (r->rlist != NULL)
-        free(r->rlist);
     free(r);
 }
 
@@ -383,7 +394,7 @@ static void redisSetReplyReaderError(redisReader *r, sds err) {
         r->buf = sdsempty();
         r->pos = 0;
     }
-    r->rlen = r->rpos = 0;
+    r->ridx = -1;
     r->error = err;
 }
 
@@ -408,18 +419,17 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
     if (sdslen(r->buf) == 0)
         return REDIS_OK;
 
-    /* Create first item to process when the item list is empty. */
-    if (r->rlen == 0) {
-        r->rlist = realloc(r->rlist,sizeof(redisReadTask)*1);
-        r->rlist[0].type = -1;
-        r->rlist[0].parent = NULL;
-        r->rlist[0].idx = -1;
-        r->rlen = 1;
-        r->rpos = 0;
+    /* Set first item to process when the stack is empty. */
+    if (r->ridx == -1) {
+        r->rstack[0].type = -1;
+        r->rstack[0].elements = -1;
+        r->rstack[0].parent = NULL;
+        r->rstack[0].idx = -1;
+        r->ridx = 0;
     }
 
     /* Process items in reply. */
-    while (r->rpos < r->rlen)
+    while (r->ridx >= 0)
         if (processItem(r) < 0)
             break;
 
@@ -436,7 +446,7 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
     }
 
     /* Emit a reply when there is one. */
-    if (r->rpos == r->rlen) {
+    if (r->ridx == -1) {
         void *aux = r->reply;
         r->reply = NULL;
 
@@ -446,9 +456,6 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
             r->buf = sdsempty();
             r->pos = 0;
         }
-
-        /* Set list of items to read to be empty. */
-        r->rlen = r->rpos = 0;
 
         /* Check if there actually *is* a reply. */
         if (r->error != NULL) {
