@@ -37,6 +37,7 @@
 #include "hiredis.h"
 #include "anet.h"
 #include "sds.h"
+#include "util.h"
 
 typedef struct redisReader {
     struct redisReplyObjectFunctions *fn;
@@ -65,12 +66,6 @@ static redisReplyObjectFunctions defaultFunctions = {
     createNilObject,
     freeReplyObject
 };
-
-/* We simply abort on out of memory */
-static void redisOOM(void) {
-    fprintf(stderr,"Out of memory in hiredis.c");
-    exit(1);
-}
 
 /* Create a reply object */
 static redisReply *createReplyObject(int type) {
