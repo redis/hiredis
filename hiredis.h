@@ -29,7 +29,8 @@
 
 #ifndef __HIREDIS_H
 #define __HIREDIS_H
-#include <stdarg.h>
+#include <stdio.h> /* for size_t */
+#include <stdarg.h> /* for va_list */
 
 #define REDIS_ERR -1
 #define REDIS_OK 0
