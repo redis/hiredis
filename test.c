@@ -28,6 +28,48 @@ static void __connect(redisContext **target) {
     }
 }
 
+static void test_format_commands() {
+    char *cmd;
+    int len;
+
+    test("Format command without interpolation: ");
+    len = redisFormatCommand(&cmd,"SET foo bar");
+    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
+        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    free(cmd);
+
+    test("Format command with %%s string interpolation: ");
+    len = redisFormatCommand(&cmd,"SET %s %s","foo","bar");
+    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
+        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    free(cmd);
+
+    test("Format command with %%b string interpolation: ");
+    len = redisFormatCommand(&cmd,"SET %b %b","foo",3,"b\0r",3);
+    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nb\0r\r\n",len) == 0 &&
+        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    free(cmd);
+
+    const char *argv[3];
+    argv[0] = "SET";
+    argv[1] = "foo";
+    argv[2] = "bar";
+    size_t lens[3] = { 3, 3, 3 };
+    int argc = 3;
+
+    test("Format command by passing argc/argv without lengths: ");
+    len = redisFormatCommandArgv(&cmd,argc,argv,NULL);
+    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
+        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    free(cmd);
+
+    test("Format command by passing argc/argv with lengths: ");
+    len = redisFormatCommandArgv(&cmd,argc,argv,lens);
+    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
+        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    free(cmd);
+}
+
 static void test_blocking_connection() {
     redisContext *c;
     redisReply *reply;
@@ -294,6 +336,7 @@ static void test_nonblocking_connection() {
 }
 
 int main(void) {
+    test_format_commands();
     test_blocking_connection();
     test_reply_reader();
     test_nonblocking_connection();

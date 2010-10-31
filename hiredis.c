@@ -578,6 +578,42 @@ int redisFormatCommand(char **target, const char *format, ...) {
     return len;
 }
 
+/* Format a command according to the Redis protocol. This function takes the
+ * number of arguments, an array with arguments and an array with their
+ * lengths. If the latter is set to NULL, strlen will be used to compute the
+ * argument lengths.
+ */
+int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
+    char *cmd = NULL; /* final command */
+    int pos; /* position in final command */
+    size_t len;
+    int totlen, j;
+
+    /* Calculate number of bytes needed for the command */
+    totlen = 1+intlen(argc)+2;
+    for (j = 0; j < argc; j++) {
+        len = argvlen ? argvlen[j] : strlen(argv[j]);
+        totlen += 1+intlen(len)+2+len+2;
+    }
+
+    /* Build the command at protocol level */
+    cmd = malloc(totlen+1);
+    if (!cmd) redisOOM();
+    pos = sprintf(cmd,"*%d\r\n",argc);
+    for (j = 0; j < argc; j++) {
+        len = argvlen ? argvlen[j] : strlen(argv[j]);
+        pos += sprintf(cmd+pos,"$%zu\r\n",len);
+        memcpy(cmd+pos,argv[j],len);
+        pos += len;
+        cmd[pos++] = '\r';
+        cmd[pos++] = '\n';
+    }
+    assert(pos == totlen);
+    cmd[totlen] = '\0';
+    *target = cmd;
+    return totlen;
+}
+
 static int redisContextConnect(redisContext *c, const char *ip, int port) {
     char err[ANET_ERR_LEN];
     if (c->flags & REDIS_BLOCK) {
