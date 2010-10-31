@@ -9,7 +9,7 @@ int main(void) {
     redisContext *c;
     redisReply *reply;
 
-    c = redisConnect((char*)"127.0.0.1", 6379, NULL);
+    c = redisConnect((char*)"127.0.0.1", 6379);
     if (c->error != NULL) {
         printf("Connection error: %s\n", c->error);
         exit(1);
@@ -17,22 +17,22 @@ int main(void) {
 
     /* PING server */
     reply = redisCommand(c,"PING");
-    printf("PONG: %s\n", reply->reply);
+    printf("PONG: %s\n", reply->str);
     freeReplyObject(reply);
 
     /* Set a key */
     reply = redisCommand(c,"SET %s %s", "foo", "hello world");
-    printf("SET: %s\n", reply->reply);
+    printf("SET: %s\n", reply->str);
     freeReplyObject(reply);
 
     /* Set a key using binary safe API */
     reply = redisCommand(c,"SET %b %b", "bar", 3, "hello", 5);
-    printf("SET (binary API): %s\n", reply->reply);
+    printf("SET (binary API): %s\n", reply->str);
     freeReplyObject(reply);
 
     /* Try a GET and two INCR */
     reply = redisCommand(c,"GET foo");
-    printf("GET foo: %s\n", reply->reply);
+    printf("GET foo: %s\n", reply->str);
     freeReplyObject(reply);
 
     reply = redisCommand(c,"INCR counter");
@@ -58,7 +58,7 @@ int main(void) {
     reply = redisCommand(c,"LRANGE mylist 0 -1");
     if (reply->type == REDIS_REPLY_ARRAY) {
         for (j = 0; j < reply->elements; j++) {
-            printf("%u) %s\n", j, reply->element[j]->reply);
+            printf("%u) %s\n", j, reply->element[j]->str);
         }
     }
     freeReplyObject(reply);
