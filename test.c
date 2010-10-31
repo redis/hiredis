@@ -21,7 +21,7 @@ static long long usec(void) {
 
 static redisContext *blocking_context = NULL;
 static void __connect(redisContext **target) {
-    *target = blocking_context = redisConnect((char*)"127.0.0.1", 6379, NULL);
+    *target = blocking_context = redisConnect((char*)"127.0.0.1", 6379);
     if (blocking_context->error != NULL) {
         printf("Connection error: %s\n", blocking_context->error);
         exit(1);

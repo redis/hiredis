@@ -633,12 +633,12 @@ static int redisContextConnect(redisContext *c, const char *ip, int port) {
     return REDIS_OK;
 }
 
-static redisContext *redisContextInit(redisReplyObjectFunctions *fn) {
+static redisContext *redisContextInit() {
     redisContext *c = calloc(sizeof(redisContext),1);
     c->error = NULL;
     c->obuf = sdsempty();
-    c->fn = fn == NULL ? &defaultFunctions : fn;
-    c->reader = redisReplyReaderCreate(c->fn);
+    c->fn = &defaultFunctions;
+    c->reader = NULL;
     return c;
 }
 
@@ -661,27 +661,44 @@ void redisFree(redisContext *c) {
         sdsfree(c->error);
     if (c->obuf != NULL)
         sdsfree(c->obuf);
-    redisReplyReaderFree(c->reader);
+    if (c->reader != NULL)
+        redisReplyReaderFree(c->reader);
     free(c);
 }
 
 /* Connect to a Redis instance. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
-redisContext *redisConnect(const char *ip, int port, redisReplyObjectFunctions *fn) {
-    redisContext *c = redisContextInit(fn);
+redisContext *redisConnect(const char *ip, int port) {
+    redisContext *c = redisContextInit();
     c->flags |= REDIS_BLOCK;
     c->flags |= REDIS_CONNECTED;
     redisContextConnect(c,ip,port);
     return c;
 }
 
-redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyObjectFunctions *fn) {
-    redisContext *c = redisContextInit(fn);
+redisContext *redisConnectNonBlock(const char *ip, int port) {
+    redisContext *c = redisContextInit();
     c->flags &= ~REDIS_BLOCK;
     c->flags |= REDIS_CONNECTED;
     redisContextConnect(c,ip,port);
     return c;
+}
+
+/* Set the replyObjectFunctions to use. Returns REDIS_ERR when the reader
+ * was already initialized and the function set could not be re-set.
+ * Return REDIS_OK when they could be set. */
+int redisSetReplyObjectFunctions(redisContext *c, redisReplyObjectFunctions *fn) {
+    if (c->reader != NULL)
+        return REDIS_ERR;
+    c->fn = fn;
+    return REDIS_OK;
+}
+
+/* Helper function to lazily create a reply reader. */
+static void __redisCreateReplyReader(redisContext *c) {
+    if (c->reader == NULL)
+        c->reader = redisReplyReaderCreate(c->fn);
 }
 
 /* Register callback that is triggered when redisDisconnect is called. */
@@ -725,6 +742,7 @@ int redisBufferRead(redisContext *c) {
             "read: Server closed the connection");
         return REDIS_ERR;
     } else {
+        __redisCreateReplyReader(c);
         redisReplyReaderFeed(c->reader,buf,nread);
     }
     return REDIS_OK;
@@ -768,6 +786,7 @@ int redisBufferWrite(redisContext *c, int *done) {
 /* Internal helper function to try and get a reply from the reader,
  * or set an error in the context otherwise. */
 static int __redisGetReply(redisContext *c, void **reply) {
+    __redisCreateReplyReader(c);
     if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
         /* Copy the (protocol) error from the reader to the context. */
         c->error = sdsnew(((redisReader*)c->reader)->error);

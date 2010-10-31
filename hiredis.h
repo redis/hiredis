@@ -114,8 +114,9 @@ int redisvFormatCommand(char **target, const char *format, va_list ap);
 int redisFormatCommand(char **target, const char *format, ...);
 int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
 
-redisContext *redisConnect(const char *ip, int port, redisReplyObjectFunctions *fn);
-redisContext *redisConnectNonBlock(const char *ip, int port, redisReplyObjectFunctions *fn);
+redisContext *redisConnect(const char *ip, int port);
+redisContext *redisConnectNonBlock(const char *ip, int port);
+int redisSetReplyObjectFunctions(redisContext *c, redisReplyObjectFunctions *fn);
 void redisDisconnect(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
