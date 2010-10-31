@@ -52,10 +52,10 @@ typedef struct redisReader {
 } redisReader;
 
 static redisReply *createReplyObject(int type);
-static void *createStringObject(redisReadTask *task, char *str, size_t len);
-static void *createArrayObject(redisReadTask *task, int elements);
-static void *createIntegerObject(redisReadTask *task, long long value);
-static void *createNilObject(redisReadTask *task);
+static void *createStringObject(const redisReadTask *task, char *str, size_t len);
+static void *createArrayObject(const redisReadTask *task, int elements);
+static void *createIntegerObject(const redisReadTask *task, long long value);
+static void *createNilObject(const redisReadTask *task);
 static void redisSetReplyReaderError(redisReader *r, sds err);
 
 /* Default set of functions to build the reply. */
@@ -103,7 +103,7 @@ void freeReplyObject(void *reply) {
     free(r);
 }
 
-static void *createStringObject(redisReadTask *task, char *str, size_t len) {
+static void *createStringObject(const redisReadTask *task, char *str, size_t len) {
     redisReply *r = createReplyObject(task->type);
     char *value = malloc(len+1);
     if (!value) redisOOM();
@@ -125,7 +125,7 @@ static void *createStringObject(redisReadTask *task, char *str, size_t len) {
     return r;
 }
 
-static void *createArrayObject(redisReadTask *task, int elements) {
+static void *createArrayObject(const redisReadTask *task, int elements) {
     redisReply *r = createReplyObject(REDIS_REPLY_ARRAY);
     r->elements = elements;
     if ((r->element = calloc(sizeof(redisReply*),elements)) == NULL)
@@ -138,7 +138,7 @@ static void *createArrayObject(redisReadTask *task, int elements) {
     return r;
 }
 
-static void *createIntegerObject(redisReadTask *task, long long value) {
+static void *createIntegerObject(const redisReadTask *task, long long value) {
     redisReply *r = createReplyObject(REDIS_REPLY_INTEGER);
     r->integer = value;
     if (task->parent) {
@@ -149,7 +149,7 @@ static void *createIntegerObject(redisReadTask *task, long long value) {
     return r;
 }
 
-static void *createNilObject(redisReadTask *task) {
+static void *createNilObject(const redisReadTask *task) {
     redisReply *r = createReplyObject(REDIS_REPLY_NIL);
     if (task->parent) {
         redisReply *parent = task->parent;
