@@ -29,6 +29,7 @@
 
 #ifndef __HIREDIS_H
 #define __HIREDIS_H
+#include <stdarg.h>
 
 #define REDIS_ERR -1
 #define REDIS_OK 0

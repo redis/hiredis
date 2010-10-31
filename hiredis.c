@@ -31,7 +31,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdarg.h>
 #include <assert.h>
 #include <errno.h>
 
