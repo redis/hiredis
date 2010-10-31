@@ -120,6 +120,11 @@ void redisDisconnect(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
+
+/* In a blocking context, this function first checks if there are unconsumed
+ * replies to return and returns one if so. Otherwise, it flushes the output
+ * buffer to the socket and reads until it has a reply. In a non-blocking
+ * context, it will return unconsumed replies until there are no more. */
 int redisGetReply(redisContext *c, void **reply);
 
 /* The disconnect callback is called *immediately* when redisDisconnect()
@@ -136,11 +141,19 @@ void redisSetCommandCallback(redisContext *c, redisContextCallbackFn *fn, void *
  * release resources that depend/use the redisContext that is being free'd. */
 void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata);
 
-/* Issue a command to Redis. In a blocking context, it returns the reply. When
- * an error occurs, it returns NULL and you should read redisContext->error
- * to find out what's wrong. In a non-blocking context, it has the same effect
- * as calling redisCommandWithCallback() with a NULL callback, and will always
- * return NULL. */
+/* Write a command to the output buffer. Use these functions in blocking mode
+ * to get a pipeline of commands. */
+void redisvAppendCommand(redisContext *c, const char *format, va_list ap);
+void redisAppendCommand(redisContext *c, const char *format, ...);
+void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+
+/* Issue a command to Redis. In a blocking context, it is identical to calling
+ * redisAppendCommand, followed by redisGetReply. The function will return
+ * NULL if there was an error in performing the request, otherwise it will
+ * return the reply. In a non-blocking context, it is identical to calling
+ * only redisAppendCommand and will always return NULL. */
+void *redisvCommand(redisContext *c, const char *format, va_list ap);
 void *redisCommand(redisContext *c, const char *format, ...);
+void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
 
 #endif

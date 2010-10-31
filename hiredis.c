@@ -730,15 +730,6 @@ int redisBufferRead(redisContext *c) {
     return REDIS_OK;
 }
 
-int redisGetReply(redisContext *c, void **reply) {
-    if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
-        /* Copy the (protocol) error from the reader to the context. */
-        c->error = sdsnew(((redisReader*)c->reader)->error);
-        return REDIS_ERR;
-    }
-    return REDIS_OK;
-}
-
 /* Write the output buffer to the socket.
  *
  * Returns REDIS_OK when the buffer is empty, or (a part of) the buffer was
@@ -774,69 +765,137 @@ int redisBufferWrite(redisContext *c, int *done) {
     return REDIS_OK;
 }
 
-static int redisCommandWriteBlock(redisContext *c, void **reply, char *str, size_t len) {
-    int wdone = 0;
-    void *aux = NULL;
-    assert(c->flags & REDIS_BLOCK);
-    c->obuf = sdscatlen(c->obuf,str,len);
-
-    /* Write until done. */
-    do {
-        if (redisBufferWrite(c,&wdone) == REDIS_ERR)
-            return REDIS_ERR;
-    } while (!wdone);
-
-    /* Read until there is a reply. */
-    do {
-        if (redisBufferRead(c) == REDIS_ERR)
-            return REDIS_ERR;
-        if (redisGetReply(c,&aux) == REDIS_ERR)
-            return REDIS_ERR;
-    } while (aux == NULL);
-
-    /* Set reply object. */
-    if (reply != NULL)
-        *reply = aux;
-
+/* Internal helper function to try and get a reply from the reader,
+ * or set an error in the context otherwise. */
+static int __redisGetReply(redisContext *c, void **reply) {
+    if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
+        /* Copy the (protocol) error from the reader to the context. */
+        c->error = sdsnew(((redisReader*)c->reader)->error);
+        return REDIS_ERR;
+    }
     return REDIS_OK;
 }
 
-static int redisCommandWriteNonBlock(redisContext *c, char *str, size_t len) {
-    assert(!(c->flags & REDIS_BLOCK));
-    c->obuf = sdscatlen(c->obuf,str,len);
+int redisGetReply(redisContext *c, void **reply) {
+    int wdone = 0;
+    void *aux = NULL;
+
+    /* Try to read pending replies */
+    if (__redisGetReply(c,&aux) == REDIS_ERR) {
+        return REDIS_ERR;
+    } else {
+        /* Return immediately if there was a pending reply */
+        if (aux != NULL) return REDIS_OK;
+    }
+
+    /* For the blocking context, flush output buffer and read reply */
+    if (c->flags & REDIS_BLOCK) {
+        /* Write until done */
+        do {
+            if (redisBufferWrite(c,&wdone) == REDIS_ERR)
+                return REDIS_ERR;
+        } while (!wdone);
+
+        /* Read until there is a reply */
+        do {
+            if (redisBufferRead(c) == REDIS_ERR)
+                return REDIS_ERR;
+            if (__redisGetReply(c,&aux) == REDIS_ERR)
+                return REDIS_ERR;
+        } while (aux == NULL);
+
+        /* Set reply object */
+        if (reply != NULL) *reply = aux;
+    }
+    return REDIS_OK;
+}
+
+
+/* Helper function for the redisAppendCommand* family of functions.
+ *
+ * Write a formatted command to the output buffer. When this family
+ * is used, you need to call redisGetReply yourself to retrieve
+ * the reply (or replies in pub/sub).
+ */
+void __redisAppendCommand(redisContext *c, char *cmd, size_t len) {
+    c->obuf = sdscatlen(c->obuf,cmd,len);
 
     /* Fire write callback */
     if (c->cbCommand.fn != NULL)
         c->cbCommand.fn(c,c->cbCommand.privdata);
-
-    return REDIS_OK;
 }
 
-/* Write a formatted command to the output buffer. If the given context is
+void redisvAppendCommand(redisContext *c, const char *format, va_list ap) {
+    char *cmd;
+    int len;
+    len = redisvFormatCommand(&cmd,format,ap);
+    __redisAppendCommand(c,cmd,len);
+    free(cmd);
+}
+
+void redisAppendCommand(redisContext *c, const char *format, ...) {
+    va_list ap;
+    va_start(ap,format);
+    redisvAppendCommand(c,format,ap);
+    va_end(ap);
+}
+
+void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
+    char *cmd;
+    int len;
+    len = redisFormatCommandArgv(&cmd,argc,argv,argvlen);
+    __redisAppendCommand(c,cmd,len);
+    free(cmd);
+}
+
+/* Helper function for the redisCommand* family of functions.
+ *
+ * Write a formatted command to the output buffer. If the given context is
  * blocking, immediately read the reply into the "reply" pointer. When the
  * context is non-blocking, the "reply" pointer will not be used and the
  * command is simply appended to the write buffer.
  *
  * Returns the reply when a reply was succesfully retrieved. Returns NULL
  * otherwise. When NULL is returned in a blocking context, the error field
- * in the context will be set. */
-void *redisCommand(redisContext *c, const char *format, ...) {
-    va_list ap;
+ * in the context will be set.
+ */
+static void *__redisCommand(redisContext *c, char *cmd, size_t len) {
+    void *aux = NULL;
+    __redisAppendCommand(c,cmd,len);
+
+    if (c->flags & REDIS_BLOCK) {
+        if (redisGetReply(c,&aux) == REDIS_OK)
+            return aux;
+        return NULL;
+    }
+    return NULL;
+}
+
+void *redisvCommand(redisContext *c, const char *format, va_list ap) {
     char *cmd;
     int len;
     void *reply = NULL;
-    va_start(ap,format);
     len = redisvFormatCommand(&cmd,format,ap);
-    va_end(ap);
-
-    if (c->flags & REDIS_BLOCK) {
-        if (redisCommandWriteBlock(c,&reply,cmd,len) == REDIS_OK) {
-            free(cmd);
-            return reply;
-        }
-    } else {
-        redisCommandWriteNonBlock(c,cmd,len);
-    }
+    reply = __redisCommand(c,cmd,len);
     free(cmd);
-    return NULL;
+    return reply;
+}
+
+void *redisCommand(redisContext *c, const char *format, ...) {
+    va_list ap;
+    void *reply = NULL;
+    va_start(ap,format);
+    reply = redisvCommand(c,format,ap);
+    va_end(ap);
+    return reply;
+}
+
+void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
+    char *cmd;
+    int len;
+    void *reply = NULL;
+    len = redisFormatCommandArgv(&cmd,argc,argv,argvlen);
+    reply = __redisCommand(c,cmd,len);
+    free(cmd);
+    return reply;
 }
