@@ -29,6 +29,7 @@
 
 #ifndef __UTIL_H
 #define __UTIL_H
+#include <stdlib.h>
 
 /* Abort on out of memory */
 static void redisOOM(void) {
