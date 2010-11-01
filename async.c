@@ -81,9 +81,7 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     int status;
 
-    /* Signal event lib to stop reading/writing */
-    if (ac->evDelRead) ac->evDelRead(ac->data);
-    if (ac->evDelWrite) ac->evDelWrite(ac->data);
+    /* Signal event lib to clean up */
     if (ac->evCleanup) ac->evCleanup(ac->data);
 
     /* Execute callback with proper status */
