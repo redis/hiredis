@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <hiredis/libevent.h>
-#include <async.h>
 #include <signal.h>
+#include "hiredis.h"
+#include "async.h"
+#include "adapters/libev.h"
 
 void getCallback(redisAsyncContext *c, redisReply *reply, void *privdata) {
     printf("argv[%s]: %s\n", (char*)privdata, reply->str);
@@ -20,7 +21,7 @@ void disconnectCallback(const redisAsyncContext *c, int status) {
 
 int main (int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
-    struct event_base *base = event_base_new();
+    struct ev_loop *loop = ev_default_loop(0);
 
     redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
     if (c->error != NULL) {
@@ -29,10 +30,10 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    redisLibeventAttach(c,base);
+    redisLibevAttach(c,loop);
     redisAsyncSetDisconnectCallback(c,disconnectCallback);
     redisAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
     redisAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
-    event_base_dispatch(base);
+    ev_loop(loop, 0);
     return 0;
 }

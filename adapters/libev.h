@@ -1,7 +1,7 @@
 #include <sys/types.h>
 #include <ev.h>
-#include <hiredis.h>
-#include <async.h>
+#include "../hiredis.h"
+#include "../async.h"
 
 typedef struct redisLibevEvents {
     redisAsyncContext *context;

@@ -37,11 +37,12 @@ all: ${DYLIBNAME} ${BINS}
 # Deps (use make dep to generate this)
 anet.o: anet.c fmacros.h anet.h
 async.o: async.c async.h hiredis.h sds.h util.h
+example-libev.o: example-libev.c hiredis.h async.h adapters/libev.h
+example-libevent.o: example-libevent.c hiredis.h async.h adapters/libevent.h
 example.o: example.c hiredis.h
 hiredis.o: hiredis.c hiredis.h anet.h sds.h util.h
 sds.o: sds.c sds.h
 test.o: test.c hiredis.h
-
 ${DYLIBNAME}: ${OBJ}
 	${DYLIB_MAKE_CMD}
 
@@ -52,23 +53,23 @@ dynamic: ${DYLIBNAME}
 static: ${STLIBNAME}
 
 # Binaries:
+hiredis-example-libevent: ${DYLIBNAME}
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -levent -Wl,-rpath,. example-libevent.c
+
+hiredis-example-libev: ${DYLIBNAME}
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -lev -Wl,-rpath,. example-libev.c
+
 hiredis-%: %.o ${DYLIBNAME}
-	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -l hiredis -Wl,-rpath,. $<
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -Wl,-rpath,. $<
 
 test: hiredis-test
 	./hiredis-test
-
-libevent-example: extra/hiredis/libevent.h libevent-example.c ${DYLIBNAME}
-	$(CC) -o $@ $(CCOPT) $(DEBUG) -I. -Iextra -L. -lhiredis -levent libevent-example.c
-
-libev-example: extra/hiredis/libev.h libev-example.c ${DYLIBNAME}
-	$(CC) -o $@ $(CCOPT) $(DEBUG) -I. -Iextra -L. -lhiredis -lev libev-example.c
 
 .c.o:
 	$(CC) -c $(CFLAGS) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
-	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) *-example *.o *.gcda *.gcno *.gcov
+	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
