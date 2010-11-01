@@ -34,7 +34,7 @@
 struct redisAsyncContext; /* need forward declaration of redisAsyncContext */
 
 /* Reply callback prototype and container */
-typedef void (redisCallbackFn)(struct redisAsyncContext*, redisReply*, void*);
+typedef void (redisCallbackFn)(struct redisAsyncContext*, void*, void*);
 typedef struct redisCallback {
     struct redisCallback *next; /* simple singly linked list */
     redisCallbackFn *fn;
