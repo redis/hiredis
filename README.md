@@ -258,6 +258,10 @@ callbacks have been executed. After this, the disconnection callback is executed
 There are a few hooks that need to be set on the context object after it is created.
 See the `adapters/` directory for bindings to *libev* and *libevent*.
 
+## Reply parsing API
+
+To be done.
+
 ## AUTHORS
 
 Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
