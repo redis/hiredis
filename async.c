@@ -33,6 +33,9 @@
 #include "sds.h"
 #include "util.h"
 
+/* Forward declaration of function in hiredis.c */
+void __redisAppendCommand(redisContext *c, char *cmd, size_t len);
+
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac = realloc(c,sizeof(redisAsyncContext));
     /* Set all bytes in the async part of the context to 0 */
@@ -231,7 +234,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
 
     /* Don't accept new commands when the connection is lazily closed. */
     if (c->flags & REDIS_DISCONNECTING) return REDIS_ERR;
-    c->obuf = sdscatlen(c->obuf,cmd,len);
+    __redisAppendCommand(c,cmd,len);
 
     /* Store callback */
     cb.fn = fn;
