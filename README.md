@@ -172,6 +172,92 @@ This API can also be used to implement a blocking subscriber:
       freeReplyObject(reply);
     }
 
+## Asynchronous API
+
+Hiredis comes with an asynchronous API that works easily with any event library.
+Examples are bundled that show using Hiredis with [libev](http://software.schmorp.de/pkg/libev.html)
+and [libevent](http://monkey.org/~provos/libevent/).
+
+### Connecting
+
+The function `redisAsyncConnect` can be used to establish a non-blocking connection to
+Redis. It returns a pointer to the newly created `redisAsyncContext` struct. The `error` field
+should be checked after creation to see if there were errors creating the connection.
+Because the connection that will be created is non-blocking, the kernel is not able to
+instantly return if the specified host and port is able to accept a connection.
+
+    redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
+    if (c->error != NULL) {
+      printf("Error: %s\n", c->error);
+      // handle error
+    }
+
+The asynchronous context can hold a disconnect callback function that is called when the
+connection is disconnected (either because of an error or per user request). This function should
+have the following prototype:
+
+    void(const redisAsyncContext *c, int status);
+
+On a disconnect, the `status` argument is set to `REDIS_OK` when disconnection was initiated by the
+user, or `REDIS_ERR` when the disconnection was caused by an error. When it is `REDIS_ERR`, the `error`
+field in the context can be accessed to find out the cause of the error.
+
+The context object is always free'd after the disconnect callback fired. When a reconnect is needed,
+the disconnect callback is a good point to do so.
+
+Setting the disconnect callback can only be done once per context. For subsequent calls it will
+return `REDIS_ERR`. The function to set the disconnect callback has the following prototype:
+
+    int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
+
+### Sending commands and their callbacks
+
+In an asynchronous context, commands are automatically pipelined due to the nature of an event loop.
+Therefore, unlike the synchronous API, there is only a single way to send commands.
+Because commands are sent to Redis asynchronously, issuing a command requires a callback function
+that is called when the reply is received. Reply callbacks should have the following prototype:
+
+    void(redisAsyncContext *c, void *reply, void *privdata);
+
+The `privdata` argument can be used to curry arbitrary data to the callback from the point where
+the command is initially queued for execution.
+
+The functions that can be used to issue commands in an asynchronous context are:
+
+    int redisAsyncCommand(
+      redisAsyncContext *ac, redisCallbackFn *fn, void *privdata,
+      const char *format, ...);
+    int redisAsyncCommandArgv(
+      redisAsyncContext *ac, redisCallbackFn *fn, void *privdata,
+      int argc, const char **argv, const size_t *argvlen);
+
+Both functions work like their blocking counterparts. The return value is `REDIS_OK` when the command
+was successfully added to the output buffer and `REDIS_ERR` otherwise. Example: when the connection
+is being disconnected per user-request, no new commands may be added to the output buffer and `REDIS_ERR` is
+returned on calls to the `redisAsyncCommand` family.
+
+If the reply for a command with a `NULL` callback is read, it is immediately free'd. When the callback
+for a command is non-`NULL`, it is responsible for cleaning up the reply.
+
+All pending callbacks are called with a `NULL` reply when the context encountered an error.
+
+### Disconnecting
+
+An asynchronous connection can be terminated using:
+
+    void redisAsyncDisconnect(redisAsyncContext *ac);
+
+When this function is called, the connection is **not** immediately terminated. Instead, new
+commands are no longer accepted and the connection is only terminated when all pending commands
+have been written to the socket, their respective replies have been read and their respective
+callbacks have been executed. After this, the disconnection callback is executed with the
+`REDIS_OK` status and the context object is free'd.
+
+### Hooking it up to event library *X*
+
+There are a few hooks that need to be set on the context object after it is created.
+See the `adapters/` directory for bindings to *libev* and *libevent*.
+
 ## AUTHORS
 
 Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
