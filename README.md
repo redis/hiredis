@@ -1,116 +1,113 @@
-HIREDIS OVERVIEW
-----------------
+# HIREDIS
 
-Hiredis is a minimalistic C client library for the Redis Database.
+Hiredis is a minimalistic C client library for the [Redis](http://redis.io/) database.
 
 It is minimalistic because it just adds minimal support for the protocol, but
 at the same time it uses an high level printf-alike API in order to make it
 much higher level than otherwise suggested by its minimal code base and the
 lack of explicit bindings for every Redis command.
 
-Hiredis only supports the new Redis protocol, so you can use it with any
+Apart from supporting sending commands and receiving replies, it comes with
+a reply parser that is decoupled from the I/O layer. It
+is a stream parser designed for easy reusability, which can for instance be used
+in higher level language bindings for efficient reply parsing.
+
+Hiredis only supports the binary-safe Redis protocol, so you can use it with any
 Redis version >= 1.2.0.
 
-HIREDIS API
------------
+The library comes with multiple APIs. There is the
+*synchronous API*, the *asynchronous API* and the *reply parsing API*.
 
-Hiredis exports only three function calls:
+## SYNCHRONOUS API
 
-    redisReply *redisConnect(int *fd, char *ip, int port);
-    redisReply *redisCommand(int fd, char *format, ...);
-    void freeReplyObject(redisReply *r);
+To consume the synchronous API, there are only a few function calls that need to be introduced:
 
-The first function is used in order to create a connection to the Redis server:
+    redisContext *redisConnect(const char *ip, int port);
+    void *redisCommand(redisContext *c, const char *format, ...);
+    void freeReplyObject(void *reply);
 
-    redisReply *reply;
-    int fd;
+### Connecting
 
-    reply = redisConnect(&fd,"127.0.0.1",6379);
+The function `redisConnect` is used to create a so-called `redisContext`. The context is where
+Hiredis holds state for a connection. The `redisContext` struct has an `error` field that is
+non-NULL when the connection is in an error state. It contains a string with a textual
+representation of the error. After trying to connect to Redis using `redisConnect` you should
+check the `error` field to see if establishing the connection was successful:
 
-to test for connection errors all it is needed to do is checking if reply
-is not NULL:
-
-    if (reply != NULL) {
-        printf("Connection error: %s\n", reply->reply);
-        freeReplyObject(reply);
-        exit(1);
+    redisContext *c = redisConnect("127.0.0.1", 6379);
+    if (c->error != NULL) {
+      printf("Error: %s\n", c->error);
+      // handle error
     }
 
-When a reply object returns an error, the reply->type is set to the value
-`REDIS_REPLY_ERROR`, and reply->reply points to a C string with the description
-of the error.
+### Sending commands
 
-In the above example we don't check for reply->type as `redisConnect()` can
-only return `NULL` or a reply object that is actually an error.
+There are several ways to issue commands to Redis. The first that will be introduced is
+`redisCommand`. This function takes a format similar to printf. In the simplest form,
+it is used like this:
 
-As you can see `redisConnect()` will just set (by reference) the `fd` variable
-to the file descriptor of the open socket connected to our Redis server.
+    reply = redisCommand(context, "SET foo bar");
 
-Calls to `redisCommand()` will require this file descriptor as first argument.
+The specifier `%s` interpolates a string in the command, and uses `strlen` to
+determine the length of the string:
 
-SENDING COMMANDS
-----------------
+    reply = redisCommand(context, "SET foo %s", value);
 
-Commands are sent using a printf-alike format. In the simplest form it is
-like that:
+When you need to pass binary safe strings in a command, the `%b` specifier can be
+used. Together with a pointer to the string, it requires a `size_t` length argument
+of the string:
 
-    reply = redisCommand("SET foo bar");
+    reply = redisCommand(context, "SET foo %b", value, valuelen);
 
-But you can use "%s" and "%b" format specifiers to create commands in a
-printf-alike fashion:
-
-    reply = redisComand("SET foo %s", somevalue);
-
-If your arguments are binary safe, you can use "%b" that receives the pointer
-to the buffer and a size_t integer with the length of the buffer.
-
-    reply = redisCommand("SET %s %b", "foo", somevalue, somevalue_length);
-
-Internally Hiredis will split the command in different arguments and will
-convert it to the actual protocol used to communicate with Redis.
-Every space will separate arguments, so you can use interpolation.
-The following example is valid:
+Internally, Hiredis splits the command in different arguments and will
+convert it to the protocol used to communicate with Redis.
+One or more spaces separates arguments, so you can use the specifiers
+anywhere in an argument:
 
     reply = redisCommand("SET key:%s %s", myid, value);
 
-USING REPLIES
--------------
+### Using replies
 
-`redisCommand()` returns a reply object. In order to use this object you
-need to test the reply->type field, that can be one of the following types:
+The return value of `redisCommand` holds a reply when the command was
+successfully executed. When the return value is `NULL`, the `error` field
+in the context can be used to find out what was the cause of failure.
+Once an error is returned the context cannot be reused and you should set up
+a new connection.
+
+The standard replies that `redisCommand` are of the type `redisReply`. The
+`type` field in the `redisReply` should be used to test what kind of reply
+was received:
+
+* `REDIS_REPLY_STATUS`:
+    The command replied with a status reply. The status string can be accessed using `reply->str`.
+    The length of this string can be accessed using `reply->len`.
 
 * `REDIS_REPLY_ERROR`:
-    The command returned an error string, that can be read accessing to
-    the reply->reply field.
-
-* `REDIS_REPLY_STRING`:
-    The command returned a string, that can be read accessing to the
-    reply->reply field. The string is always null-terminated, but when you
-    need to work with binary-safe strings you can obtain the exact length
-    of the reply with: `sdslen(reply->reply)`.
-
-* `REDIS_REPLY_ARRAY`:
-    The command returned an array of reply->elements elements.
-    Every element is a redisReply object, stored at redis->element[..index..]
-    Redis may reply with nested arrays but this is fully supported.
+    The command replied with an error. The error string can be accessed identical to `REDIS_REPLY_STATUS`.
 
 * `REDIS_REPLY_INTEGER`:
-    The command replies with an integer. It's possible to access this integer
-    using the reply->integer field that is of type "long long".
+    The command replied with an integer. The integer value can be accessed using the
+    `reply->integer` field of type `long long`.
 
 * `REDIS_REPLY_NIL`:
-    The command replies with a NIL special object. There is no data to access.
+    The command replied with a **nil** object. There is no data to access.
 
-FREEING REPLIES
----------------
+* `REDIS_REPLY_STRING`:
+    A bulk (string) reply. The value of the reply can be accessed using `reply->str`.
+    The length of this string can be accessed using `reply->len`.
+
+* `REDIS_REPLY_ARRAY`:
+    A multi bulk reply. The number of elements in the multi bulk reply is stored in
+    `reply->elements`. Every element in the multi bulk reply is a `redisReply` object as well
+    and can be accessed via `reply->elements[..index..]`.
+    Redis may reply with nested arrays but this is fully supported.
 
 Replies should be freed using the `freeReplyObject()` function.
 Note that this function will take care of freeing sub-replies objects
 contained in arrays and nested arrays, so there is no need for the user to
 free the sub replies (it is actually harmful and will corrupt the memory).
 
-AUHTOR
-------
+## AUTHORS
 
-Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and is
-released under the BSD license.
+Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
+Pieter Noordhuis (pcnoordhuis at gmail) and is released under the BSD license.
