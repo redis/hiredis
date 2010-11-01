@@ -158,6 +158,7 @@ void redisAsyncHandleRead(redisAsyncContext *ac) {
     } else {
         /* Always re-schedule reads */
         if (ac->evAddRead) ac->evAddRead(ac->data);
+        redisProcessCallbacks(ac);
     }
 }
 
