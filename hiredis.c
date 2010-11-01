@@ -643,8 +643,6 @@ static redisContext *redisContextInit() {
 }
 
 void redisDisconnect(redisContext *c) {
-    if (c->cbDisconnect.fn != NULL)
-        c->cbDisconnect.fn(c,c->cbDisconnect.privdata);
     close(c->fd);
     c->flags &= ~REDIS_CONNECTED;
 }
@@ -653,10 +651,6 @@ void redisFree(redisContext *c) {
     /* Disconnect before free'ing if not yet disconnected. */
     if (c->flags & REDIS_CONNECTED)
         redisDisconnect(c);
-
-    /* Fire free callback and clear all allocations. */
-    if (c->cbFree.fn != NULL)
-        c->cbFree.fn(c,c->cbFree.privdata);
     if (c->error != NULL)
         sdsfree(c->error);
     if (c->obuf != NULL)
@@ -699,25 +693,6 @@ int redisSetReplyObjectFunctions(redisContext *c, redisReplyObjectFunctions *fn)
 static void __redisCreateReplyReader(redisContext *c) {
     if (c->reader == NULL)
         c->reader = redisReplyReaderCreate(c->fn);
-}
-
-/* Register callback that is triggered when redisDisconnect is called. */
-void redisSetDisconnectCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata) {
-    c->cbDisconnect.fn = fn;
-    c->cbDisconnect.privdata = privdata;
-}
-
-/* Register callback that is triggered when a command is put in the output
- * buffer when the context is non-blocking. */
-void redisSetCommandCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata) {
-    c->cbCommand.fn = fn;
-    c->cbCommand.privdata = privdata;
-}
-
-/* Register callback that is triggered when the context is free'd. */
-void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata) {
-    c->cbFree.fn = fn;
-    c->cbFree.privdata = privdata;
 }
 
 /* Use this function to handle a read event on the descriptor. It will try
@@ -834,10 +809,6 @@ int redisGetReply(redisContext *c, void **reply) {
  */
 void __redisAppendCommand(redisContext *c, char *cmd, size_t len) {
     c->obuf = sdscatlen(c->obuf,cmd,len);
-
-    /* Fire write callback */
-    if (c->cbCommand.fn != NULL)
-        c->cbCommand.fn(c,c->cbCommand.privdata);
 }
 
 void redisvAppendCommand(redisContext *c, const char *format, va_list ap) {

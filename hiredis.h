@@ -84,15 +84,6 @@ typedef struct redisReplyObjectFunctions {
 
 struct redisContext; /* need forward declaration of redisContext */
 
-/* Callbacks triggered on non-reply events. */
-typedef void (redisContextCallbackFn)(struct redisContext*, void*);
-
-/* Callback containers */
-typedef struct redisContextCallback {
-    redisContextCallbackFn *fn;
-    void *privdata;
-} redisContextCallback;
-
 /* Context for a connection to Redis */
 typedef struct redisContext {
     int fd;
@@ -103,11 +94,6 @@ typedef struct redisContext {
     /* Function set for reply buildup and reply reader */
     redisReplyObjectFunctions *fn;
     void *reader;
-
-    /* Non-reply callbacks */
-    redisContextCallback cbDisconnect;
-    redisContextCallback cbCommand;
-    redisContextCallback cbFree;
 } redisContext;
 
 void freeReplyObject(void *reply);
@@ -136,20 +122,6 @@ int redisBufferWrite(redisContext *c, int *done);
  * buffer to the socket and reads until it has a reply. In a non-blocking
  * context, it will return unconsumed replies until there are no more. */
 int redisGetReply(redisContext *c, void **reply);
-
-/* The disconnect callback is called *immediately* when redisDisconnect()
- * is called. It is called only once for every redisContext (since hiredis
- * currently does not support reconnecting an existing context). */
-void redisSetDisconnectCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata);
-
-/* The command callback is called every time redisCommand() is called in a
- * non-blocking context. It is called *after* the formatted command has been
- * appended to the write buffer. */
-void redisSetCommandCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata);
-
-/* The free callback is called *before* all allocations are free'd. Use it to
- * release resources that depend/use the redisContext that is being free'd. */
-void redisSetFreeCallback(redisContext *c, redisContextCallbackFn *fn, void *privdata);
 
 /* Write a command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
