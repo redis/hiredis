@@ -46,6 +46,9 @@ typedef struct redisCallbackList {
     redisCallback *head, *tail;
 } redisCallbackList;
 
+/* Disconnect callback prototype */
+typedef void (redisDisconnectCallback)(const struct redisAsyncContext*, int status);
+
 /* Context for an async connection to Redis */
 typedef struct redisAsyncContext {
     /* Hold the regular context, so it can be realloc'ed. */
@@ -57,7 +60,12 @@ typedef struct redisAsyncContext {
     void (*evDelRead)(void *privdata);
     void (*evAddWrite)(void *privdata);
     void (*evDelWrite)(void *privdata);
+    void (*evCleanup)(void *privdata);
     void *data;
+
+    /* Called when either the connection is terminated due to an error or per
+     * user request. The status is set accordingly (REDIS_OK, REDIS_ERR). */
+    redisDisconnectCallback *onDisconnect;
 
     /* Reply callbacks */
     redisCallbackList replies;
@@ -65,7 +73,9 @@ typedef struct redisAsyncContext {
 
 /* Functions that proxy to hiredis */
 redisAsyncContext *redisAsyncConnect(const char *ip, int port);
-int redisAsyncSetReplyObjectFunctions(redisAsyncContext *c, redisReplyObjectFunctions *fn);
+int redisAsyncSetReplyObjectFunctions(redisAsyncContext *ac, redisReplyObjectFunctions *fn);
+int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
+void redisAsyncDisconnect(redisAsyncContext *ac);
 
 /* Handle read/write events */
 void redisAsyncHandleRead(redisAsyncContext *ac);
@@ -73,8 +83,8 @@ void redisAsyncHandleWrite(redisAsyncContext *ac);
 
 /* Command functions for an async context. Write the command to the
  * output buffer and register the provided callback. */
-int redisvAsyncCommand(redisAsyncContext *c, redisCallbackFn *fn, void *privdata, const char *format, va_list ap);
-int redisAsyncCommand(redisAsyncContext *c, redisCallbackFn *fn, void *privdata, const char *format, ...);
-int redisAsyncCommandArgv(redisAsyncContext *c, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
+int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, va_list ap);
+int redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, ...);
+int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
 
 #endif

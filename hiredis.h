@@ -43,6 +43,12 @@
  * in the flags field is set when the context is connected. */
 #define REDIS_CONNECTED 0x2
 
+/* The async API might try to disconnect cleanly and flush the output
+ * buffer and read all subsequent replies before disconnecting.
+ * This flag means no new commands can come in and the connection
+ * should be terminated once all replies have been read. */
+#define REDIS_DISCONNECTING 0x4
+
 #define REDIS_ERROR -1
 #define REDIS_REPLY_ERROR 0
 #define REDIS_REPLY_STRING 1
