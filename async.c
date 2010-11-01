@@ -75,8 +75,10 @@ static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
     /* Copy callback from stack to heap */
     cb = calloc(1,sizeof(*cb));
     if (!cb) redisOOM();
-    if (source != NULL)
-        memcpy(cb,source,sizeof(*cb));
+    if (source != NULL) {
+        cb->fn = source->fn;
+        cb->privdata = source->privdata;
+    }
 
     /* Store callback in list */
     if (list->head == NULL)
