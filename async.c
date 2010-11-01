@@ -69,22 +69,38 @@ int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallba
 }
 
 /* Helper functions to push/shift callbacks */
-static void __redisPushCallback(redisCallbackList *list, redisCallback *cb) {
+static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
+    redisCallback *cb;
+
+    /* Copy callback from stack to heap */
+    cb = calloc(1,sizeof(*cb));
+    if (!cb) redisOOM();
+    if (source != NULL)
+        memcpy(cb,source,sizeof(*cb));
+
+    /* Store callback in list */
     if (list->head == NULL)
         list->head = cb;
     if (list->tail != NULL)
         list->tail->next = cb;
     list->tail = cb;
+    return REDIS_OK;
 }
 
-static redisCallback *__redisShiftCallback(redisCallbackList *list) {
+static int __redisShiftCallback(redisCallbackList *list, redisCallback *target) {
     redisCallback *cb = list->head;
     if (cb != NULL) {
         list->head = cb->next;
         if (cb == list->tail)
             list->tail = NULL;
+
+        /* Copy callback from heap to stack */
+        if (target != NULL)
+            memcpy(target,cb,sizeof(*cb));
+        free(cb);
+        return REDIS_OK;
     }
-    return cb;
+    return REDIS_ERR;
 }
 
 /* Tries to do a clean disconnect from Redis, meaning it stops new commands
@@ -102,7 +118,7 @@ void redisAsyncDisconnect(redisAsyncContext *ac) {
 /* Helper function to make the disconnect happen and clean up. */
 static void __redisAsyncDisconnect(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    redisCallback *cb;
+    redisCallback cb;
     int status;
 
     /* Make sure error is accessible if there is any */
@@ -112,15 +128,15 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
     if (status == REDIS_OK) {
         /* When the connection is cleanly disconnected, there should not
          * be pending callbacks. */
-        assert((cb = __redisShiftCallback(&ac->replies)) == NULL);
+        assert(__redisShiftCallback(&ac->replies,NULL) == REDIS_ERR);
     } else {
         /* Callbacks should not be able to issue new commands. */
         c->flags |= REDIS_DISCONNECTING;
 
         /* Execute pending callbacks with NULL reply. */
-        while ((cb = __redisShiftCallback(&ac->replies)) != NULL) {
-            if (cb->fn != NULL)
-                cb->fn(ac,NULL,cb->privdata);
+        while (__redisShiftCallback(&ac->replies,&cb) == REDIS_OK) {
+            if (cb.fn != NULL)
+                cb.fn(ac,NULL,cb.privdata);
         }
     }
 
@@ -136,7 +152,7 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
 
 void redisProcessCallbacks(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    redisCallback *cb;
+    redisCallback cb;
     void *reply = NULL;
     int status;
 
@@ -155,10 +171,9 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
         }
 
         /* Shift callback and execute it */
-        cb = __redisShiftCallback(&ac->replies);
-        assert(cb != NULL);
-        if (cb->fn != NULL) {
-            cb->fn(ac,reply,cb->privdata);
+        assert(__redisShiftCallback(&ac->replies,&cb) == REDIS_OK);
+        if (cb.fn != NULL) {
+            cb.fn(ac,reply,cb.privdata);
         } else {
             c->fn->freeObject(reply);
         }
@@ -210,18 +225,16 @@ void redisAsyncHandleWrite(redisAsyncContext *ac) {
  */
 static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, char *cmd, size_t len) {
     redisContext *c = &(ac->c);
-    redisCallback *cb;
+    redisCallback cb;
 
     /* Don't accept new commands when the connection is lazily closed. */
     if (c->flags & REDIS_DISCONNECTING) return REDIS_ERR;
     c->obuf = sdscatlen(c->obuf,cmd,len);
 
     /* Store callback */
-    cb = calloc(1,sizeof(redisCallback));
-    if (!cb) redisOOM();
-    cb->fn = fn;
-    cb->privdata = privdata;
-    __redisPushCallback(&(ac->replies),cb);
+    cb.fn = fn;
+    cb.privdata = privdata;
+    __redisPushCallback(&ac->replies,&cb);
 
     /* Always schedule a write when the write buffer is non-empty */
     if (ac->evAddWrite) ac->evAddWrite(ac->data);
