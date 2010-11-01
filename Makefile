@@ -58,10 +58,10 @@ dynamic: ${DYLIBNAME}
 static: ${STLIBNAME}
 
 # Binaries:
-hiredis-example-libevent: ${DYLIBNAME}
+hiredis-example-libevent: example-libevent.o ${DYLIBNAME}
 	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -levent -Wl,-rpath,. example-libevent.c
 
-hiredis-example-libev: ${DYLIBNAME}
+hiredis-example-libev: example-libev.o ${DYLIBNAME}
 	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -lev -Wl,-rpath,. example-libev.c
 
 hiredis-%: %.o ${DYLIBNAME}

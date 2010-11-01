@@ -7,6 +7,7 @@
 #include "adapters/libev.h"
 
 void getCallback(redisAsyncContext *c, redisReply *reply, void *privdata) {
+    if (reply == NULL) return;
     printf("argv[%s]: %s\n", (char*)privdata, reply->str);
 
     /* Disconnect after receiving the reply to GET */
