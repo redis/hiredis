@@ -1,98 +1,76 @@
 #include <sys/types.h>
 #include <event.h>
 #include <hiredis.h>
+#include <async.h>
 
-/* Prototype for the error callback. */
-typedef void (redisErrorCallback)(const redisContext*);
-
-typedef struct libeventRedisEvents {
-    redisContext *context;
-    redisErrorCallback *err;
+typedef struct redisLibeventEvents {
+    redisAsyncContext *context;
     struct event rev, wev;
-} libeventRedisEvents;
+} redisLibeventEvents;
 
-void libeventRedisReadEvent(int fd, short event, void *arg) {
+void redisLibeventReadEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
-    libeventRedisEvents *e = arg;
+    redisLibeventEvents *e = arg;
+    redisAsyncHandleRead(e->context);
+}
 
-    /* Always re-schedule read events */
+void redisLibeventWriteEvent(int fd, short event, void *arg) {
+    ((void)fd); ((void)event);
+    redisLibeventEvents *e = arg;
+    redisAsyncHandleWrite(e->context);
+}
+
+void redisLibeventAddRead(void *privdata) {
+    redisLibeventEvents *e = privdata;
     event_add(&e->rev,NULL);
-
-    if (redisBufferRead(e->context) == REDIS_ERR) {
-        redisDisconnect(e->context);
-        e->err(e->context);
-    } else {
-        if (redisProcessCallbacks(e->context) == REDIS_ERR) {
-            redisDisconnect(e->context);
-            e->err(e->context);
-        }
-    }
 }
 
-void libeventRedisWriteEvent(int fd, short event, void *arg) {
-    ((void)fd); ((void)event);
-    libeventRedisEvents *e = arg;
-    int done = 0;
-
-    if (redisBufferWrite(e->context,&done) == REDIS_ERR) {
-        redisDisconnect(e->context);
-        e->err(e->context);
-    } else {
-        /* Schedule write event again when writing is not done. */
-        if (!done) {
-            event_add(&e->wev,NULL);
-        } else {
-            event_add(&e->rev,NULL);
-        }
-    }
+void redisLibeventDelRead(void *privdata) {
+    redisLibeventEvents *e = privdata;
+    event_del(&e->rev);
 }
 
-/* Schedule to be notified on a write event, so the outgoing buffer
- * can be flushed to the socket. */
-void libeventRedisCommandCallback(redisContext *c, void *privdata) {
-    ((void)c);
-    libeventRedisEvents *e = privdata;
+void redisLibeventAddWrite(void *privdata) {
+    redisLibeventEvents *e = privdata;
     event_add(&e->wev,NULL);
 }
 
-/* Remove event handlers when the context gets disconnected. */
-void libeventRedisDisconnectCallback(redisContext *c, void *privdata) {
-    ((void)c);
-    libeventRedisEvents *e = privdata;
-    event_del(&e->rev);
+void redisLibeventDelWrite(void *privdata) {
+    redisLibeventEvents *e = privdata;
     event_del(&e->wev);
 }
 
-/* Free the libeventRedisEvents struct when the context is free'd. */
-void libeventRedisFreeCallback(redisContext *c, void *privdata) {
-    ((void)c);
-    libeventRedisEvents *e = privdata;
+void redisLibeventCleanup(void *privdata) {
+    redisLibeventEvents *e = privdata;
+    event_del(&e->rev);
+    event_del(&e->wev);
     free(e);
 }
 
-redisContext *libeventRedisConnect(struct event_base *base, redisErrorCallback *err, const char *ip, int port) {
-    libeventRedisEvents *e;
-    redisContext *c = redisConnectNonBlock(ip,port,NULL);
-    if (c->error != NULL) {
-        err(c);
-        redisFree(c);
-        return NULL;
-    }
+int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
+    redisContext *c = &(ac->c);
+    redisLibeventEvents *e;
+
+    /* Nothing should be attached when something is already attached */
+    if (ac->data != NULL)
+        return REDIS_ERR;
 
     /* Create container for context and r/w events */
     e = malloc(sizeof(*e));
-    e->context = c;
-    e->err = err;
+    e->context = ac;
 
-    /* Register callbacks */
-    redisSetDisconnectCallback(c,libeventRedisDisconnectCallback,e);
-    redisSetCommandCallback(c,libeventRedisCommandCallback,e);
-    redisSetFreeCallback(c,libeventRedisFreeCallback,e);
+    /* Register functions to start/stop listening for events */
+    ac->evAddRead = redisLibeventAddRead;
+    ac->evDelRead = redisLibeventDelRead;
+    ac->evAddWrite = redisLibeventAddWrite;
+    ac->evDelWrite = redisLibeventDelWrite;
+    ac->evCleanup = redisLibeventCleanup;
+    ac->data = e;
 
     /* Initialize and install read/write events */
-    event_set(&e->rev,c->fd,EV_READ,libeventRedisReadEvent,e);
-    event_set(&e->wev,c->fd,EV_WRITE,libeventRedisWriteEvent,e);
+    event_set(&e->rev,c->fd,EV_READ,redisLibeventReadEvent,e);
+    event_set(&e->wev,c->fd,EV_WRITE,redisLibeventWriteEvent,e);
     event_base_set(base,&e->rev);
     event_base_set(base,&e->wev);
-    return c;
+    return REDIS_OK;
 }

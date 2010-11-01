@@ -2,30 +2,37 @@
 #include <stdlib.h>
 #include <string.h>
 #include <hiredis/libevent.h>
+#include <async.h>
 #include <signal.h>
 
-void getCallback(redisContext *c, redisReply *reply, void *privdata) {
-    if (reply == NULL) return; /* Error */
-    printf("argv[%s]: %s\n", (const char*)privdata, reply->reply);
+void getCallback(redisAsyncContext *c, redisReply *reply, void *privdata) {
+    printf("argv[%s]: %s\n", (char*)privdata, reply->str);
 
     /* Disconnect after receiving the reply to GET */
-    redisDisconnect(c);
+    redisAsyncDisconnect(c);
 }
 
-void errorCallback(const redisContext *c) {
-    printf("Error: %s\n", c->error);
+void disconnectCallback(const redisAsyncContext *c, int status) {
+    if (status != REDIS_OK) {
+        printf("Error: %s\n", c->error);
+    }
 }
 
 int main (int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     struct event_base *base = event_base_new();
 
-    redisContext *c = libeventRedisConnect(base, errorCallback, "127.0.0.1", 6379);
-    if (c == NULL) return 1;
+    redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
+    if (c->error != NULL) {
+        /* Let *c leak for now... */
+        printf("Error: %s\n", c->error);
+        return 1;
+    }
 
-    redisCommand(c, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
-    redisCommandWithCallback(c, getCallback, (char*)"end-1", "GET key");
+    redisLibeventAttach(c,base);
+    redisAsyncSetDisconnectCallback(c,disconnectCallback);
+    redisAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
+    redisAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
     event_base_dispatch(base);
-    redisFree(c);
     return 0;
 }
