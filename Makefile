@@ -32,6 +32,11 @@ endif
 CCOPT= $(CFLAGS) $(CCLINK) $(ARCH) $(PROF)
 DEBUG?= -g -ggdb 
 
+PREFIX?= /usr/local
+INSTALL_INC= $(PREFIX)/include/hiredis
+INSTALL_LIB= $(PREFIX)/lib
+INSTALL= cp -a
+
 all: ${DYLIBNAME} ${BINS}
 
 # Deps (use make dep to generate this)
@@ -73,6 +78,11 @@ clean:
 
 dep:
 	$(CC) -MM *.c
+
+install: ${DYLIBNAME} ${STLIBNAME}
+	mkdir -p $(INSTALL_INC) $(INSTALL_LIB)
+	$(INSTALL) hiredis.h async.h adapters $(INSTALL_INC)
+	$(INSTALL) ${DYLIBNAME} ${STLIBNAME} $(INSTALL_LIB)
 
 32bit:
 	@echo ""
