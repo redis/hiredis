@@ -148,7 +148,12 @@ to the `redisCommand` family, apart from not returning a reply:
     void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
 
 After calling either function one or more times, `redisGetReply` can be used to receive the
-subsequent replies:
+subsequent replies. The return value for this function is either `REDIS_OK` or `REDIS_ERR`, where
+the latter means an error occurred while reading a reply. Just as with the other commands,
+the `error` field in the context can be used to find out what the cause of this error is.
+
+The following examples shows a simple pipeline (resulting in only a single call to `write(2)` and
+a single call to `write(2)`):
 
     redisReply *reply;
     redisAppendCommand(context,"SET foo bar");
