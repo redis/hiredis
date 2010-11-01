@@ -40,9 +40,18 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     return ac;
 }
 
+/* We want the error field to be accessible directly instead of requiring
+ * an indirection to the redisContext struct. */
+static void __redisAsyncCopyError(redisAsyncContext *ac) {
+    redisContext *c = &(ac->c);
+    if (c->error != NULL)
+        ac->error = c->error;
+}
+
 redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
     redisContext *c = redisConnectNonBlock(ip,port);
     redisAsyncContext *ac = redisAsyncInitialize(c);
+    __redisAsyncCopyError(ac);
     return ac;
 }
 
@@ -78,7 +87,8 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
     if (ac->evCleanup) ac->evCleanup(ac->data);
 
     /* Execute callback with proper status */
-    status = (c->error == NULL) ? REDIS_OK : REDIS_ERR;
+    __redisAsyncCopyError(ac);
+    status = (ac->error == NULL) ? REDIS_OK : REDIS_ERR;
     if (ac->onDisconnect) ac->onDisconnect(ac,status);
 
     /* Cleanup self */

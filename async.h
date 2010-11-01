@@ -54,6 +54,9 @@ typedef struct redisAsyncContext {
     /* Hold the regular context, so it can be realloc'ed. */
     redisContext c;
 
+    /* Hold a reference to the error object so it can be used directly. */
+    char *error;
+
     /* Called when the library expects to start reading/writing.
      * The supplied functions should be idempotent. */
     void (*evAddRead)(void *privdata);
