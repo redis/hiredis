@@ -70,7 +70,11 @@ int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallba
 
 /* Tries to do a clean disconnect from Redis, meaning it stops new commands
  * from being issued, but tries to flush the output buffer and execute
- * callbacks for all remaining replies. */
+ * callbacks for all remaining replies.
+ *
+ * This functions is generally called from within a callback, so the
+ * processCallbacks function will pick up the flag when there are no
+ * more replies. */
 void redisAsyncDisconnect(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     c->flags |= REDIS_DISCONNECTING;
