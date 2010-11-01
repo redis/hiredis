@@ -15,6 +15,7 @@ ifeq ($(uname_S),SunOS)
   STLIBNAME?=libhiredis.a
   STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
 else ifeq ($(uname_S),Darwin)
+  ARCH?= -arch i386 -arch x86_64
   CFLAGS?= -std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?= -lm -pthread
   DYLIBNAME?=libhiredis.dylib
