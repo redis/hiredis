@@ -107,6 +107,66 @@ Note that this function will take care of freeing sub-replies objects
 contained in arrays and nested arrays, so there is no need for the user to
 free the sub replies (it is actually harmful and will corrupt the memory).
 
+### Sending commands (cont'd)
+
+Together with `redisCommand`, the function `redisCommandArgv` can be used to issue commands.
+It has the following prototype:
+
+    void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+
+It takes the number of arguments `argc`, an array of strings `argv` and the lengths of the
+arguments `argvlen`. For convenience, `argvlen` may be set to `NULL` and the function will
+use `strlen(3)` on every argument to determine its length. Obviously, when any of the arguments
+need to be binary safe, the entire array of lengths `argvlen` should be provided.
+
+The return value has the same semantic as `redisCommand`.
+
+### Pipelining
+
+To explain how Hiredis supports pipelining in a blocking connection, there needs to be
+understanding of the internal execution flow.
+
+When any of the functions in the `redisCommand` family is called, Hiredis first formats the
+command according to the Redis protocol. The formatted command is then put in the output buffer
+of the context. This output buffer is dynamic, so it can hold any number of commands.
+After the command is put in the output buffer, `redisGetReply` is called. This function has the
+following two execution paths:
+
+1. The input buffer is non-empty:
+  * Try to parse a single reply from the input buffer and return it
+  * If no reply could be parsed, continue at *2*
+2. The input buffer is empty:
+  * Write the **entire** output buffer to the socket
+  * Read from the socket until a single reply could be parsed
+
+The function `redisGetReply` is exported as part of the Hiredis API and can be used when a reply
+is expected on the socket. To pipeline commands, the only things that needs to be done is
+filling up the output buffer. For this cause, two commands can be used that are identical
+to the `redisCommand` family, apart from not returning a reply:
+
+    void redisAppendCommand(redisContext *c, const char *format, ...);
+    void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+
+After calling either function one or more times, `redisGetReply` can be used to receive the
+subsequent replies:
+
+    redisReply *reply;
+    redisAppendCommand(context,"SET foo bar");
+    redisAppendCommand(context,"GET foo");
+    redisGetReply(context,&reply); // reply for SET
+    freeReplyObject(reply);
+    redisGetReply(context,&reply); // reply for GET
+    freeReplyObject(reply);
+
+This API can also be used to implement a blocking subscriber:
+
+    reply = redisCommand(context,"SUBSCRIBE foo");
+    freeReplyObject(reply);
+    while(redisGetReply(context,&reply) == REDIS_OK) {
+      // consume message
+      freeReplyObject(reply);
+    }
+
 ## AUTHORS
 
 Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
