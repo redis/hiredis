@@ -107,6 +107,15 @@ Note that this function will take care of freeing sub-replies objects
 contained in arrays and nested arrays, so there is no need for the user to
 free the sub replies (it is actually harmful and will corrupt the memory).
 
+### Cleaning up
+
+To disconnect and free the context the following function can be used:
+
+    void redisFree(redisContext *c);
+
+This function immediately closes the socket and then free's the allocations done in
+creating the context.
+
 ### Sending commands (cont'd)
 
 Together with `redisCommand`, the function `redisCommandArgv` can be used to issue commands.

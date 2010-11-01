@@ -642,15 +642,10 @@ static redisContext *redisContextInit() {
     return c;
 }
 
-void redisDisconnect(redisContext *c) {
-    close(c->fd);
-    c->flags &= ~REDIS_CONNECTED;
-}
-
 void redisFree(redisContext *c) {
     /* Disconnect before free'ing if not yet disconnected. */
     if (c->flags & REDIS_CONNECTED)
-        redisDisconnect(c);
+        close(c->fd);
     if (c->error != NULL)
         sdsfree(c->error);
     if (c->obuf != NULL)

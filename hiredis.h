@@ -112,7 +112,6 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectNonBlock(const char *ip, int port);
 int redisSetReplyObjectFunctions(redisContext *c, redisReplyObjectFunctions *fn);
-void redisDisconnect(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
