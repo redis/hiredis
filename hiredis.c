@@ -744,7 +744,7 @@ int redisBufferWrite(redisContext *c, int *done) {
 
 /* Internal helper function to try and get a reply from the reader,
  * or set an error in the context otherwise. */
-static int __redisGetReply(redisContext *c, void **reply) {
+int redisGetReplyFromReader(redisContext *c, void **reply) {
     __redisCreateReplyReader(c);
     if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
         __redisSetError(c,REDIS_ERR_PROTOCOL,
@@ -759,7 +759,7 @@ int redisGetReply(redisContext *c, void **reply) {
     void *aux = NULL;
 
     /* Try to read pending replies */
-    if (__redisGetReply(c,&aux) == REDIS_ERR)
+    if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
         return REDIS_ERR;
 
     /* For the blocking context, flush output buffer and read reply */
@@ -774,7 +774,7 @@ int redisGetReply(redisContext *c, void **reply) {
         do {
             if (redisBufferRead(c) == REDIS_ERR)
                 return REDIS_ERR;
-            if (__redisGetReply(c,&aux) == REDIS_ERR)
+            if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
                 return REDIS_ERR;
         } while (aux == NULL);
     }

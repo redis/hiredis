@@ -130,6 +130,7 @@ int redisBufferWrite(redisContext *c, int *done);
  * buffer to the socket and reads until it has a reply. In a non-blocking
  * context, it will return unconsumed replies until there are no more. */
 int redisGetReply(redisContext *c, void **reply);
+int redisGetReplyFromReader(redisContext *c, void **reply);
 
 /* Write a command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
