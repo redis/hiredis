@@ -49,7 +49,6 @@
  * should be terminated once all replies have been read. */
 #define REDIS_DISCONNECTING 0x4
 
-#define REDIS_ERROR -1
 #define REDIS_REPLY_ERROR 0
 #define REDIS_REPLY_STRING 1
 #define REDIS_REPLY_ARRAY 2
