@@ -34,7 +34,7 @@
 #include <errno.h>
 
 #include "hiredis.h"
-#include "anet.h"
+#include "net.h"
 #include "sds.h"
 #include "util.h"
 
@@ -614,7 +614,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     return totlen;
 }
 
-static void __redisSetError(redisContext *c, int type, const char *str) {
+void __redisSetError(redisContext *c, int type, const char *str) {
     c->err = type;
     if (str) {
         c->errstr = sdsnew(str);
@@ -623,25 +623,6 @@ static void __redisSetError(redisContext *c, int type, const char *str) {
         assert(type == REDIS_ERR_IO);
         c->errstr = sdsnew(strerror(errno));
     }
-}
-
-static int redisContextConnect(redisContext *c, const char *ip, int port) {
-    char err[ANET_ERR_LEN];
-    if (c->flags & REDIS_BLOCK) {
-        c->fd = anetTcpConnect(err,(char*)ip,port);
-    } else {
-        c->fd = anetTcpNonBlockConnect(err,(char*)ip,port);
-    }
-
-    if (c->fd == ANET_ERR) {
-        __redisSetError(c,REDIS_ERR_CONN,err);
-        return REDIS_ERR;
-    }
-    if (anetTcpNoDelay(err,c->fd) == ANET_ERR) {
-        __redisSetError(c,REDIS_ERR_CONN,err);
-        return REDIS_ERR;
-    }
-    return REDIS_OK;
 }
 
 static redisContext *redisContextInit() {

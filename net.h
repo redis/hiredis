@@ -1,4 +1,4 @@
-/* anet.c -- Basic TCP socket stuff made a bit less boring
+/* Extracted from anet.c to work properly with Hiredis error reporting.
  *
  * Copyright (c) 2006-2010, Salvatore Sanfilippo <antirez at gmail dot com>
  * All rights reserved.
@@ -28,22 +28,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ANET_H
-#define ANET_H
+#ifndef __NET_H
+#define __NET_H
 
-#define ANET_OK 0
-#define ANET_ERR -1
-#define ANET_ERR_LEN 256
-
-int anetTcpConnect(char *err, const char *addr, int port);
-int anetTcpNonBlockConnect(char *err, char *addr, int port);
-int anetRead(int fd, char *buf, int count);
-int anetResolve(char *err, char *host, char *ipbuf);
-int anetTcpServer(char *err, int port, char *bindaddr);
-int anetAccept(char *err, int serversock, char *ip, int *port);
-int anetWrite(int fd, char *buf, int count);
-int anetNonBlock(char *err, int fd);
-int anetTcpNoDelay(char *err, int fd);
-int anetTcpKeepAlive(char *err, int fd);
+int redisContextConnect(redisContext *c, const char *addr, int port);
 
 #endif
