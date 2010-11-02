@@ -2,7 +2,7 @@
 # Copyright (C) 2010 Salvatore Sanfilippo <antirez at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ = anet.o hiredis.o sds.o async.o
+OBJ = net.o hiredis.o sds.o async.o
 BINS = hiredis-example hiredis-test
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
@@ -41,14 +41,15 @@ INSTALL= cp -a
 all: ${DYLIBNAME} ${BINS}
 
 # Deps (use make dep to generate this)
-anet.o: anet.c fmacros.h anet.h
+net.o: net.c fmacros.h net.h
 async.o: async.c async.h hiredis.h sds.h util.h
 example-libev.o: example-libev.c hiredis.h async.h adapters/libev.h
 example-libevent.o: example-libevent.c hiredis.h async.h adapters/libevent.h
 example.o: example.c hiredis.h
-hiredis.o: hiredis.c hiredis.h anet.h sds.h util.h
+hiredis.o: hiredis.c hiredis.h net.h sds.h util.h
 sds.o: sds.c sds.h
 test.o: test.c hiredis.h
+
 ${DYLIBNAME}: ${OBJ}
 	${DYLIB_MAKE_CMD}
 
