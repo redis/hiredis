@@ -15,9 +15,9 @@ ifeq ($(uname_S),SunOS)
   STLIBNAME?=libhiredis.a
   STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
 else ifeq ($(uname_S),Darwin)
-  ARCH?= -arch i386 -arch x86_64
   CFLAGS?= -std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?= -lm -pthread
+  OBJARCH?= -arch i386 -arch x86_64
   DYLIBNAME?=libhiredis.dylib
   DYLIB_MAKE_CMD?=libtool -dynamic -o ${DYLIBNAME} -lm ${DEBUG} - ${OBJ}
   STLIBNAME?=libhiredis.a
@@ -73,7 +73,7 @@ test: hiredis-test
 	./hiredis-test
 
 .c.o:
-	$(CC) -c $(CFLAGS) $(DEBUG) $(COMPILE_TIME) $<
+	$(CC) -c $(CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
 	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov

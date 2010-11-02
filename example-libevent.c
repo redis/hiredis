@@ -17,7 +17,7 @@ void getCallback(redisAsyncContext *c, void *r, void *privdata) {
 
 void disconnectCallback(const redisAsyncContext *c, int status) {
     if (status != REDIS_OK) {
-        printf("Error: %s\n", c->error);
+        printf("Error: %s\n", c->errstr);
     }
 }
 
@@ -26,9 +26,9 @@ int main (int argc, char **argv) {
     struct event_base *base = event_base_new();
 
     redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
-    if (c->error != NULL) {
+    if (c->err) {
         /* Let *c leak for now... */
-        printf("Error: %s\n", c->error);
+        printf("Error: %s\n", c->errstr);
         return 1;
     }
 
