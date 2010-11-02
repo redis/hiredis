@@ -614,10 +614,10 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     return totlen;
 }
 
-void __redisSetError(redisContext *c, int type, const char *str) {
+void __redisSetError(redisContext *c, int type, const sds errstr) {
     c->err = type;
-    if (str) {
-        c->errstr = sdsnew(str);
+    if (errstr != NULL) {
+        c->errstr = errstr;
     } else {
         /* Only REDIS_ERR_IO may lack a description! */
         assert(type == REDIS_ERR_IO);
@@ -700,7 +700,7 @@ int redisBufferRead(redisContext *c) {
         }
     } else if (nread == 0) {
         __redisSetError(c,REDIS_ERR_EOF,
-            "Server closed the connection");
+            sdsnew("Server closed the connection"));
         return REDIS_ERR;
     } else {
         __redisCreateReplyReader(c);
@@ -747,7 +747,8 @@ int redisBufferWrite(redisContext *c, int *done) {
 static int __redisGetReply(redisContext *c, void **reply) {
     __redisCreateReplyReader(c);
     if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
-        __redisSetError(c,REDIS_ERR_PROTOCOL,((redisReader*)c->reader)->error);
+        __redisSetError(c,REDIS_ERR_PROTOCOL,
+            sdsnew(((redisReader*)c->reader)->error));
         return REDIS_ERR;
     }
     return REDIS_OK;

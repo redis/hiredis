@@ -46,7 +46,7 @@
 #include "sds.h"
 
 /* Forward declaration */
-void __redisSetError(redisContext *c, int type, const char *err);
+void __redisSetError(redisContext *c, int type, sds err);
 
 static int redisSetNonBlock(redisContext *c, int fd) {
     int flags;
