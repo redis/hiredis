@@ -35,6 +35,15 @@
 #define REDIS_ERR -1
 #define REDIS_OK 0
 
+/* When an error occurs, the err flag in a context is set to hold the type of
+ * error that occured. REDIS_ERR_IO means there was an I/O error and you
+ * should use the "errno" variable to find out what is wrong.
+ * For other values, the "errstr" field will hold a description. */
+#define REDIS_ERR_IO 1 /* error in read or write */
+#define REDIS_ERR_CONN 2 /* error connecting */
+#define REDIS_ERR_EOF 3 /* eof */
+#define REDIS_ERR_PROTOCOL 4 /* protocol error */
+
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
 #define REDIS_BLOCK 0x1
@@ -87,8 +96,9 @@ struct redisContext; /* need forward declaration of redisContext */
 typedef struct redisContext {
     int fd;
     int flags;
-    char *error; /* Error object is set when in erronous state */
     char *obuf; /* Write buffer */
+    int err; /* Error flags, 0 when there is no error */
+    char *errstr; /* String representation of error when applicable */
 
     /* Function set for reply buildup and reply reader */
     redisReplyObjectFunctions *fn;

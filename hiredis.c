@@ -614,6 +614,17 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     return totlen;
 }
 
+static void __redisSetError(redisContext *c, int type, const char *str) {
+    c->err = type;
+    if (str) {
+        c->errstr = sdsnew(str);
+    } else {
+        /* Only REDIS_ERR_IO may lack a description! */
+        assert(type == REDIS_ERR_IO);
+        c->errstr = sdsnew(strerror(errno));
+    }
+}
+
 static int redisContextConnect(redisContext *c, const char *ip, int port) {
     char err[ANET_ERR_LEN];
     if (c->flags & REDIS_BLOCK) {
@@ -623,11 +634,11 @@ static int redisContextConnect(redisContext *c, const char *ip, int port) {
     }
 
     if (c->fd == ANET_ERR) {
-        c->error = sdsnew(err);
+        __redisSetError(c,REDIS_ERR_CONN,err);
         return REDIS_ERR;
     }
     if (anetTcpNoDelay(err,c->fd) == ANET_ERR) {
-        c->error = sdsnew(err);
+        __redisSetError(c,REDIS_ERR_CONN,err);
         return REDIS_ERR;
     }
     return REDIS_OK;
@@ -635,7 +646,8 @@ static int redisContextConnect(redisContext *c, const char *ip, int port) {
 
 static redisContext *redisContextInit() {
     redisContext *c = calloc(sizeof(redisContext),1);
-    c->error = NULL;
+    c->err = 0;
+    c->errstr = NULL;
     c->obuf = sdsempty();
     c->fn = &defaultFunctions;
     c->reader = NULL;
@@ -646,8 +658,8 @@ void redisFree(redisContext *c) {
     /* Disconnect before free'ing if not yet disconnected. */
     if (c->flags & REDIS_CONNECTED)
         close(c->fd);
-    if (c->error != NULL)
-        sdsfree(c->error);
+    if (c->errstr != NULL)
+        sdsfree(c->errstr);
     if (c->obuf != NULL)
         sdsfree(c->obuf);
     if (c->reader != NULL)
@@ -702,14 +714,12 @@ int redisBufferRead(redisContext *c) {
         if (errno == EAGAIN) {
             /* Try again later */
         } else {
-            /* Set error in context */
-            c->error = sdscatprintf(sdsempty(),
-                "read: %s", strerror(errno));
+            __redisSetError(c,REDIS_ERR_IO,NULL);
             return REDIS_ERR;
         }
     } else if (nread == 0) {
-        c->error = sdscatprintf(sdsempty(),
-            "read: Server closed the connection");
+        __redisSetError(c,REDIS_ERR_EOF,
+            "Server closed the connection");
         return REDIS_ERR;
     } else {
         __redisCreateReplyReader(c);
@@ -735,9 +745,7 @@ int redisBufferWrite(redisContext *c, int *done) {
             if (errno == EAGAIN) {
                 /* Try again later */
             } else {
-                /* Set error in context */
-                c->error = sdscatprintf(sdsempty(),
-                    "write: %s", strerror(errno));
+                __redisSetError(c,REDIS_ERR_IO,NULL);
                 return REDIS_ERR;
             }
         } else if (nwritten > 0) {
@@ -758,8 +766,7 @@ int redisBufferWrite(redisContext *c, int *done) {
 static int __redisGetReply(redisContext *c, void **reply) {
     __redisCreateReplyReader(c);
     if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
-        /* Copy the (protocol) error from the reader to the context. */
-        c->error = sdsnew(((redisReader*)c->reader)->error);
+        __redisSetError(c,REDIS_ERR_PROTOCOL,((redisReader*)c->reader)->error);
         return REDIS_ERR;
     }
     return REDIS_OK;

@@ -54,8 +54,9 @@ typedef struct redisAsyncContext {
     /* Hold the regular context, so it can be realloc'ed. */
     redisContext c;
 
-    /* Hold a reference to the error object so it can be used directly. */
-    char *error;
+    /* Setup error flags so they can be used directly. */
+    int err;
+    char *errstr;
 
     /* Called when the library expects to start reading/writing.
      * The supplied functions should be idempotent. */

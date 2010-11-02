@@ -10,8 +10,8 @@ int main(void) {
     redisReply *reply;
 
     c = redisConnect((char*)"127.0.0.1", 6379);
-    if (c->error != NULL) {
-        printf("Connection error: %s\n", c->error);
+    if (c->err) {
+        printf("Connection error: %s\n", c->errstr);
         exit(1);
     }
 

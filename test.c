@@ -22,8 +22,8 @@ static long long usec(void) {
 static redisContext *blocking_context = NULL;
 static void __connect(redisContext **target) {
     *target = blocking_context = redisConnect((char*)"127.0.0.1", 6379);
-    if (blocking_context->error != NULL) {
-        printf("Connection error: %s\n", blocking_context->error);
+    if (blocking_context->err) {
+        printf("Connection error: %s\n", blocking_context->errstr);
         exit(1);
     }
 }
@@ -77,9 +77,10 @@ static void test_blocking_connection() {
     __connect(&c);
     test("Returns I/O error when the connection is lost: ");
     reply = redisCommand(c,"QUIT");
-    test_cond(redisCommand(c,"PING") == NULL &&
-        strcasecmp(reply->str,"OK") == 0 &&
-        strcmp(c->error,"read: Server closed the connection") == 0);
+    test_cond(strcasecmp(reply->str,"OK") == 0 &&
+        redisCommand(c,"PING") == NULL &&
+        c->err == REDIS_ERR_EOF &&
+        strcmp(c->errstr,"Server closed the connection") == 0);
     freeReplyObject(reply);
     redisFree(c);
 

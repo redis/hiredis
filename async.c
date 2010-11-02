@@ -47,8 +47,8 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
  * an indirection to the redisContext struct. */
 static void __redisAsyncCopyError(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    if (c->error != NULL)
-        ac->error = c->error;
+    ac->err = c->err;
+    ac->errstr = c->errstr;
 }
 
 redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
@@ -128,7 +128,7 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
 
     /* Make sure error is accessible if there is any */
     __redisAsyncCopyError(ac);
-    status = (ac->error == NULL) ? REDIS_OK : REDIS_ERR;
+    status = (ac->err == 0) ? REDIS_OK : REDIS_ERR;
 
     if (status == REDIS_OK) {
         /* When the connection is cleanly disconnected, there should not
