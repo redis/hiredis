@@ -224,7 +224,10 @@ static void test_throughput() {
 
     replies = malloc(sizeof(redisReply*)*1000);
     t1 = usec();
-    for (i = 0; i < 1000; i++) assert((replies[i] = redisCommand(c,"PING")) != NULL);
+    for (i = 0; i < 1000; i++) {
+        replies[i] = redisCommand(c,"PING");
+        assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_STATUS);
+    }
     t2 = usec();
     for (i = 0; i < 1000; i++) freeReplyObject(replies[i]);
     free(replies);
@@ -232,7 +235,11 @@ static void test_throughput() {
 
     replies = malloc(sizeof(redisReply*)*1000);
     t1 = usec();
-    for (i = 0; i < 1000; i++) assert((replies[i] = redisCommand(c,"LRANGE mylist 0 499")) != NULL);
+    for (i = 0; i < 1000; i++) {
+        replies[i] = redisCommand(c,"LRANGE mylist 0 499");
+        assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_ARRAY);
+        assert(replies[i] != NULL && replies[i]->elements == 500);
+    }
     t2 = usec();
     for (i = 0; i < 1000; i++) freeReplyObject(replies[i]);
     free(replies);
@@ -350,7 +357,12 @@ static void cleanup() {
 //     redisFree(c);
 // }
 
-int main(void) {
+int main(int argc, char **argv) {
+    if (argc > 1) {
+        if (strcmp(argv[1],"-s") == 0)
+            use_unix = 1;
+    }
+
     signal(SIGPIPE, SIG_IGN);
     test_format_commands();
     test_blocking_connection();
