@@ -48,6 +48,22 @@
 /* Forward declaration */
 void __redisSetError(redisContext *c, int type, sds err);
 
+static int redisCreateSocket(redisContext *c, int type) {
+    int s, on = 1;
+    if ((s = socket(type, SOCK_STREAM, 0)) == -1) {
+        __redisSetError(c,REDIS_ERR_IO,NULL);
+        return REDIS_ERR;
+    }
+    if (type == AF_INET) {
+        if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
+            __redisSetError(c,REDIS_ERR_IO,NULL);
+            close(s);
+            return REDIS_ERR;
+        }
+    }
+    return s;
+}
+
 static int redisSetNonBlock(redisContext *c, int fd) {
     int flags;
 
@@ -57,11 +73,13 @@ static int redisSetNonBlock(redisContext *c, int fd) {
     if ((flags = fcntl(fd, F_GETFL)) == -1) {
         __redisSetError(c,REDIS_ERR_IO,
             sdscatprintf(sdsempty(), "fcntl(F_GETFL): %s", strerror(errno)));
+        close(fd);
         return REDIS_ERR;
     }
     if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
         __redisSetError(c,REDIS_ERR_IO,
             sdscatprintf(sdsempty(), "fcntl(F_SETFL,O_NONBLOCK): %s", strerror(errno)));
+        close(fd);
         return REDIS_ERR;
     }
     return REDIS_OK;
@@ -78,18 +96,14 @@ static int redisSetTcpNoDelay(redisContext *c, int fd) {
 }
 
 int redisContextConnect(redisContext *c, const char *addr, int port) {
-    int s, on = 1;
+    int s;
     int blocking = (c->flags & REDIS_BLOCK);
     struct sockaddr_in sa;
 
-    if ((s = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        __redisSetError(c,REDIS_ERR_IO,NULL);
+    if ((s = redisCreateSocket(c,AF_INET)) == REDIS_ERR)
         return REDIS_ERR;
-    }
-    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
-        __redisSetError(c,REDIS_ERR_IO,NULL);
+    if (!blocking && redisSetNonBlock(c,s) == REDIS_ERR)
         return REDIS_ERR;
-    }
 
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
@@ -106,21 +120,20 @@ int redisContextConnect(redisContext *c, const char *addr, int port) {
         memcpy(&sa.sin_addr, he->h_addr, sizeof(struct in_addr));
     }
 
-    if (!blocking)
-        if (redisSetNonBlock(c,s) != REDIS_OK)
-            return REDIS_ERR;
-
     if (connect(s, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
-        if (errno == EINPROGRESS && !blocking)
-            return s;
+        if (errno == EINPROGRESS && !blocking) {
+            /* This is ok. */
+        } else {
+            __redisSetError(c,REDIS_ERR_IO,NULL);
+            close(s);
+            return REDIS_ERR;
+        }
+    }
 
-        __redisSetError(c,REDIS_ERR_IO,NULL);
+    if (redisSetTcpNoDelay(c,s) != REDIS_OK) {
         close(s);
         return REDIS_ERR;
     }
-
-    if (redisSetTcpNoDelay(c,s) != REDIS_OK)
-        return REDIS_ERR;
 
     c->fd = s;
     return REDIS_OK;
