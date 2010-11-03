@@ -18,6 +18,13 @@ Redis version >= 1.2.0.
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
 
+## UPGRADING
+
+Version 0.9.0 is a major overhaul of hiredis in every aspect. However, upgrading existing
+code using hiredis should not be a big pain. The key thing to keep in mind when
+upgrading is that hiredis >= 0.9.0 uses a `redisContext*` to keep state, in contrast to
+the stateless 0.0.1 that only has a file descriptor to work with.
+
 ## SYNCHRONOUS API
 
 To consume the synchronous API, there are only a few function calls that need to be introduced:
