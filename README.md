@@ -86,28 +86,28 @@ The standard replies that `redisCommand` are of the type `redisReply`. The
 was received:
 
 * **`REDIS_REPLY_STATUS`**:
-    The command replied with a status reply. The status string can be accessed using `reply->str`.
-    The length of this string can be accessed using `reply->len`.
+    * The command replied with a status reply. The status string can be accessed using `reply->str`.
+      The length of this string can be accessed using `reply->len`.
 
 * **`REDIS_REPLY_ERROR`**:
-    The command replied with an error. The error string can be accessed identical to `REDIS_REPLY_STATUS`.
+    *  The command replied with an error. The error string can be accessed identical to `REDIS_REPLY_STATUS`.
 
 * **`REDIS_REPLY_INTEGER`**:
-    The command replied with an integer. The integer value can be accessed using the
-    `reply->integer` field of type `long long`.
+    * The command replied with an integer. The integer value can be accessed using the
+      `reply->integer` field of type `long long`.
 
 * **`REDIS_REPLY_NIL`**:
-    The command replied with a **nil** object. There is no data to access.
+    * The command replied with a **nil** object. There is no data to access.
 
 * **`REDIS_REPLY_STRING`**:
-    A bulk (string) reply. The value of the reply can be accessed using `reply->str`.
-    The length of this string can be accessed using `reply->len`.
+    * A bulk (string) reply. The value of the reply can be accessed using `reply->str`.
+      The length of this string can be accessed using `reply->len`.
 
 * **`REDIS_REPLY_ARRAY`**:
-    A multi bulk reply. The number of elements in the multi bulk reply is stored in
-    `reply->elements`. Every element in the multi bulk reply is a `redisReply` object as well
-    and can be accessed via `reply->elements[..index..]`.
-    Redis may reply with nested arrays but this is fully supported.
+    * A multi bulk reply. The number of elements in the multi bulk reply is stored in
+      `reply->elements`. Every element in the multi bulk reply is a `redisReply` object as well
+      and can be accessed via `reply->elements[..index..]`.
+      Redis may reply with nested arrays but this is fully supported.
 
 Replies should be freed using the `freeReplyObject()` function.
 Note that this function will take care of freeing sub-replies objects
