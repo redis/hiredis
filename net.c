@@ -31,6 +31,7 @@
 #include "fmacros.h"
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -95,7 +96,7 @@ static int redisSetTcpNoDelay(redisContext *c, int fd) {
     return REDIS_OK;
 }
 
-int redisContextConnect(redisContext *c, const char *addr, int port) {
+int redisContextConnectTcp(redisContext *c, const char *addr, int port) {
     int s;
     int blocking = (c->flags & REDIS_BLOCK);
     struct sockaddr_in sa;
@@ -133,6 +134,32 @@ int redisContextConnect(redisContext *c, const char *addr, int port) {
     if (redisSetTcpNoDelay(c,s) != REDIS_OK) {
         close(s);
         return REDIS_ERR;
+    }
+
+    c->fd = s;
+    return REDIS_OK;
+}
+
+int redisContextConnectUnix(redisContext *c, const char *path) {
+    int s;
+    int blocking = (c->flags & REDIS_BLOCK);
+    struct sockaddr_un sa;
+
+    if ((s = redisCreateSocket(c,AF_LOCAL)) == REDIS_ERR)
+        return REDIS_ERR;
+    if (!blocking && redisSetNonBlock(c,s) != REDIS_OK)
+        return REDIS_ERR;
+
+    sa.sun_family = AF_LOCAL;
+    strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);
+    if (connect(s, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
+        if (errno == EINPROGRESS && !blocking) {
+            /* This is ok. */
+        } else {
+            __redisSetError(c,REDIS_ERR_IO,NULL);
+            close(s);
+            return REDIS_ERR;
+        }
     }
 
     c->fd = s;

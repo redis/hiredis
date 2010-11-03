@@ -655,7 +655,7 @@ redisContext *redisConnect(const char *ip, int port) {
     redisContext *c = redisContextInit();
     c->flags |= REDIS_BLOCK;
     c->flags |= REDIS_CONNECTED;
-    redisContextConnect(c,ip,port);
+    redisContextConnectTcp(c,ip,port);
     return c;
 }
 
@@ -663,7 +663,7 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
     redisContext *c = redisContextInit();
     c->flags &= ~REDIS_BLOCK;
     c->flags |= REDIS_CONNECTED;
-    redisContextConnect(c,ip,port);
+    redisContextConnectTcp(c,ip,port);
     return c;
 }
 

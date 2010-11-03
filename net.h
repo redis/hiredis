@@ -31,6 +31,7 @@
 #ifndef __NET_H
 #define __NET_H
 
-int redisContextConnect(redisContext *c, const char *addr, int port);
+int redisContextConnectTcp(redisContext *c, const char *addr, int port);
+int redisContextConnectUnix(redisContext *c, const char *path);
 
 #endif
