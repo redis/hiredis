@@ -78,25 +78,31 @@ The standard replies that `redisCommand` are of the type `redisReply`. The
 `type` field in the `redisReply` should be used to test what kind of reply
 was received:
 
-* `REDIS_REPLY_STATUS`:
+* **`REDIS_REPLY_STATUS`**:
+
     The command replied with a status reply. The status string can be accessed using `reply->str`.
     The length of this string can be accessed using `reply->len`.
 
-* `REDIS_REPLY_ERROR`:
+* **`REDIS_REPLY_ERROR`**:
+
     The command replied with an error. The error string can be accessed identical to `REDIS_REPLY_STATUS`.
 
-* `REDIS_REPLY_INTEGER`:
+* **`REDIS_REPLY_INTEGER`**:
+
     The command replied with an integer. The integer value can be accessed using the
     `reply->integer` field of type `long long`.
 
-* `REDIS_REPLY_NIL`:
+* **`REDIS_REPLY_NIL`**:
+
     The command replied with a **nil** object. There is no data to access.
 
-* `REDIS_REPLY_STRING`:
+* **`REDIS_REPLY_STRING`**:
+
     A bulk (string) reply. The value of the reply can be accessed using `reply->str`.
     The length of this string can be accessed using `reply->len`.
 
-* `REDIS_REPLY_ARRAY`:
+* **`REDIS_REPLY_ARRAY`**:
+
     A multi bulk reply. The number of elements in the multi bulk reply is stored in
     `reply->elements`. Every element in the multi bulk reply is a `redisReply` object as well
     and can be accessed via `reply->elements[..index..]`.
@@ -142,11 +148,11 @@ After the command is put in the output buffer, `redisGetReply` is called. This f
 following two execution paths:
 
 1. The input buffer is non-empty:
-  * Try to parse a single reply from the input buffer and return it
-  * If no reply could be parsed, continue at *2*
+    * Try to parse a single reply from the input buffer and return it
+    * If no reply could be parsed, continue at *2*
 2. The input buffer is empty:
-  * Write the **entire** output buffer to the socket
-  * Read from the socket until a single reply could be parsed
+    * Write the **entire** output buffer to the socket
+    * Read from the socket until a single reply could be parsed
 
 The function `redisGetReply` is exported as part of the Hiredis API and can be used when a reply
 is expected on the socket. To pipeline commands, the only things that needs to be done is
