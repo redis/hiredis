@@ -25,7 +25,7 @@ code using hiredis should not be a big pain. The key thing to keep in mind when
 upgrading is that hiredis >= 0.9.0 uses a `redisContext*` to keep state, in contrast to
 the stateless 0.0.1 that only has a file descriptor to work with.
 
-## SYNCHRONOUS API
+## Synchronous API
 
 To consume the synchronous API, there are only a few function calls that need to be introduced:
 
@@ -86,30 +86,24 @@ The standard replies that `redisCommand` are of the type `redisReply`. The
 was received:
 
 * **`REDIS_REPLY_STATUS`**:
-
     The command replied with a status reply. The status string can be accessed using `reply->str`.
     The length of this string can be accessed using `reply->len`.
 
 * **`REDIS_REPLY_ERROR`**:
-
     The command replied with an error. The error string can be accessed identical to `REDIS_REPLY_STATUS`.
 
 * **`REDIS_REPLY_INTEGER`**:
-
     The command replied with an integer. The integer value can be accessed using the
     `reply->integer` field of type `long long`.
 
 * **`REDIS_REPLY_NIL`**:
-
     The command replied with a **nil** object. There is no data to access.
 
 * **`REDIS_REPLY_STRING`**:
-
     A bulk (string) reply. The value of the reply can be accessed using `reply->str`.
     The length of this string can be accessed using `reply->len`.
 
 * **`REDIS_REPLY_ARRAY`**:
-
     A multi bulk reply. The number of elements in the multi bulk reply is stored in
     `reply->elements`. Every element in the multi bulk reply is a `redisReply` object as well
     and can be accessed via `reply->elements[..index..]`.
