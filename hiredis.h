@@ -32,6 +32,10 @@
 #include <stdio.h> /* for size_t */
 #include <stdarg.h> /* for va_list */
 
+#define HIREDIS_MAJOR 0
+#define HIREDIS_MINOR 9
+#define HIREDIS_PATCH 0
+
 #define REDIS_ERR -1
 #define REDIS_OK 0
 
