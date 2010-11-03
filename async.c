@@ -58,6 +58,13 @@ redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
     return ac;
 }
 
+redisAsyncContext *redisAsyncConnectUnix(const char *path) {
+    redisContext *c = redisConnectUnixNonBlock(path);
+    redisAsyncContext *ac = redisAsyncInitialize(c);
+    __redisAsyncCopyError(ac);
+    return ac;
+}
+
 int redisAsyncSetReplyObjectFunctions(redisAsyncContext *ac, redisReplyObjectFunctions *fn) {
     redisContext *c = &(ac->c);
     return redisSetReplyObjectFunctions(c,fn);

@@ -667,6 +667,22 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
     return c;
 }
 
+redisContext *redisConnectUnix(const char *path) {
+    redisContext *c = redisContextInit();
+    c->flags |= REDIS_BLOCK;
+    c->flags |= REDIS_CONNECTED;
+    redisContextConnectUnix(c,path);
+    return c;
+}
+
+redisContext *redisConnectUnixNonBlock(const char *path) {
+    redisContext *c = redisContextInit();
+    c->flags &= ~REDIS_BLOCK;
+    c->flags |= REDIS_CONNECTED;
+    redisContextConnectUnix(c,path);
+    return c;
+}
+
 /* Set the replyObjectFunctions to use. Returns REDIS_ERR when the reader
  * was already initialized and the function set could not be re-set.
  * Return REDIS_OK when they could be set. */

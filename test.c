@@ -19,9 +19,11 @@ static long long usec(void) {
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
+static int use_unix = 0;
 static redisContext *blocking_context = NULL;
 static void __connect(redisContext **target) {
-    *target = blocking_context = redisConnect((char*)"127.0.0.1", 6379);
+    *target = blocking_context = (use_unix ?
+        redisConnectUnix("/tmp/redis.sock") : redisConnect((char*)"127.0.0.1", 6379));
     if (blocking_context->err) {
         printf("Connection error: %s\n", blocking_context->errstr);
         exit(1);
@@ -77,10 +79,22 @@ static void test_blocking_connection() {
     __connect(&c);
     test("Returns I/O error when the connection is lost: ");
     reply = redisCommand(c,"QUIT");
-    test_cond(strcasecmp(reply->str,"OK") == 0 &&
-        redisCommand(c,"PING") == NULL &&
-        c->err == REDIS_ERR_EOF &&
-        strcmp(c->errstr,"Server closed the connection") == 0);
+    test_cond(strcasecmp(reply->str,"OK") == 0 && redisCommand(c,"PING") == NULL);
+
+    /* Two conditions may happen, depending on the type of connection.
+     * When connected via TCP, the socket will not yet be aware of the closed
+     * connection and the write(2) call will succeed, but the read(2) will
+     * result in an EOF. When connected via Unix sockets, the socket will be
+     * immediately aware that it was closed and fail on the write(2) call. */
+    if (use_unix) {
+        fprintf(stderr,"Error: %s\n", c->errstr);
+        assert(c->err == REDIS_ERR_IO &&
+            strcmp(c->errstr,"Broken pipe") == 0);
+    } else {
+        fprintf(stderr,"Error: %s\n", c->errstr);
+        assert(c->err == REDIS_ERR_EOF &&
+            strcmp(c->errstr,"Server closed the connection") == 0);
+    }
     freeReplyObject(reply);
     redisFree(c);
 
@@ -210,7 +224,7 @@ static void test_throughput() {
 
     replies = malloc(sizeof(redisReply*)*1000);
     t1 = usec();
-    for (i = 0; i < 1000; i++) replies[i] = redisCommand(c,"PING");
+    for (i = 0; i < 1000; i++) assert((replies[i] = redisCommand(c,"PING")) != NULL);
     t2 = usec();
     for (i = 0; i < 1000; i++) freeReplyObject(replies[i]);
     free(replies);
@@ -218,7 +232,7 @@ static void test_throughput() {
 
     replies = malloc(sizeof(redisReply*)*1000);
     t1 = usec();
-    for (i = 0; i < 1000; i++) replies[i] = redisCommand(c,"LRANGE mylist 0 499");
+    for (i = 0; i < 1000; i++) assert((replies[i] = redisCommand(c,"LRANGE mylist 0 499")) != NULL);
     t2 = usec();
     for (i = 0; i < 1000; i++) freeReplyObject(replies[i]);
     free(replies);
@@ -337,6 +351,7 @@ static void cleanup() {
 // }
 
 int main(void) {
+    signal(SIGPIPE, SIG_IGN);
     test_format_commands();
     test_blocking_connection();
     test_reply_reader();
