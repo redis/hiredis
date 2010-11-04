@@ -162,11 +162,20 @@ static char *readBytes(redisReader *r, unsigned int bytes) {
     return NULL;
 }
 
+static char *seekNewline(char *s) {
+    /* Find pointer to \r\n without strstr */
+    while(s != NULL && s[0] != '\r' && s[1] != '\n')
+        s = strchr(s,'\r');
+    return s;
+}
+
 static char *readLine(redisReader *r, int *_len) {
-    char *p, *s = strstr(r->buf+r->pos,"\r\n");
+    char *p, *s;
     int len;
+
+    p = r->buf+r->pos;
+    s = seekNewline(p);
     if (s != NULL) {
-        p = r->buf+r->pos;
         len = s-(r->buf+r->pos);
         r->pos += len+2; /* skip \r\n */
         if (_len) *_len = len;
@@ -234,7 +243,7 @@ static int processBulkItem(redisReader *r) {
     unsigned long bytelen;
 
     p = r->buf+r->pos;
-    s = strstr(p,"\r\n");
+    s = seekNewline(p);
     if (s != NULL) {
         p = r->buf+r->pos;
         bytelen = s-(r->buf+r->pos)+2; /* include \r\n */
