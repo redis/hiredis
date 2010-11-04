@@ -424,7 +424,7 @@ char *redisReplyReaderGetError(void *reader) {
     return r->error;
 }
 
-void redisReplyReaderFeed(void *reader, char *buf, int len) {
+void redisReplyReaderFeed(void *reader, char *buf, size_t len) {
     redisReader *r = reader;
 
     /* Copy the provided buffer. */
