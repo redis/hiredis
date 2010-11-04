@@ -186,26 +186,26 @@ static char *readLine(redisReader *r, int *_len) {
 
 static void moveToNextTask(redisReader *r) {
     redisReadTask *cur, *prv;
-    assert(r->ridx >= 0);
+    while (r->ridx >= 0) {
+        /* Return a.s.a.p. when the stack is now empty. */
+        if (r->ridx == 0) {
+            r->ridx--;
+            return;
+        }
 
-    /* Return a.s.a.p. when the stack is now empty. */
-    if (r->ridx == 0) {
-        r->ridx--;
-        return;
-    }
-
-    cur = &(r->rstack[r->ridx]);
-    prv = &(r->rstack[r->ridx-1]);
-    assert(prv->type == REDIS_REPLY_ARRAY);
-    if (cur->idx == prv->elements-1) {
-        r->ridx--;
-        moveToNextTask(r);
-    } else {
-        /* Reset the type because the next item can be anything */
-        assert(cur->idx < prv->elements);
-        cur->type = -1;
-        cur->elements = -1;
-        cur->idx++;
+        cur = &(r->rstack[r->ridx]);
+        prv = &(r->rstack[r->ridx-1]);
+        assert(prv->type == REDIS_REPLY_ARRAY);
+        if (cur->idx == prv->elements-1) {
+            r->ridx--;
+        } else {
+            /* Reset the type because the next item can be anything */
+            assert(cur->idx < prv->elements);
+            cur->type = -1;
+            cur->elements = -1;
+            cur->idx++;
+            return;
+        }
     }
 }
 
