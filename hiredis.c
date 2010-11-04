@@ -164,8 +164,17 @@ static char *readBytes(redisReader *r, unsigned int bytes) {
 
 static char *seekNewline(char *s) {
     /* Find pointer to \r\n without strstr */
-    while(s != NULL && s[0] != '\r' && s[1] != '\n')
+    while (s != NULL) {
         s = strchr(s,'\r');
+        if (s != NULL) {
+            if (s[1] == '\n')
+                break;
+            else
+                s++;
+        } else {
+            break;
+        }
+    }
     return s;
 }
 
