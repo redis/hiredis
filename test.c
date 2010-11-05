@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "hiredis.h"
 
