@@ -38,8 +38,17 @@ void __redisAppendCommand(redisContext *c, char *cmd, size_t len);
 
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac = realloc(c,sizeof(redisAsyncContext));
-    /* Set all bytes in the async part of the context to 0 */
-    memset(ac+sizeof(redisContext),0,sizeof(redisAsyncContext)-sizeof(redisContext));
+    ac->err = 0;
+    ac->errstr = NULL;
+    ac->data = NULL;
+    ac->evAddRead = NULL;
+    ac->evDelRead = NULL;
+    ac->evAddWrite = NULL;
+    ac->evDelWrite = NULL;
+    ac->evCleanup = NULL;
+    ac->onDisconnect = NULL;
+    ac->replies.head = NULL;
+    ac->replies.tail = NULL;
     return ac;
 }
 

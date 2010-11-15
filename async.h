@@ -58,6 +58,9 @@ typedef struct redisAsyncContext {
     int err;
     char *errstr;
 
+    /* Not used by hiredis */
+    void *data;
+
     /* Called when the library expects to start reading/writing.
      * The supplied functions should be idempotent. */
     void (*evAddRead)(void *privdata);
@@ -65,7 +68,6 @@ typedef struct redisAsyncContext {
     void (*evAddWrite)(void *privdata);
     void (*evDelWrite)(void *privdata);
     void (*evCleanup)(void *privdata);
-    void *data;
 
     /* Called when either the connection is terminated due to an error or per
      * user request. The status is set accordingly (REDIS_OK, REDIS_ERR). */
