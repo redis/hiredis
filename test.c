@@ -178,24 +178,20 @@ static void test_blocking_connection() {
     if (major >= 2 && minor > 0) {
         /* > 2.0 returns OK on QUIT and read() should be issued once more
          * to know the descriptor is at EOF. */
-        test_cond(strcasecmp(reply->str,"OK") == 0 && redisCommand(c,"PING") == NULL);
+        test_cond(strcasecmp(reply->str,"OK") == 0 &&
+            redisGetReply(c,(void**)&reply) == REDIS_ERR);
         freeReplyObject(reply);
     } else {
         test_cond(reply == NULL);
     }
 
-    /* Two conditions may happen, depending on the type of connection.
-     * When connected via TCP, the socket will not yet be aware of the closed
-     * connection and the write(2) call will succeed, but the read(2) will
-     * result in an EOF. When connected via Unix sockets, the socket will be
-     * immediately aware that it was closed and fail on the write(2) call. */
-    if (use_unix) {
-        assert(c->err == REDIS_ERR_IO &&
-            strcmp(c->errstr,"Broken pipe") == 0);
-    } else {
-        assert(c->err == REDIS_ERR_EOF &&
-            strcmp(c->errstr,"Server closed the connection") == 0);
-    }
+    /* On 2.0, QUIT will cause the connection to be closed immediately and
+     * the read(2) for the reply on QUIT will set the error to EOF.
+     * On >2.0, QUIT will return with OK and another read(2) needed to be
+     * issued to find out the socket was closed by the server. In both
+     * conditions, the error will be set to EOF. */
+    assert(c->err == REDIS_ERR_EOF &&
+        strcmp(c->errstr,"Server closed the connection") == 0);
 
     /* Clean up context and reconnect again */
     redisFree(c);
