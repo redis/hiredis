@@ -10,38 +10,38 @@ typedef struct redisLibeventEvents {
 
 void redisLibeventReadEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
-    redisLibeventEvents *e = arg;
+    redisLibeventEvents *e = (redisLibeventEvents*)arg;
     redisAsyncHandleRead(e->context);
 }
 
 void redisLibeventWriteEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
-    redisLibeventEvents *e = arg;
+    redisLibeventEvents *e = (redisLibeventEvents*)arg;
     redisAsyncHandleWrite(e->context);
 }
 
 void redisLibeventAddRead(void *privdata) {
-    redisLibeventEvents *e = privdata;
+    redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_add(&e->rev,NULL);
 }
 
 void redisLibeventDelRead(void *privdata) {
-    redisLibeventEvents *e = privdata;
+    redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_del(&e->rev);
 }
 
 void redisLibeventAddWrite(void *privdata) {
-    redisLibeventEvents *e = privdata;
+    redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_add(&e->wev,NULL);
 }
 
 void redisLibeventDelWrite(void *privdata) {
-    redisLibeventEvents *e = privdata;
+    redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_del(&e->wev);
 }
 
 void redisLibeventCleanup(void *privdata) {
-    redisLibeventEvents *e = privdata;
+    redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_del(&e->rev);
     event_del(&e->wev);
     free(e);
@@ -56,7 +56,7 @@ int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
-    e = malloc(sizeof(*e));
+    e = (redisLibeventEvents*)malloc(sizeof(*e));
     e->context = ac;
 
     /* Register functions to start/stop listening for events */
