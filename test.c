@@ -73,9 +73,9 @@ static void test_format_commands() {
 
     const char *argv[3];
     argv[0] = "SET";
-    argv[1] = "foo";
+    argv[1] = "foo\0xxx";
     argv[2] = "bar";
-    size_t lens[3] = { 3, 3, 3 };
+    size_t lens[3] = { 3, 7, 3 };
     int argc = 3;
 
     test("Format command by passing argc/argv without lengths: ");
@@ -86,8 +86,8 @@ static void test_format_commands() {
 
     test("Format command by passing argc/argv with lengths: ");
     len = redisFormatCommandArgv(&cmd,argc,argv,lens);
-    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
-        len == 4+4+(3+2)+4+(3+2)+4+(3+2));
+    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n",len) == 0 &&
+        len == 4+4+(3+2)+4+(7+2)+4+(3+2));
     free(cmd);
 }
 
