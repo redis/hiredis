@@ -31,6 +31,10 @@
 #define __HIREDIS_ASYNC_H
 #include "hiredis.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct redisAsyncContext; /* need forward declaration of redisAsyncContext */
 
 /* Reply callback prototype and container */
@@ -92,5 +96,9 @@ void redisAsyncHandleWrite(redisAsyncContext *ac);
 int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, va_list ap);
 int redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, ...);
 int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
