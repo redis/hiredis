@@ -99,7 +99,7 @@ static void test_blocking_connection() {
     test("Returns error when host cannot be resolved: ");
     c = redisConnect((char*)"idontexist.local", 6379);
     test_cond(c->err == REDIS_ERR_OTHER &&
-        strcmp(c->errstr,"can't resolve: idontexist.local") == 0);
+        strcmp(c->errstr,"Can't resolve: idontexist.local") == 0);
     redisFree(c);
 
     test("Returns error when the port is not open: ");
@@ -240,7 +240,7 @@ static void test_reply_reader() {
     ret = redisReplyReaderGetReply(reader,NULL);
     err = redisReplyReaderGetError(reader);
     test_cond(ret == REDIS_ERR &&
-              strcasecmp(err,"protocol error, got \"@\" as reply type byte") == 0);
+              strcasecmp(err,"Protocol error, got \"@\" as reply type byte") == 0);
     redisReplyReaderFree(reader);
 
     /* when the reply already contains multiple items, they must be free'd
@@ -253,7 +253,7 @@ static void test_reply_reader() {
     ret = redisReplyReaderGetReply(reader,NULL);
     err = redisReplyReaderGetError(reader);
     test_cond(ret == REDIS_ERR &&
-              strcasecmp(err,"protocol error, got \"@\" as reply type byte") == 0);
+              strcasecmp(err,"Protocol error, got \"@\" as reply type byte") == 0);
     redisReplyReaderFree(reader);
 
     test("Works with NULL functions for reply: ");
