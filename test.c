@@ -96,6 +96,18 @@ static void test_blocking_connection() {
     redisReply *reply;
     int major, minor;
 
+    test("Returns error when host cannot be resolved: ");
+    c = redisConnect((char*)"idontexist.local", 6379);
+    test_cond(c->err == REDIS_ERR_OTHER &&
+        strcmp(c->errstr,"can't resolve: idontexist.local") == 0);
+    redisFree(c);
+
+    test("Returns error when the port is not open: ");
+    c = redisConnect((char*)"localhost", 56380);
+    test_cond(c->err == REDIS_ERR_IO &&
+        strcmp(c->errstr,"Connection refused") == 0);
+    redisFree(c);
+
     __connect(&c);
     test("Is able to deliver commands: ");
     reply = redisCommand(c,"PING");
