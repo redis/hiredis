@@ -35,16 +35,17 @@ To consume the synchronous API, there are only a few function calls that need to
 
 ### Connecting
 
-The function `redisConnect` is used to create a so-called `redisContext`. The context is where
-Hiredis holds state for a connection. The `redisContext` struct has an `error` field that is
-non-NULL when the connection is in an error state. It contains a string with a textual
-representation of the error. After trying to connect to Redis using `redisConnect` you should
-check the `error` field to see if establishing the connection was successful:
+The function `redisConnect` is used to create a so-called `redisContext`. The
+context is where Hiredis holds state for a connection. The `redisContext`
+struct has an integer `err` field that is non-zero when an the connection is in
+an error state. The field `errstr` will contain a string with a description of
+the error. After trying to connect to Redis using `redisConnect` you should
+check the `err` field to see if establishing the connection was successful:
 
     redisContext *c = redisConnect("127.0.0.1", 6379);
-    if (c->error != NULL) {
-      printf("Error: %s\n", c->error);
-      // handle error
+    if (c->err) {
+        printf("Error: %s\n", c->errstr);
+        // handle error
     }
 
 ### Sending commands
