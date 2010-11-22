@@ -564,7 +564,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                 interpolated = 1;
                 break;
             case '%':
-                cmd = sdscat(cmd,"%");
+                current = sdscat(current,"%");
                 break;
             }
             c++;

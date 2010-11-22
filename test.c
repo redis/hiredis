@@ -65,6 +65,12 @@ static void test_format_commands() {
         len == 4+4+(3+2)+4+(3+2)+4+(0+2));
     free(cmd);
 
+    test("Format command with literal %%: ");
+    len = redisFormatCommand(&cmd,"SET %% %%");
+    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$1\r\n%\r\n$1\r\n%\r\n",len) == 0 &&
+        len == 4+4+(3+2)+4+(1+2)+4+(1+2));
+    free(cmd);
+
     const char *argv[3];
     argv[0] = "SET";
     argv[1] = "foo";
