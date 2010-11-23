@@ -23,7 +23,6 @@ void disconnectCallback(const redisAsyncContext *c, int status) {
 
 int main (int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
-    struct ev_loop *loop = ev_default_loop(0);
 
     redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
     if (c->err) {
@@ -32,10 +31,10 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    redisLibevAttach(c,loop);
+    redisLibevAttach(EV_DEFAULT_ c);
     redisAsyncSetDisconnectCallback(c,disconnectCallback);
     redisAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
     redisAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
-    ev_loop(loop, 0);
+    ev_loop(EV_DEFAULT_ 0);
     return 0;
 }
