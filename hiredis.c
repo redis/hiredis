@@ -313,6 +313,7 @@ static int processMultiBulkItem(redisReader *r) {
                 r->rstack[r->ridx].type = -1;
                 r->rstack[r->ridx].elements = -1;
                 r->rstack[r->ridx].parent = obj;
+                r->rstack[r->ridx].parentTask = cur;
                 r->rstack[r->ridx].idx = 0;
                 r->rstack[r->ridx].privdata = r->privdata;
             } else {
@@ -471,7 +472,7 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
     if (r->ridx == -1) {
         r->rstack[0].type = -1;
         r->rstack[0].elements = -1;
-        r->rstack[0].parent = NULL;
+        r->rstack[0].parent = r->rstack[0].parentTask = NULL;
         r->rstack[0].idx = -1;
         r->rstack[0].privdata = r->privdata;
         r->ridx = 0;

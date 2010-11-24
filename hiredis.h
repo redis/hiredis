@@ -88,6 +88,7 @@ typedef struct redisReadTask {
     int elements; /* number of elements in multibulk container */
     void *parent; /* optional pointer to parent object */
     int idx; /* index in parent (array) object */
+    struct redisReadTask *parentTask; /* pointer to parent task */
     void *privdata; /* user-settable arbitrary field */
 } redisReadTask;
 
