@@ -452,7 +452,6 @@ static void redisSetReplyReaderError(redisReader *r, sds err) {
     r->ridx = -1;
     r->error = err;
 }
-int redisReplyReaderSetPrivdata(void *reader, void *privdata);
 
 char *redisReplyReaderGetError(void *reader) {
     redisReader *r = reader;
