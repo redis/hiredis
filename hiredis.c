@@ -48,6 +48,7 @@ typedef struct redisReader {
 
     redisReadTask rstack[3]; /* stack of read tasks */
     int ridx; /* index of stack */
+    void *privdata; /* user-settable arbitrary field */
 } redisReader;
 
 static redisReply *createReplyObject(int type);
@@ -307,6 +308,7 @@ static int processMultiBulkItem(redisReader *r) {
                 r->rstack[r->ridx].elements = -1;
                 r->rstack[r->ridx].parent = obj;
                 r->rstack[r->ridx].idx = 0;
+                r->rstack[r->ridx].privdata = r->privdata;
             } else {
                 moveToNextTask(r);
             }
@@ -393,6 +395,17 @@ int redisReplyReaderSetReplyObjectFunctions(void *reader, redisReplyObjectFuncti
     return REDIS_ERR;
 }
 
+/* Set the private data field that is used in the read tasks. This argument can
+ * be used to curry arbitrary data to the custom reply object functions. */
+int redisReplyReaderSetPrivdata(void *reader, void *privdata) {
+    redisReader *r = reader;
+    if (r->reply == NULL) {
+        r->privdata = privdata;
+        return REDIS_OK;
+    }
+    return REDIS_ERR;
+}
+
 /* External libraries wrapping hiredis might need access to the temporary
  * variable while the reply is built up. When the reader contains an
  * object in between receiving some bytes to parse, this object might
@@ -426,6 +439,7 @@ static void redisSetReplyReaderError(redisReader *r, sds err) {
     r->ridx = -1;
     r->error = err;
 }
+int redisReplyReaderSetPrivdata(void *reader, void *privdata);
 
 char *redisReplyReaderGetError(void *reader) {
     redisReader *r = reader;
@@ -454,6 +468,7 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
         r->rstack[0].elements = -1;
         r->rstack[0].parent = NULL;
         r->rstack[0].idx = -1;
+        r->rstack[0].privdata = r->privdata;
         r->ridx = 0;
     }
 

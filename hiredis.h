@@ -88,6 +88,7 @@ typedef struct redisReadTask {
     int elements; /* number of elements in multibulk container */
     void *parent; /* optional pointer to parent object */
     int idx; /* index in parent (array) object */
+    void *privdata; /* user-settable arbitrary field */
 } redisReadTask;
 
 typedef struct redisReplyObjectFunctions {
@@ -116,6 +117,7 @@ typedef struct redisContext {
 void freeReplyObject(void *reply);
 void *redisReplyReaderCreate();
 int redisReplyReaderSetReplyObjectFunctions(void *reader, redisReplyObjectFunctions *fn);
+int redisReplyReaderSetPrivdata(void *reader, void *privdata);
 void *redisReplyReaderGetObject(void *reader);
 char *redisReplyReaderGetError(void *reader);
 void redisReplyReaderFree(void *ptr);
