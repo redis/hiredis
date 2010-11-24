@@ -236,9 +236,8 @@ static int processLineItem(redisReader *r) {
             obj = (void*)(size_t)(cur->type);
         }
 
-        /* If there is no root yet, register this object as root. */
-        if (r->reply == NULL)
-            r->reply = obj;
+        /* Set reply if this is the root object. */
+        if (r->ridx == 0) r->reply = obj;
         moveToNextTask(r);
         return 0;
     }
@@ -251,6 +250,7 @@ static int processBulkItem(redisReader *r) {
     char *p, *s;
     long len;
     unsigned long bytelen;
+    int success = 0;
 
     p = r->buf+r->pos;
     s = seekNewline(p);
@@ -263,20 +263,23 @@ static int processBulkItem(redisReader *r) {
             /* The nil object can always be created. */
             obj = r->fn ? r->fn->createNil(cur) :
                 (void*)REDIS_REPLY_NIL;
+            success = 1;
         } else {
             /* Only continue when the buffer contains the entire bulk item. */
             bytelen += len+2; /* include \r\n */
             if (r->pos+bytelen <= sdslen(r->buf)) {
                 obj = r->fn ? r->fn->createString(cur,s+2,len) :
                     (void*)REDIS_REPLY_STRING;
+                success = 1;
             }
         }
 
         /* Proceed when obj was created. */
-        if (obj != NULL) {
+        if (success) {
             r->pos += bytelen;
-            if (r->reply == NULL)
-                r->reply = obj;
+
+            /* Set reply if this is the root object. */
+            if (r->ridx == 0) r->reply = obj;
             moveToNextTask(r);
             return 0;
         }
@@ -289,9 +292,12 @@ static int processMultiBulkItem(redisReader *r) {
     void *obj;
     char *p;
     long elements;
+    int root = 0;
 
     if ((p = readLine(r,NULL)) != NULL) {
         elements = strtol(p,NULL,10);
+        root = (r->ridx == 0);
+
         if (elements == -1) {
             obj = r->fn ? r->fn->createNil(cur) :
                 (void*)REDIS_REPLY_NIL;
@@ -314,9 +320,8 @@ static int processMultiBulkItem(redisReader *r) {
             }
         }
 
-        /* Object was created, so we can always continue. */
-        if (r->reply == NULL)
-            r->reply = obj;
+        /* Set reply if this is the root object. */
+        if (root) r->reply = obj;
         return 0;
     }
     return -1;
