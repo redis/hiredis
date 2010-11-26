@@ -112,7 +112,7 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     r->len = len;
 
     if (task->parent) {
-        redisReply *parent = task->parent;
+        redisReply *parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
         parent->element[task->idx] = r;
     }
@@ -125,7 +125,7 @@ static void *createArrayObject(const redisReadTask *task, int elements) {
     if ((r->element = calloc(sizeof(redisReply*),elements)) == NULL)
         redisOOM();
     if (task->parent) {
-        redisReply *parent = task->parent;
+        redisReply *parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
         parent->element[task->idx] = r;
     }
@@ -136,7 +136,7 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
     redisReply *r = createReplyObject(REDIS_REPLY_INTEGER);
     r->integer = value;
     if (task->parent) {
-        redisReply *parent = task->parent;
+        redisReply *parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
         parent->element[task->idx] = r;
     }
@@ -146,7 +146,7 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
 static void *createNilObject(const redisReadTask *task) {
     redisReply *r = createReplyObject(REDIS_REPLY_NIL);
     if (task->parent) {
-        redisReply *parent = task->parent;
+        redisReply *parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
         parent->element[task->idx] = r;
     }
@@ -316,12 +316,13 @@ static int processMultiBulkItem(redisReader *r) {
             /* Modify task stack when there are more than 0 elements. */
             if (elements > 0) {
                 cur->elements = elements;
+                cur->obj = obj;
                 r->ridx++;
                 r->rstack[r->ridx].type = -1;
                 r->rstack[r->ridx].elements = -1;
-                r->rstack[r->ridx].parent = obj;
-                r->rstack[r->ridx].parentTask = cur;
                 r->rstack[r->ridx].idx = 0;
+                r->rstack[r->ridx].obj = NULL;
+                r->rstack[r->ridx].parent = cur;
                 r->rstack[r->ridx].privdata = r->privdata;
             } else {
                 moveToNextTask(r);
@@ -478,8 +479,9 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
     if (r->ridx == -1) {
         r->rstack[0].type = -1;
         r->rstack[0].elements = -1;
-        r->rstack[0].parent = r->rstack[0].parentTask = NULL;
         r->rstack[0].idx = -1;
+        r->rstack[0].obj = NULL;
+        r->rstack[0].parent = NULL;
         r->rstack[0].privdata = r->privdata;
         r->ridx = 0;
     }
