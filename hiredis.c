@@ -44,7 +44,8 @@ typedef struct redisReader {
     void *reply; /* holds temporary reply */
 
     sds buf; /* read buffer */
-    unsigned int pos; /* buffer cursor */
+    size_t pos; /* buffer cursor */
+    size_t len; /* buffer length */
 
     redisReadTask rstack[3]; /* stack of read tasks */
     int ridx; /* index of stack */
@@ -163,20 +164,31 @@ static char *readBytes(redisReader *r, unsigned int bytes) {
     return NULL;
 }
 
-static char *seekNewline(char *s) {
-    /* Find pointer to \r\n without strstr */
-    while (s != NULL) {
-        s = strchr(s,'\r');
-        if (s != NULL) {
-            if (s[1] == '\n')
-                break;
-            else
-                s++;
+/* Find pointer to \r\n. */
+static char *seekNewline(char *s, size_t len) {
+    int pos = 0;
+    int _len = len-1;
+
+    /* Position should be < len-1 because the character at "pos" should be
+     * followed by a \n. Note that strchr cannot be used because it doesn't
+     * allow to search a limited length and the buffer that is being searched
+     * might not have a trailing NULL character. */
+    while (pos < _len) {
+        while(pos < _len && s[pos] != '\r') pos++;
+        if (s[pos] != '\r') {
+            /* Not found. */
+            return NULL;
         } else {
-            break;
+            if (s[pos+1] == '\n') {
+                /* Found. */
+                return s+pos;
+            } else {
+                /* Continue searching. */
+                pos++;
+            }
         }
     }
-    return s;
+    return NULL;
 }
 
 static char *readLine(redisReader *r, int *_len) {
@@ -184,7 +196,7 @@ static char *readLine(redisReader *r, int *_len) {
     int len;
 
     p = r->buf+r->pos;
-    s = seekNewline(p);
+    s = seekNewline(p,(r->len-r->pos));
     if (s != NULL) {
         len = s-(r->buf+r->pos);
         r->pos += len+2; /* skip \r\n */
@@ -253,7 +265,7 @@ static int processBulkItem(redisReader *r) {
     int success = 0;
 
     p = r->buf+r->pos;
-    s = seekNewline(p);
+    s = seekNewline(p,r->len-r->pos);
     if (s != NULL) {
         p = r->buf+r->pos;
         bytelen = s-(r->buf+r->pos)+2; /* include \r\n */
@@ -267,7 +279,7 @@ static int processBulkItem(redisReader *r) {
         } else {
             /* Only continue when the buffer contains the entire bulk item. */
             bytelen += len+2; /* include \r\n */
-            if (r->pos+bytelen <= sdslen(r->buf)) {
+            if (r->pos+bytelen <= r->len) {
                 obj = r->fn ? r->fn->createString(cur,s+2,len) :
                     (void*)REDIS_REPLY_STRING;
                 success = 1;
@@ -463,8 +475,10 @@ void redisReplyReaderFeed(void *reader, char *buf, size_t len) {
     redisReader *r = reader;
 
     /* Copy the provided buffer. */
-    if (buf != NULL && len >= 1)
+    if (buf != NULL && len >= 1) {
         r->buf = sdscatlen(r->buf,buf,len);
+        r->len = sdslen(r->buf);
+    }
 }
 
 int redisReplyReaderGetReply(void *reader, void **reply) {
@@ -472,7 +486,7 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
     if (reply != NULL) *reply = NULL;
 
     /* When the buffer is empty, there will never be a reply. */
-    if (sdslen(r->buf) == 0)
+    if (r->len == 0)
         return REDIS_OK;
 
     /* Set first item to process when the stack is empty. */
@@ -493,14 +507,15 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
 
     /* Discard the consumed part of the buffer. */
     if (r->pos > 0) {
-        if (r->pos == sdslen(r->buf)) {
+        if (r->pos == r->len) {
             /* sdsrange has a quirck on this edge case. */
             sdsfree(r->buf);
             r->buf = sdsempty();
         } else {
-            r->buf = sdsrange(r->buf,r->pos,sdslen(r->buf));
+            r->buf = sdsrange(r->buf,r->pos,r->len);
         }
         r->pos = 0;
+        r->len = sdslen(r->buf);
     }
 
     /* Emit a reply when there is one. */
@@ -509,7 +524,7 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
         r->reply = NULL;
 
         /* Destroy the buffer when it is empty and is quite large. */
-        if (sdslen(r->buf) == 0 && sdsavail(r->buf) > 16*1024) {
+        if (r->len == 0 && sdsavail(r->buf) > 16*1024) {
             sdsfree(r->buf);
             r->buf = sdsempty();
             r->pos = 0;
