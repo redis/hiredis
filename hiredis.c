@@ -192,6 +192,35 @@ static char *seekNewline(char *s, size_t len) {
     return NULL;
 }
 
+/* Read a long long value starting at *s, under the assumption that it will be
+ * terminated by \r\n. Ambiguously returns -1 for unexpected input. */
+static long long readLongLong(char *s) {
+    long long v = 0;
+    int dec, mult = 1;
+    char c;
+
+    if (*s == '-') {
+        mult = -1;
+        s++;
+    } else if (*s == '+') {
+        mult = 1;
+        s++;
+    }
+
+    while ((c = *(s++)) != '\r') {
+        dec = c - '0';
+        if (dec >= 0 && dec < 10) {
+            v *= 10;
+            v += dec;
+        } else {
+            /* Should not happen... */
+            return -1;
+        }
+    }
+
+    return mult*v;
+}
+
 static char *readLine(redisReader *r, int *_len) {
     char *p, *s;
     int len;
@@ -241,7 +270,7 @@ static int processLineItem(redisReader *r) {
     if ((p = readLine(r,&len)) != NULL) {
         if (r->fn) {
             if (cur->type == REDIS_REPLY_INTEGER) {
-                obj = r->fn->createInteger(cur,strtoll(p,NULL,10));
+                obj = r->fn->createInteger(cur,readLongLong(p));
             } else {
                 obj = r->fn->createString(cur,p,len);
             }
@@ -270,7 +299,7 @@ static int processBulkItem(redisReader *r) {
     if (s != NULL) {
         p = r->buf+r->pos;
         bytelen = s-(r->buf+r->pos)+2; /* include \r\n */
-        len = strtol(p,NULL,10);
+        len = readLongLong(p);
 
         if (len < 0) {
             /* The nil object can always be created. */
@@ -315,7 +344,7 @@ static int processMultiBulkItem(redisReader *r) {
     }
 
     if ((p = readLine(r,NULL)) != NULL) {
-        elements = strtol(p,NULL,10);
+        elements = readLongLong(p);
         root = (r->ridx == 0);
 
         if (elements == -1) {
