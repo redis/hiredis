@@ -157,7 +157,7 @@ static void *createNilObject(const redisReadTask *task) {
 
 static char *readBytes(redisReader *r, unsigned int bytes) {
     char *p;
-    if (sdslen(r->buf)-r->pos >= bytes) {
+    if (r->len-r->pos >= bytes) {
         p = r->buf+r->pos;
         r->pos += bytes;
         return p;
