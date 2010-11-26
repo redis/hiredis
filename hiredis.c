@@ -70,7 +70,7 @@ static redisReplyObjectFunctions defaultFunctions = {
 
 /* Create a reply object */
 static redisReply *createReplyObject(int type) {
-    redisReply *r = calloc(sizeof(*r),1);
+    redisReply *r = malloc(sizeof(*r));
 
     if (!r) redisOOM();
     r->type = type;
@@ -90,9 +90,10 @@ void freeReplyObject(void *reply) {
             if (r->element[j]) freeReplyObject(r->element[j]);
         free(r->element);
         break;
-    default:
-        if (r->str != NULL)
-            free(r->str);
+    case REDIS_REPLY_ERROR:
+    case REDIS_REPLY_STATUS:
+    case REDIS_REPLY_STRING:
+        free(r->str);
         break;
     }
     free(r);
