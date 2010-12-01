@@ -43,8 +43,6 @@ all: ${DYLIBNAME} ${BINS}
 # Deps (use make dep to generate this)
 net.o: net.c fmacros.h net.h
 async.o: async.c async.h hiredis.h sds.h util.h
-example-libev.o: example-libev.c hiredis.h async.h adapters/libev.h
-example-libevent.o: example-libevent.c hiredis.h async.h adapters/libevent.h
 example.o: example.c hiredis.h
 hiredis.o: hiredis.c hiredis.h net.h sds.h util.h
 sds.o: sds.c sds.h
@@ -60,10 +58,10 @@ dynamic: ${DYLIBNAME}
 static: ${STLIBNAME}
 
 # Binaries:
-hiredis-example-libevent: example-libevent.o ${DYLIBNAME}
+hiredis-example-libevent: example-libevent.c adapters/libevent.h ${DYLIBNAME}
 	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -levent -Wl,-rpath,. example-libevent.c
 
-hiredis-example-libev: example-libev.o ${DYLIBNAME}
+hiredis-example-libev: example-libev.c adapters/libev.h ${DYLIBNAME}
 	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -lev -Wl,-rpath,. example-libev.c
 
 hiredis-%: %.o ${DYLIBNAME}
