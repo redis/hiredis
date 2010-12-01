@@ -41,6 +41,7 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     ac->err = 0;
     ac->errstr = NULL;
     ac->data = NULL;
+    ac->_adapter_data = NULL;
     ac->evAddRead = NULL;
     ac->evDelRead = NULL;
     ac->evAddWrite = NULL;
@@ -162,7 +163,7 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
     }
 
     /* Signal event lib to clean up */
-    if (ac->evCleanup) ac->evCleanup(ac->data);
+    if (ac->evCleanup) ac->evCleanup(ac->_adapter_data);
 
     /* Execute callback with proper status */
     if (ac->onDisconnect) ac->onDisconnect(ac,status);
@@ -215,7 +216,7 @@ void redisAsyncHandleRead(redisAsyncContext *ac) {
         __redisAsyncDisconnect(ac);
     } else {
         /* Always re-schedule reads */
-        if (ac->evAddRead) ac->evAddRead(ac->data);
+        if (ac->evAddRead) ac->evAddRead(ac->_adapter_data);
         redisProcessCallbacks(ac);
     }
 }
@@ -229,13 +230,13 @@ void redisAsyncHandleWrite(redisAsyncContext *ac) {
     } else {
         /* Continue writing when not done, stop writing otherwise */
         if (!done) {
-            if (ac->evAddWrite) ac->evAddWrite(ac->data);
+            if (ac->evAddWrite) ac->evAddWrite(ac->_adapter_data);
         } else {
-            if (ac->evDelWrite) ac->evDelWrite(ac->data);
+            if (ac->evDelWrite) ac->evDelWrite(ac->_adapter_data);
         }
 
         /* Always schedule reads when something was written */
-        if (ac->evAddRead) ac->evAddRead(ac->data);
+        if (ac->evAddRead) ac->evAddRead(ac->_adapter_data);
     }
 }
 
@@ -258,7 +259,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     __redisPushCallback(&ac->replies,&cb);
 
     /* Always schedule a write when the write buffer is non-empty */
-    if (ac->evAddWrite) ac->evAddWrite(ac->data);
+    if (ac->evAddWrite) ac->evAddWrite(ac->_adapter_data);
 
     return REDIS_OK;
 }

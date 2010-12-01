@@ -82,7 +82,7 @@ int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
     redisLibevEvents *e;
 
     /* Nothing should be attached when something is already attached */
-    if (ac->data != NULL)
+    if (ac->_adapter_data != NULL)
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
@@ -103,7 +103,7 @@ int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
     ac->evAddWrite = redisLibevAddWrite;
     ac->evDelWrite = redisLibevDelWrite;
     ac->evCleanup = redisLibevCleanup;
-    ac->data = e;
+    ac->_adapter_data = e;
 
     /* Initialize read/write events */
     ev_io_init(&e->rev,redisLibevReadEvent,c->fd,EV_READ);

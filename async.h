@@ -65,6 +65,9 @@ typedef struct redisAsyncContext {
     /* Not used by hiredis */
     void *data;
 
+    /* Used by the different event lib adapters to store their private data */
+    void *_adapter_data;
+
     /* Called when the library expects to start reading/writing.
      * The supplied functions should be idempotent. */
     void (*evAddRead)(void *privdata);
