@@ -603,6 +603,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     int argc = 0, j;
     int totlen = 0;
     int num;
+    double dbl;
 
     /* Abort if there is not target to set */
     if (target == NULL)
@@ -641,6 +642,11 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
             case 'i':
                 num = va_arg(ap, int);
                 current = sdscatprintf(current, "%d", num);
+                interpolated = 1;
+                break;
+            case 'f':
+                dbl = va_arg(ap, double);
+                current = sdscatprintf(current, "%0.8f", dbl);
                 interpolated = 1;
                 break;
             case '%':

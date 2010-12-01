@@ -77,6 +77,12 @@ static void test_format_commands() {
         len == 4+4+(6+2)+4+(3+2)+4+(1+2)+4+(2+2));
     free(cmd);
 
+    test("Format command with %%f string interpolation: ");
+    len = redisFormatCommand(&cmd,"ZINCRBY %s %f %s","foo", 2.5, "bar");
+    test_cond(strncmp(cmd,"*4\r\n$7\r\nZINCRBY\r\n$3\r\nfoo\r\n$10\r\n2.50000000\r\n$3\r\nbar\r\n",len) == 0 &&
+        len == 4+4+(7+2)+4+(3+2)+5+(10+2)+4+(3+2));
+    free(cmd);
+
     const char *argv[3];
     argv[0] = "SET";
     argv[1] = "foo\0xxx";
