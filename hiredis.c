@@ -771,7 +771,6 @@ void redisFree(redisContext *c) {
 redisContext *redisConnect(const char *ip, int port) {
     redisContext *c = redisContextInit();
     c->flags |= REDIS_BLOCK;
-    c->flags |= REDIS_CONNECTED;
     redisContextConnectTcp(c,ip,port);
     return c;
 }
@@ -779,7 +778,6 @@ redisContext *redisConnect(const char *ip, int port) {
 redisContext *redisConnectNonBlock(const char *ip, int port) {
     redisContext *c = redisContextInit();
     c->flags &= ~REDIS_BLOCK;
-    c->flags |= REDIS_CONNECTED;
     redisContextConnectTcp(c,ip,port);
     return c;
 }
@@ -787,7 +785,6 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
 redisContext *redisConnectUnix(const char *path) {
     redisContext *c = redisContextInit();
     c->flags |= REDIS_BLOCK;
-    c->flags |= REDIS_CONNECTED;
     redisContextConnectUnix(c,path);
     return c;
 }
@@ -795,7 +792,6 @@ redisContext *redisConnectUnix(const char *path) {
 redisContext *redisConnectUnixNonBlock(const char *path) {
     redisContext *c = redisContextInit();
     c->flags &= ~REDIS_BLOCK;
-    c->flags |= REDIS_CONNECTED;
     redisContextConnectUnix(c,path);
     return c;
 }

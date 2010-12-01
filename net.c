@@ -137,6 +137,7 @@ int redisContextConnectTcp(redisContext *c, const char *addr, int port) {
     }
 
     c->fd = s;
+    c->flags |= REDIS_CONNECTED;
     return REDIS_OK;
 }
 
@@ -163,5 +164,6 @@ int redisContextConnectUnix(redisContext *c, const char *path) {
     }
 
     c->fd = s;
+    c->flags |= REDIS_CONNECTED;
     return REDIS_OK;
 }
