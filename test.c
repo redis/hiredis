@@ -71,6 +71,12 @@ static void test_format_commands() {
         len == 4+4+(3+2)+4+(1+2)+4+(1+2));
     free(cmd);
 
+    test("Format command with %%d string interpolation: ");
+    len = redisFormatCommand(&cmd,"LRANGE %s %d %d","foo", 0, -1);
+    test_cond(strncmp(cmd,"*4\r\n$6\r\nLRANGE\r\n$3\r\nfoo\r\n$1\r\n0\r\n$2\r\n-1\r\n",len) == 0 &&
+        len == 4+4+(6+2)+4+(3+2)+4+(1+2)+4+(2+2));
+    free(cmd);
+
     const char *argv[3];
     argv[0] = "SET";
     argv[1] = "foo\0xxx";
