@@ -64,6 +64,15 @@ hiredis-example-libevent: example-libevent.c adapters/libevent.h ${DYLIBNAME}
 hiredis-example-libev: example-libev.c adapters/libev.h ${DYLIBNAME}
 	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -lev -Wl,-rpath,. example-libev.c
 
+ifndef AE_DIR
+hiredis-example-ae:
+	@echo "Please specify AE_DIR (e.g. <redis repository>/src)"
+	@false
+else
+hiredis-example-ae: example-ae.c adapters/ae.h ${DYLIBNAME}
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -I$(AE_DIR) -L. -lhiredis -Wl,-rpath,. example-ae.c $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o
+endif
+
 hiredis-%: %.o ${DYLIBNAME}
 	$(CC) -o $@ $(CCOPT) $(DEBUG) -L. -lhiredis -Wl,-rpath,. $<
 
