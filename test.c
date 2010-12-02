@@ -71,6 +71,30 @@ static void test_format_commands() {
         len == 4+4+(3+2)+4+(1+2)+4+(1+2));
     free(cmd);
 
+    test("Format command with printf-delegation (long long): ");
+    len = redisFormatCommand(&cmd,"key:%08lld",1234ll);
+    test_cond(strncmp(cmd,"*1\r\n$12\r\nkey:00001234\r\n",len) == 0 &&
+        len == 4+5+(12+2));
+    free(cmd);
+
+    test("Format command with printf-delegation (float): ");
+    len = redisFormatCommand(&cmd,"v:%06.1f",12.34f);
+    test_cond(strncmp(cmd,"*1\r\n$8\r\nv:0012.3\r\n",len) == 0 &&
+        len == 4+4+(8+2));
+    free(cmd);
+
+    test("Format command with printf-delegation and extra interpolation: ");
+    len = redisFormatCommand(&cmd,"key:%d %b",1234,"foo",3);
+    test_cond(strncmp(cmd,"*2\r\n$8\r\nkey:1234\r\n$3\r\nfoo\r\n",len) == 0 &&
+        len == 4+4+(8+2)+4+(3+2));
+    free(cmd);
+
+    test("Format command with wrong printf format and extra interpolation: ");
+    len = redisFormatCommand(&cmd,"key:%08p %b",1234,"foo",3);
+    test_cond(strncmp(cmd,"*2\r\n$6\r\nkey:8p\r\n$3\r\nfoo\r\n",len) == 0 &&
+        len == 4+4+(6+2)+4+(3+2));
+    free(cmd);
+
     const char *argv[3];
     argv[0] = "SET";
     argv[1] = "foo\0xxx";
