@@ -31,7 +31,7 @@ else
   STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
 endif
 CCOPT= $(CFLAGS) $(CCLINK) $(ARCH) $(PROF)
-DEBUG?= -g -ggdb 
+DEBUG?= -g -ggdb
 
 PREFIX?= /usr/local
 INSTALL_INC= $(PREFIX)/include/hiredis
