@@ -50,8 +50,9 @@ typedef struct redisCallbackList {
     redisCallback *head, *tail;
 } redisCallbackList;
 
-/* Disconnect callback prototype */
+/* Connection callback prototypes */
 typedef void (redisDisconnectCallback)(const struct redisAsyncContext*, int status);
+typedef void (redisConnectCallback)(const struct redisAsyncContext*);
 
 /* Context for an async connection to Redis */
 typedef struct redisAsyncContext {
@@ -80,6 +81,9 @@ typedef struct redisAsyncContext {
      * user request. The status is set accordingly (REDIS_OK, REDIS_ERR). */
     redisDisconnectCallback *onDisconnect;
 
+    /* Called when the first write event was received. */
+    redisConnectCallback *onConnect;
+
     /* Reply callbacks */
     redisCallbackList replies;
 } redisAsyncContext;
@@ -87,6 +91,7 @@ typedef struct redisAsyncContext {
 /* Functions that proxy to hiredis */
 redisAsyncContext *redisAsyncConnect(const char *ip, int port);
 int redisAsyncSetReplyObjectFunctions(redisAsyncContext *ac, redisReplyObjectFunctions *fn);
+int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 void redisAsyncDisconnect(redisAsyncContext *ac);
 
