@@ -10,7 +10,7 @@ OPTIMIZATION?=-O3
 ifeq ($(uname_S),SunOS)
   CFLAGS?=-std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -D__EXTENSIONS__ -D_XPG6 $(ARCH) $(PROF)
   CCLINK?=-ldl -lnsl -lsocket -lm -lpthread
-  LDFLAGS?=-L. -Wl,-R,. 
+  LDFLAGS?=-L. -Wl,-R,.
   DYLIBNAME?=libhiredis.so
   DYLIB_MAKE_CMD?=$(CC) -G -o ${DYLIBNAME} ${OBJ}
   STLIBNAME?=libhiredis.a
@@ -18,7 +18,7 @@ ifeq ($(uname_S),SunOS)
 else ifeq ($(uname_S),Darwin)
   CFLAGS?=-std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
-  LDFLAGS?=-Wl,-rpath,.
+  LDFLAGS?=-L. -Wl,-rpath,.
   OBJARCH?=-arch i386 -arch x86_64
   DYLIBNAME?=libhiredis.dylib
   DYLIB_MAKE_CMD?=libtool -dynamic -o ${DYLIBNAME} -lm ${DEBUG} - ${OBJ}
@@ -27,13 +27,13 @@ else ifeq ($(uname_S),Darwin)
 else
   CFLAGS?=-std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
-  LDFLAGS?=-Wl,-rpath,.
+  LDFLAGS?=-L. -Wl,-rpath,.
   DYLIBNAME?=libhiredis.so
   DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,${DYLIBNAME} -o ${DYLIBNAME} ${OBJ}
   STLIBNAME?=libhiredis.a
   STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
 endif
-CCOPT= $(CFLAGS) $(CCLINK) $(ARCH) $(PROF)
+CCOPT= $(CFLAGS) $(CCLINK)
 DEBUG?= -g -ggdb
 
 PREFIX?= /usr/local
