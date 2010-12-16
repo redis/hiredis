@@ -36,7 +36,7 @@
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 9
-#define HIREDIS_PATCH 1
+#define HIREDIS_PATCH 2
 
 #define REDIS_ERR -1
 #define REDIS_OK 0
