@@ -44,7 +44,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "hiredis.h"
+#include "net.h"
 #include "sds.h"
 
 /* Forward declaration */
