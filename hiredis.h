@@ -62,12 +62,12 @@
  * should be terminated once all replies have been read. */
 #define REDIS_DISCONNECTING 0x4
 
-#define REDIS_REPLY_ERROR 0
 #define REDIS_REPLY_STRING 1
 #define REDIS_REPLY_ARRAY 2
 #define REDIS_REPLY_INTEGER 3
 #define REDIS_REPLY_NIL 4
 #define REDIS_REPLY_STATUS 5
+#define REDIS_REPLY_ERROR 6
 
 #ifdef __cplusplus
 extern "C" {
