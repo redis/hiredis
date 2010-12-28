@@ -64,6 +64,10 @@
  * should be terminated once all replies have been read. */
 #define REDIS_DISCONNECTING 0x4
 
+/* Flag specific to the async API which means that the context should be clean
+ * up as soon as possible. */
+#define REDIS_FREEING 0x8
+
 #define REDIS_REPLY_STRING 1
 #define REDIS_REPLY_ARRAY 2
 #define REDIS_REPLY_INTEGER 3

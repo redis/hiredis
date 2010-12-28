@@ -95,6 +95,7 @@ int redisAsyncSetReplyObjectFunctions(redisAsyncContext *ac, redisReplyObjectFun
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 void redisAsyncDisconnect(redisAsyncContext *ac);
+void redisAsyncFree(redisAsyncContext *ac);
 
 /* Handle read/write events */
 void redisAsyncHandleRead(redisAsyncContext *ac);

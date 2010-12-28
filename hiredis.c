@@ -809,8 +809,7 @@ static redisContext *redisContextInit() {
 }
 
 void redisFree(redisContext *c) {
-    /* Disconnect before free'ing if not yet disconnected. */
-    if (c->flags & REDIS_CONNECTED)
+    if (c->fd > 0)
         close(c->fd);
     if (c->errstr != NULL)
         sdsfree(c->errstr);
