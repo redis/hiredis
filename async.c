@@ -246,14 +246,14 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
         assert(__redisShiftCallback(&ac->replies,&cb) == REDIS_OK);
         if (cb.fn != NULL) {
             cb.fn(ac,reply,cb.privdata);
+
+            /* Proceed with free'ing when redisAsyncFree() was called. */
+            if (c->flags & REDIS_FREEING) {
+                __redisAsyncFree(ac);
+                return;
+            }
         } else {
             c->fn->freeObject(reply);
-        }
-
-        /* Proceed with free'ing when redisAsyncFree() was called. */
-        if (c->flags & REDIS_FREEING) {
-            __redisAsyncFree(ac);
-            return;
         }
     }
 
