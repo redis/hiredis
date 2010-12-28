@@ -169,31 +169,17 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     redisFree(c);
 }
 
-/* Free's the async context. When REDIS_CONNECTED is set, it could only have
- * been called from a command callback so we need to let control return to
- * redisProcessCallbacks() before free'ing can continue.
- *
- * When REDIS_CONNECTED is not set, the first write event has not yet fired and
- * we can free immediately. */
+/* Free the async context. When this function is called from a callback,
+ * control needs to be returned to redisProcessCallbacks() before actual
+ * free'ing. To do so, a flag is set on the context which is picked up by
+ * redisProcessCallbacks(). Otherwise, the context is immediately free'd. */
 void redisAsyncFree(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    if (c->flags & REDIS_CONNECTED) {
+    if (c->flags & REDIS_IN_CALLBACK) {
         c->flags |= REDIS_FREEING;
     } else {
         __redisAsyncFree(ac);
     }
-}
-
-/* Tries to do a clean disconnect from Redis, meaning it stops new commands
- * from being issued, but tries to flush the output buffer and execute
- * callbacks for all remaining replies.
- *
- * This functions is generally called from within a callback, so the
- * processCallbacks function will pick up the flag when there are no
- * more replies. */
-void redisAsyncDisconnect(redisAsyncContext *ac) {
-    redisContext *c = &(ac->c);
-    c->flags |= REDIS_DISCONNECTING;
 }
 
 /* Helper function to make the disconnect happen and clean up. */
@@ -214,12 +200,30 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
 
         /* Execute pending callbacks with NULL reply. */
         while (__redisShiftCallback(&ac->replies,&cb) == REDIS_OK) {
-            if (cb.fn != NULL)
+            if (cb.fn != NULL) {
+                c->flags |= REDIS_IN_CALLBACK;
                 cb.fn(ac,NULL,cb.privdata);
+                c->flags &= ~REDIS_IN_CALLBACK;
+            }
         }
     }
 
     __redisAsyncFree(ac);
+}
+
+/* Tries to do a clean disconnect from Redis, meaning it stops new commands
+ * from being issued, but tries to flush the output buffer and execute
+ * callbacks for all remaining replies. When this function is called from a
+ * callback, there might be more replies and we can safely defer disconnecting
+ * to redisProcessCallbacks(). Otherwise, we can only disconnect immediately
+ * when there are no pending callbacks. */
+void redisAsyncDisconnect(redisAsyncContext *ac) {
+    redisContext *c = &(ac->c);
+    if (c->flags & REDIS_IN_CALLBACK || ac->replies.head != NULL) {
+        c->flags |= REDIS_DISCONNECTING;
+    } else {
+        __redisAsyncDisconnect(ac);
+    }
 }
 
 void redisProcessCallbacks(redisAsyncContext *ac) {
@@ -245,7 +249,9 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
         /* Shift callback and execute it */
         assert(__redisShiftCallback(&ac->replies,&cb) == REDIS_OK);
         if (cb.fn != NULL) {
+            c->flags |= REDIS_IN_CALLBACK;
             cb.fn(ac,reply,cb.privdata);
+            c->flags &= ~REDIS_IN_CALLBACK;
 
             /* Proceed with free'ing when redisAsyncFree() was called. */
             if (c->flags & REDIS_FREEING) {
