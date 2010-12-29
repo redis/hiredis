@@ -50,13 +50,13 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     ac->err = 0;
     ac->errstr = NULL;
     ac->data = NULL;
-    ac->_adapter_data = NULL;
 
-    ac->evAddRead = NULL;
-    ac->evDelRead = NULL;
-    ac->evAddWrite = NULL;
-    ac->evDelWrite = NULL;
-    ac->evCleanup = NULL;
+    ac->ev.data = NULL;
+    ac->ev.addRead = NULL;
+    ac->ev.delRead = NULL;
+    ac->ev.addWrite = NULL;
+    ac->ev.delWrite = NULL;
+    ac->ev.cleanup = NULL;
 
     ac->onConnect = NULL;
     ac->onDisconnect = NULL;
@@ -100,7 +100,7 @@ int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn
         /* The common way to detect an established connection is to wait for
          * the first write event to be fired. This assumes the related event
          * library functions are already set. */
-        if (ac->evAddWrite) ac->evAddWrite(ac->_adapter_data);
+        if (ac->ev.addWrite) ac->ev.addWrite(ac->ev.data);
         return REDIS_OK;
     }
     return REDIS_ERR;
@@ -166,7 +166,7 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     }
 
     /* Signal event lib to clean up */
-    if (ac->evCleanup) ac->evCleanup(ac->_adapter_data);
+    if (ac->ev.cleanup) ac->ev.cleanup(ac->ev.data);
 
     /* Execute disconnect callback. When redisAsyncFree() initiated destroying
      * this context, the status will always be REDIS_OK. */
@@ -279,7 +279,7 @@ void redisAsyncHandleRead(redisAsyncContext *ac) {
         __redisAsyncDisconnect(ac);
     } else {
         /* Always re-schedule reads */
-        if (ac->evAddRead) ac->evAddRead(ac->_adapter_data);
+        if (ac->ev.addRead) ac->ev.addRead(ac->ev.data);
         redisProcessCallbacks(ac);
     }
 }
@@ -293,13 +293,13 @@ void redisAsyncHandleWrite(redisAsyncContext *ac) {
     } else {
         /* Continue writing when not done, stop writing otherwise */
         if (!done) {
-            if (ac->evAddWrite) ac->evAddWrite(ac->_adapter_data);
+            if (ac->ev.addWrite) ac->ev.addWrite(ac->ev.data);
         } else {
-            if (ac->evDelWrite) ac->evDelWrite(ac->_adapter_data);
+            if (ac->ev.delWrite) ac->ev.delWrite(ac->ev.data);
         }
 
         /* Always schedule reads after writes */
-        if (ac->evAddRead) ac->evAddRead(ac->_adapter_data);
+        if (ac->ev.addRead) ac->ev.addRead(ac->ev.data);
 
         /* Fire onConnect when this is the first write event. */
         if (!(c->flags & REDIS_CONNECTED)) {
@@ -328,7 +328,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     __redisPushCallback(&ac->replies,&cb);
 
     /* Always schedule a write when the write buffer is non-empty */
-    if (ac->evAddWrite) ac->evAddWrite(ac->_adapter_data);
+    if (ac->ev.addWrite) ac->ev.addWrite(ac->ev.data);
 
     return REDIS_OK;
 }

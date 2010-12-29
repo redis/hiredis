@@ -52,7 +52,7 @@ int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
     redisLibeventEvents *e;
 
     /* Nothing should be attached when something is already attached */
-    if (ac->_adapter_data != NULL)
+    if (ac->ev.data != NULL)
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
@@ -60,12 +60,12 @@ int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
     e->context = ac;
 
     /* Register functions to start/stop listening for events */
-    ac->evAddRead = redisLibeventAddRead;
-    ac->evDelRead = redisLibeventDelRead;
-    ac->evAddWrite = redisLibeventAddWrite;
-    ac->evDelWrite = redisLibeventDelWrite;
-    ac->evCleanup = redisLibeventCleanup;
-    ac->_adapter_data = e;
+    ac->ev.addRead = redisLibeventAddRead;
+    ac->ev.delRead = redisLibeventDelRead;
+    ac->ev.addWrite = redisLibeventAddWrite;
+    ac->ev.delWrite = redisLibeventDelWrite;
+    ac->ev.cleanup = redisLibeventCleanup;
+    ac->ev.data = e;
 
     /* Initialize and install read/write events */
     event_set(&e->rev,c->fd,EV_READ,redisLibeventReadEvent,e);

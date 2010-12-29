@@ -72,7 +72,7 @@ int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
     redisAeEvents *e;
 
     /* Nothing should be attached when something is already attached */
-    if (ac->_adapter_data != NULL)
+    if (ac->ev.data != NULL)
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
@@ -83,12 +83,12 @@ int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
     e->reading = e->writing = 0;
 
     /* Register functions to start/stop listening for events */
-    ac->evAddRead = redisAeAddRead;
-    ac->evDelRead = redisAeDelRead;
-    ac->evAddWrite = redisAeAddWrite;
-    ac->evDelWrite = redisAeDelWrite;
-    ac->evCleanup = redisAeCleanup;
-    ac->_adapter_data = e;
+    ac->ev.addRead = redisAeAddRead;
+    ac->ev.delRead = redisAeDelRead;
+    ac->ev.addWrite = redisAeAddWrite;
+    ac->ev.delWrite = redisAeDelWrite;
+    ac->ev.cleanup = redisAeCleanup;
+    ac->ev.data = e;
 
     return REDIS_OK;
 }
