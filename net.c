@@ -4,6 +4,7 @@
  * Copyright (c) 2010, Pieter Noordhuis <pcnoordhuis at gmail dot com>
  *
  * All rights reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
