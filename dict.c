@@ -1,4 +1,4 @@
-/* Hash Tables Implementation.
+/* Hash table implementation.
  *
  * This file implements in memory hash tables with insert/del/replace/find/
  * get-random-element operations. Hash tables will auto resize if needed
@@ -34,14 +34,9 @@
  */
 
 #include "fmacros.h"
-
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
 #include <assert.h>
 #include <limits.h>
-
 #include "dict.h"
 
 /* -------------------------- private prototypes ---------------------------- */
@@ -52,24 +47,6 @@ static int _dictKeyIndex(dict *ht, const void *key);
 static int _dictInit(dict *ht, dictType *type, void *privDataPtr);
 
 /* -------------------------- hash functions -------------------------------- */
-
-/* Thomas Wang's 32 bit Mix Function */
-unsigned int dictIntHashFunction(unsigned int key)
-{
-    key += ~(key << 15);
-    key ^=  (key >> 10);
-    key +=  (key << 3);
-    key ^=  (key >> 6);
-    key += ~(key << 11);
-    key ^=  (key >> 16);
-    return key;
-}
-
-/* Identity hash function for integer keys */
-unsigned int dictIdentityHashFunction(unsigned int key)
-{
-    return key;
-}
 
 /* Generic hash function (a popular one from Bernstein).
  * I tested a few and this was the best. */
@@ -85,8 +62,7 @@ unsigned int dictGenHashFunction(const unsigned char *buf, int len) {
 
 /* Reset an hashtable already initialized with ht_init().
  * NOTE: This function should only called by ht_destroy(). */
-static void _dictReset(dict *ht)
-{
+static void _dictReset(dict *ht) {
     ht->table = NULL;
     ht->size = 0;
     ht->sizemask = 0;
@@ -94,19 +70,14 @@ static void _dictReset(dict *ht)
 }
 
 /* Create a new hash table */
-dict *dictCreate(dictType *type,
-        void *privDataPtr)
-{
+dict *dictCreate(dictType *type, void *privDataPtr) {
     dict *ht = malloc(sizeof(*ht));
-
     _dictInit(ht,type,privDataPtr);
     return ht;
 }
 
 /* Initialize the hash table */
-int _dictInit(dict *ht, dictType *type,
-        void *privDataPtr)
-{
+int _dictInit(dict *ht, dictType *type, void *privDataPtr) {
     _dictReset(ht);
     ht->type = type;
     ht->privdata = privDataPtr;
@@ -115,18 +86,15 @@ int _dictInit(dict *ht, dictType *type,
 
 /* Resize the table to the minimal size that contains all the elements,
  * but with the invariant of a USER/BUCKETS ration near to <= 1 */
-int dictResize(dict *ht)
-{
+int dictResize(dict *ht) {
     int minimal = ht->used;
-
     if (minimal < DICT_HT_INITIAL_SIZE)
         minimal = DICT_HT_INITIAL_SIZE;
     return dictExpand(ht, minimal);
 }
 
 /* Expand or create the hashtable */
-int dictExpand(dict *ht, unsigned long size)
-{
+int dictExpand(dict *ht, unsigned long size) {
     dict n; /* the new hashtable */
     unsigned long realsize = _dictNextPower(size), i;
 
@@ -173,8 +141,7 @@ int dictExpand(dict *ht, unsigned long size)
 }
 
 /* Add an element to the target hash table */
-int dictAdd(dict *ht, void *key, void *val)
-{
+int dictAdd(dict *ht, void *key, void *val) {
     int index;
     dictEntry *entry;
 
@@ -199,8 +166,7 @@ int dictAdd(dict *ht, void *key, void *val)
  * Return 1 if the key was added from scratch, 0 if there was already an
  * element with such key and dictReplace() just performed a value update
  * operation. */
-int dictReplace(dict *ht, void *key, void *val)
-{
+int dictReplace(dict *ht, void *key, void *val) {
     dictEntry *entry, auxentry;
 
     /* Try to add the element. If the key
@@ -222,8 +188,7 @@ int dictReplace(dict *ht, void *key, void *val)
 }
 
 /* Search and remove an element */
-static int dictGenericDelete(dict *ht, const void *key, int nofree)
-{
+static int dictGenericDelete(dict *ht, const void *key, int nofree) {
     unsigned int h;
     dictEntry *he, *prevHe;
 
@@ -263,8 +228,7 @@ int dictDeleteNoFree(dict *ht, const void *key) {
 }
 
 /* Destroy an entire hash table */
-int _dictClear(dict *ht)
-{
+int _dictClear(dict *ht) {
     unsigned long i;
 
     /* Free all the elements */
@@ -289,14 +253,12 @@ int _dictClear(dict *ht)
 }
 
 /* Clear & Release the hash table */
-void dictRelease(dict *ht)
-{
+void dictRelease(dict *ht) {
     _dictClear(ht);
     free(ht);
 }
 
-dictEntry *dictFind(dict *ht, const void *key)
-{
+dictEntry *dictFind(dict *ht, const void *key) {
     dictEntry *he;
     unsigned int h;
 
@@ -311,8 +273,7 @@ dictEntry *dictFind(dict *ht, const void *key)
     return NULL;
 }
 
-dictIterator *dictGetIterator(dict *ht)
-{
+dictIterator *dictGetIterator(dict *ht) {
     dictIterator *iter = malloc(sizeof(*iter));
 
     iter->ht = ht;
@@ -322,8 +283,7 @@ dictIterator *dictGetIterator(dict *ht)
     return iter;
 }
 
-dictEntry *dictNext(dictIterator *iter)
-{
+dictEntry *dictNext(dictIterator *iter) {
     while (1) {
         if (iter->entry == NULL) {
             iter->index++;
@@ -343,15 +303,13 @@ dictEntry *dictNext(dictIterator *iter)
     return NULL;
 }
 
-void dictReleaseIterator(dictIterator *iter)
-{
+void dictReleaseIterator(dictIterator *iter) {
     free(iter);
 }
 
 /* Return a random entry from the hash table. Useful to
  * implement randomized algorithms */
-dictEntry *dictGetRandomKey(dict *ht)
-{
+dictEntry *dictGetRandomKey(dict *ht) {
     dictEntry *he;
     unsigned int h;
     int listlen, listele;
@@ -380,8 +338,7 @@ dictEntry *dictGetRandomKey(dict *ht)
 /* ------------------------- private functions ------------------------------ */
 
 /* Expand the hash table if needed */
-static int _dictExpandIfNeeded(dict *ht)
-{
+static int _dictExpandIfNeeded(dict *ht) {
     /* If the hash table is empty expand it to the intial size,
      * if the table is "full" dobule its size. */
     if (ht->size == 0)
@@ -392,8 +349,7 @@ static int _dictExpandIfNeeded(dict *ht)
 }
 
 /* Our hash table capability is a power of two */
-static unsigned long _dictNextPower(unsigned long size)
-{
+static unsigned long _dictNextPower(unsigned long size) {
     unsigned long i = DICT_HT_INITIAL_SIZE;
 
     if (size >= LONG_MAX) return LONG_MAX;
@@ -407,8 +363,7 @@ static unsigned long _dictNextPower(unsigned long size)
 /* Returns the index of a free slot that can be populated with
  * an hash entry for the given 'key'.
  * If the key already exists, -1 is returned. */
-static int _dictKeyIndex(dict *ht, const void *key)
-{
+static int _dictKeyIndex(dict *ht, const void *key) {
     unsigned int h;
     dictEntry *he;
 
@@ -431,129 +386,3 @@ void dictEmpty(dict *ht) {
     _dictClear(ht);
 }
 
-#define DICT_STATS_VECTLEN 50
-void dictPrintStats(dict *ht) {
-    unsigned long i, slots = 0, chainlen, maxchainlen = 0;
-    unsigned long totchainlen = 0;
-    unsigned long clvector[DICT_STATS_VECTLEN];
-
-    if (ht->used == 0) {
-        printf("No stats available for empty dictionaries\n");
-        return;
-    }
-
-    for (i = 0; i < DICT_STATS_VECTLEN; i++) clvector[i] = 0;
-    for (i = 0; i < ht->size; i++) {
-        dictEntry *he;
-
-        if (ht->table[i] == NULL) {
-            clvector[0]++;
-            continue;
-        }
-        slots++;
-        /* For each hash entry on this slot... */
-        chainlen = 0;
-        he = ht->table[i];
-        while(he) {
-            chainlen++;
-            he = he->next;
-        }
-        clvector[(chainlen < DICT_STATS_VECTLEN) ? chainlen : (DICT_STATS_VECTLEN-1)]++;
-        if (chainlen > maxchainlen) maxchainlen = chainlen;
-        totchainlen += chainlen;
-    }
-    printf("Hash table stats:\n");
-    printf(" table size: %ld\n", ht->size);
-    printf(" number of elements: %ld\n", ht->used);
-    printf(" different slots: %ld\n", slots);
-    printf(" max chain length: %ld\n", maxchainlen);
-    printf(" avg chain length (counted): %.02f\n", (float)totchainlen/slots);
-    printf(" avg chain length (computed): %.02f\n", (float)ht->used/slots);
-    printf(" Chain length distribution:\n");
-    for (i = 0; i < DICT_STATS_VECTLEN-1; i++) {
-        if (clvector[i] == 0) continue;
-        printf("   %s%ld: %ld (%.02f%%)\n",(i == DICT_STATS_VECTLEN-1)?">= ":"", i, clvector[i], ((float)clvector[i]/ht->size)*100);
-    }
-}
-
-/* ----------------------- StringCopy Hash Table Type ------------------------*/
-
-static unsigned int _dictStringCopyHTHashFunction(const void *key)
-{
-    return dictGenHashFunction(key, strlen(key));
-}
-
-static void *_dictStringCopyHTKeyDup(void *privdata, const void *key)
-{
-    int len = strlen(key);
-    char *copy = malloc(len+1);
-    DICT_NOTUSED(privdata);
-
-    memcpy(copy, key, len);
-    copy[len] = '\0';
-    return copy;
-}
-
-static void *_dictStringKeyValCopyHTValDup(void *privdata, const void *val)
-{
-    int len = strlen(val);
-    char *copy = malloc(len+1);
-    DICT_NOTUSED(privdata);
-
-    memcpy(copy, val, len);
-    copy[len] = '\0';
-    return copy;
-}
-
-static int _dictStringCopyHTKeyCompare(void *privdata, const void *key1,
-        const void *key2)
-{
-    DICT_NOTUSED(privdata);
-
-    return strcmp(key1, key2) == 0;
-}
-
-static void _dictStringCopyHTKeyDestructor(void *privdata, void *key)
-{
-    DICT_NOTUSED(privdata);
-
-    free((void*)key); /* ATTENTION: const cast */
-}
-
-static void _dictStringKeyValCopyHTValDestructor(void *privdata, void *val)
-{
-    DICT_NOTUSED(privdata);
-
-    free((void*)val); /* ATTENTION: const cast */
-}
-
-dictType dictTypeHeapStringCopyKey = {
-    _dictStringCopyHTHashFunction,        /* hash function */
-    _dictStringCopyHTKeyDup,              /* key dup */
-    NULL,                               /* val dup */
-    _dictStringCopyHTKeyCompare,          /* key compare */
-    _dictStringCopyHTKeyDestructor,       /* key destructor */
-    NULL                                /* val destructor */
-};
-
-/* This is like StringCopy but does not auto-duplicate the key.
- * It's used for intepreter's shared strings. */
-dictType dictTypeHeapStrings = {
-    _dictStringCopyHTHashFunction,        /* hash function */
-    NULL,                               /* key dup */
-    NULL,                               /* val dup */
-    _dictStringCopyHTKeyCompare,          /* key compare */
-    _dictStringCopyHTKeyDestructor,       /* key destructor */
-    NULL                                /* val destructor */
-};
-
-/* This is like StringCopy but also automatically handle dynamic
- * allocated C strings as values. */
-dictType dictTypeHeapStringCopyKeyValue = {
-    _dictStringCopyHTHashFunction,        /* hash function */
-    _dictStringCopyHTKeyDup,              /* key dup */
-    _dictStringKeyValCopyHTValDup,        /* val dup */
-    _dictStringCopyHTKeyCompare,          /* key compare */
-    _dictStringCopyHTKeyDestructor,       /* key destructor */
-    _dictStringKeyValCopyHTValDestructor, /* val destructor */
-};
