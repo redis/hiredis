@@ -119,11 +119,11 @@ static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
     redisCallback *cb;
 
     /* Copy callback from stack to heap */
-    cb = calloc(1,sizeof(*cb));
+    cb = malloc(sizeof(*cb));
     if (!cb) redisOOM();
     if (source != NULL) {
-        cb->fn = source->fn;
-        cb->privdata = source->privdata;
+        memcpy(cb,source,sizeof(*cb));
+        cb->next = NULL;
     }
 
     /* Store callback in list */
