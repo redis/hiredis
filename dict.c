@@ -43,34 +43,6 @@
 #include <limits.h>
 
 #include "dict.h"
-#include "zmalloc.h"
-
-/* ---------------------------- Utility funcitons --------------------------- */
-
-static void _dictPanic(const char *fmt, ...)
-{
-    va_list ap;
-
-    va_start(ap, fmt);
-    fprintf(stderr, "\nDICT LIBRARY PANIC: ");
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n\n");
-    va_end(ap);
-}
-
-/* ------------------------- Heap Management Wrappers------------------------ */
-
-static void *_dictAlloc(size_t size)
-{
-    void *p = zmalloc(size);
-    if (p == NULL)
-        _dictPanic("Out of memory");
-    return p;
-}
-
-static void _dictFree(void *ptr) {
-    zfree(ptr);
-}
 
 /* -------------------------- private prototypes ---------------------------- */
 
@@ -125,7 +97,7 @@ static void _dictReset(dict *ht)
 dict *dictCreate(dictType *type,
         void *privDataPtr)
 {
-    dict *ht = _dictAlloc(sizeof(*ht));
+    dict *ht = malloc(sizeof(*ht));
 
     _dictInit(ht,type,privDataPtr);
     return ht;
@@ -166,10 +138,7 @@ int dictExpand(dict *ht, unsigned long size)
     _dictInit(&n, ht->type, ht->privdata);
     n.size = realsize;
     n.sizemask = realsize-1;
-    n.table = _dictAlloc(realsize*sizeof(dictEntry*));
-
-    /* Initialize all the pointers to NULL */
-    memset(n.table, 0, realsize*sizeof(dictEntry*));
+    n.table = calloc(realsize,sizeof(dictEntry*));
 
     /* Copy all the elements from the old to the new table:
      * note that if the old hash table is empty ht->size is zero,
@@ -179,7 +148,7 @@ int dictExpand(dict *ht, unsigned long size)
         dictEntry *he, *nextHe;
 
         if (ht->table[i] == NULL) continue;
-        
+
         /* For each hash entry on this slot... */
         he = ht->table[i];
         while(he) {
@@ -196,7 +165,7 @@ int dictExpand(dict *ht, unsigned long size)
         }
     }
     assert(ht->used == 0);
-    _dictFree(ht->table);
+    free(ht->table);
 
     /* Remap the new hashtable in the old */
     *ht = n;
@@ -215,7 +184,7 @@ int dictAdd(dict *ht, void *key, void *val)
         return DICT_ERR;
 
     /* Allocates the memory and stores key */
-    entry = _dictAlloc(sizeof(*entry));
+    entry = malloc(sizeof(*entry));
     entry->next = ht->table[index];
     ht->table[index] = entry;
 
@@ -275,7 +244,7 @@ static int dictGenericDelete(dict *ht, const void *key, int nofree)
                 dictFreeEntryKey(ht, he);
                 dictFreeEntryVal(ht, he);
             }
-            _dictFree(he);
+            free(he);
             ht->used--;
             return DICT_OK;
         }
@@ -307,13 +276,13 @@ int _dictClear(dict *ht)
             nextHe = he->next;
             dictFreeEntryKey(ht, he);
             dictFreeEntryVal(ht, he);
-            _dictFree(he);
+            free(he);
             ht->used--;
             he = nextHe;
         }
     }
     /* Free the table and the allocated cache structure */
-    _dictFree(ht->table);
+    free(ht->table);
     /* Re-initialize the table */
     _dictReset(ht);
     return DICT_OK; /* never fails */
@@ -323,7 +292,7 @@ int _dictClear(dict *ht)
 void dictRelease(dict *ht)
 {
     _dictClear(ht);
-    _dictFree(ht);
+    free(ht);
 }
 
 dictEntry *dictFind(dict *ht, const void *key)
@@ -344,7 +313,7 @@ dictEntry *dictFind(dict *ht, const void *key)
 
 dictIterator *dictGetIterator(dict *ht)
 {
-    dictIterator *iter = _dictAlloc(sizeof(*iter));
+    dictIterator *iter = malloc(sizeof(*iter));
 
     iter->ht = ht;
     iter->index = -1;
@@ -376,7 +345,7 @@ dictEntry *dictNext(dictIterator *iter)
 
 void dictReleaseIterator(dictIterator *iter)
 {
-    _dictFree(iter);
+    free(iter);
 }
 
 /* Return a random entry from the hash table. Useful to
@@ -517,7 +486,7 @@ static unsigned int _dictStringCopyHTHashFunction(const void *key)
 static void *_dictStringCopyHTKeyDup(void *privdata, const void *key)
 {
     int len = strlen(key);
-    char *copy = _dictAlloc(len+1);
+    char *copy = malloc(len+1);
     DICT_NOTUSED(privdata);
 
     memcpy(copy, key, len);
@@ -528,7 +497,7 @@ static void *_dictStringCopyHTKeyDup(void *privdata, const void *key)
 static void *_dictStringKeyValCopyHTValDup(void *privdata, const void *val)
 {
     int len = strlen(val);
-    char *copy = _dictAlloc(len+1);
+    char *copy = malloc(len+1);
     DICT_NOTUSED(privdata);
 
     memcpy(copy, val, len);
@@ -548,14 +517,14 @@ static void _dictStringCopyHTKeyDestructor(void *privdata, void *key)
 {
     DICT_NOTUSED(privdata);
 
-    _dictFree((void*)key); /* ATTENTION: const cast */
+    free((void*)key); /* ATTENTION: const cast */
 }
 
 static void _dictStringKeyValCopyHTValDestructor(void *privdata, void *val)
 {
     DICT_NOTUSED(privdata);
 
-    _dictFree((void*)val); /* ATTENTION: const cast */
+    free((void*)val); /* ATTENTION: const cast */
 }
 
 dictType dictTypeHeapStringCopyKey = {

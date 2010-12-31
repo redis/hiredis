@@ -2,7 +2,7 @@
 # Copyright (C) 2010 Salvatore Sanfilippo <antirez at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ = net.o hiredis.o sds.o async.o
+OBJ = net.o hiredis.o sds.o async.o dict.o
 BINS = hiredis-example hiredis-test
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
@@ -49,6 +49,7 @@ async.o: async.c async.h hiredis.h sds.h util.h
 example.o: example.c hiredis.h
 hiredis.o: hiredis.c hiredis.h net.h sds.h util.h
 sds.o: sds.c sds.h
+dict.o: dict.c dict.h
 test.o: test.c hiredis.h
 
 ${DYLIBNAME}: ${OBJ}
