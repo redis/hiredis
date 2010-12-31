@@ -32,6 +32,7 @@
 #ifndef __HIREDIS_ASYNC_H
 #define __HIREDIS_ASYNC_H
 #include "hiredis.h"
+#include "dict.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -88,8 +89,15 @@ typedef struct redisAsyncContext {
     /* Called when the first write event was received. */
     redisConnectCallback *onConnect;
 
-    /* Reply callbacks */
+    /* Regular command callbacks */
     redisCallbackList replies;
+
+    /* Subscription callbacks */
+    struct {
+        redisCallbackList invalid;
+        dict *channels;
+        dict *patterns;
+    } sub;
 } redisAsyncContext;
 
 /* Functions that proxy to hiredis */

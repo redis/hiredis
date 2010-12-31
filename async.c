@@ -38,6 +38,47 @@
 /* Forward declaration of function in hiredis.c */
 void __redisAppendCommand(redisContext *c, char *cmd, size_t len);
 
+/* Functions managing dictionary of callbacks for pub/sub. */
+static unsigned int callbackHash(const void *key) {
+    return dictGenHashFunction((unsigned char*)key,sdslen((char*)key));
+}
+
+static void *callbackValDup(void *privdata, const void *src) {
+    ((void) privdata);
+    redisCallback *dup = malloc(sizeof(*dup));
+    memcpy(dup,src,sizeof(*dup));
+    return dup;
+}
+
+static int callbackKeyCompare(void *privdata, const void *key1, const void *key2) {
+    int l1, l2;
+    ((void) privdata);
+
+    l1 = sdslen((sds)key1);
+    l2 = sdslen((sds)key2);
+    if (l1 != l2) return 0;
+    return memcmp(key1,key2,l1) == 0;
+}
+
+static void callbackKeyDestructor(void *privdata, void *key) {
+    ((void) privdata);
+    sdsfree((sds)key);
+}
+
+static void callbackValDestructor(void *privdata, void *val) {
+    ((void) privdata);
+    free(val);
+}
+
+static dictType callbackDict = {
+    callbackHash,
+    NULL,
+    callbackValDup,
+    callbackKeyCompare,
+    callbackKeyDestructor,
+    callbackValDestructor
+};
+
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac = realloc(c,sizeof(redisAsyncContext));
     c = &(ac->c);
@@ -63,6 +104,10 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
 
     ac->replies.head = NULL;
     ac->replies.tail = NULL;
+    ac->sub.invalid.head = NULL;
+    ac->sub.invalid.tail = NULL;
+    ac->sub.channels = dictCreate(&callbackDict,NULL);
+    ac->sub.patterns = dictCreate(&callbackDict,NULL);
     return ac;
 }
 
