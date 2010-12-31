@@ -71,6 +71,9 @@
 /* Flag that is set when an async callback is executed. */
 #define REDIS_IN_CALLBACK 0x10
 
+/* Flag that is set when the async context has one or more subscriptions. */
+#define REDIS_SUBSCRIBED 0x20
+
 #define REDIS_REPLY_STRING 1
 #define REDIS_REPLY_ARRAY 2
 #define REDIS_REPLY_INTEGER 3

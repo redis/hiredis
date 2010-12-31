@@ -247,12 +247,20 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
             break;
         }
 
-        /* Shift callback and execute it */
-        assert(__redisShiftCallback(&ac->replies,&cb) == REDIS_OK);
+        /* Even if the context is subscribed, pending regular callbacks will
+         * get a reply before pub/sub messages arrive. */
+        if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
+            /* No more regular callbacks, the context *must* be subscribed. */
+            assert(c->flags & REDIS_SUBSCRIBED);
+
+            /* TODO: find the right callback for pub/sub message. */
+        }
+
         if (cb.fn != NULL) {
             c->flags |= REDIS_IN_CALLBACK;
             cb.fn(ac,reply,cb.privdata);
             c->flags &= ~REDIS_IN_CALLBACK;
+            c->fn->freeObject(reply);
 
             /* Proceed with free'ing when redisAsyncFree() was called. */
             if (c->flags & REDIS_FREEING) {
@@ -260,6 +268,10 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
                 return;
             }
         } else {
+            /* No callback for this reply. This can either be a NULL callback,
+             * or there were no callbacks to begin with. Either way, don't
+             * abort with an error, but simply ignore it because the client
+             * doesn't know what the server will spit out over the wire. */
             c->fn->freeObject(reply);
         }
     }
