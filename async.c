@@ -330,8 +330,8 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
 
                 /* If this was the last unsubscribe message, revert to
                  * non-subscribe mode. */
-                assert(reply->element[2+pvariant]->type == REDIS_REPLY_INTEGER);
-                if (reply->element[2+pvariant]->integer == 0)
+                assert(reply->element[2]->type == REDIS_REPLY_INTEGER);
+                if (reply->element[2]->integer == 0)
                     c->flags &= ~REDIS_SUBSCRIBED;
             }
         }
