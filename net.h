@@ -39,6 +39,7 @@
 #define AF_LOCAL AF_UNIX
 #endif
 
+int redisContextSetTimeout(redisContext *c, struct timeval tv);
 int redisContextConnectTcp(redisContext *c, const char *addr, int port);
 int redisContextConnectUnix(redisContext *c, const char *path);
 

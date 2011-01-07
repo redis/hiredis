@@ -851,6 +851,13 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
     return c;
 }
 
+/* Set read/write timeout on a blocking socket. */
+int redisSetTimeout(redisContext *c, struct timeval tv) {
+    if (c->flags & REDIS_BLOCK)
+        return redisContextSetTimeout(c,tv);
+    return REDIS_ERR;
+}
+
 /* Set the replyObjectFunctions to use. Returns REDIS_ERR when the reader
  * was already initialized and the function set could not be re-set.
  * Return REDIS_OK when they could be set. */
@@ -878,7 +885,7 @@ int redisBufferRead(redisContext *c) {
     char buf[2048];
     int nread = read(c->fd,buf,sizeof(buf));
     if (nread == -1) {
-        if (errno == EAGAIN) {
+        if (errno == EAGAIN && !(c->flags & REDIS_BLOCK)) {
             /* Try again later */
         } else {
             __redisSetError(c,REDIS_ERR_IO,NULL);
@@ -909,7 +916,7 @@ int redisBufferWrite(redisContext *c, int *done) {
     if (sdslen(c->obuf) > 0) {
         nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
         if (nwritten == -1) {
-            if (errno == EAGAIN) {
+            if (errno == EAGAIN && !(c->flags & REDIS_BLOCK)) {
                 /* Try again later */
             } else {
                 __redisSetError(c,REDIS_ERR_IO,NULL);

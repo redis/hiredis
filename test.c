@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "hiredis.h"
 
@@ -246,9 +247,17 @@ static void test_blocking_connection() {
      * conditions, the error will be set to EOF. */
     assert(c->err == REDIS_ERR_EOF &&
         strcmp(c->errstr,"Server closed the connection") == 0);
-
-    /* Clean up context and reconnect again */
     redisFree(c);
+
+    __connect(&c);
+    test("Returns I/O error on socket timeout: ");
+    struct timeval tv = { 0, 1000 };
+    assert(redisSetTimeout(c,tv) == REDIS_OK);
+    test_cond(redisGetReply(c,(void**)&reply) == REDIS_ERR &&
+        c->err == REDIS_ERR_IO && errno == EAGAIN);
+    redisFree(c);
+
+    /* Context should be connected */
     __connect(&c);
 }
 

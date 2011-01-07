@@ -33,6 +33,7 @@
 #define __HIREDIS_H
 #include <stdio.h> /* for size_t */
 #include <stdarg.h> /* for va_list */
+#include <sys/time.h> /* for struct timeval */
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 9
@@ -146,6 +147,7 @@ redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectNonBlock(const char *ip, int port);
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixNonBlock(const char *path);
+int redisSetTimeout(redisContext *c, struct timeval tv);
 int redisSetReplyObjectFunctions(redisContext *c, redisReplyObjectFunctions *fn);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
