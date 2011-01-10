@@ -30,6 +30,7 @@
  */
 
 #include <string.h>
+#include <strings.h>
 #include <assert.h>
 #include <ctype.h>
 #include "async.h"
