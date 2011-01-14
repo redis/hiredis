@@ -94,7 +94,7 @@ dep:
 
 install: ${DYLIBNAME} ${STLIBNAME}
 	mkdir -p $(INSTALL_INC) $(INSTALL_LIB)
-	$(INSTALL) hiredis.h async.h adapters $(INSTALL_INC)
+	$(INSTALL) hiredis.h async.h adapters dict.h $(INSTALL_INC)
 	$(INSTALL) ${DYLIBNAME} ${STLIBNAME} $(INSTALL_LIB)
 
 32bit:
