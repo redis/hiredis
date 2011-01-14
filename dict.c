@@ -50,7 +50,7 @@ static int _dictInit(dict *ht, dictType *type, void *privDataPtr);
 
 /* Generic hash function (a popular one from Bernstein).
  * I tested a few and this was the best. */
-unsigned int dictGenHashFunction(const unsigned char *buf, int len) {
+static unsigned int dictGenHashFunction(const unsigned char *buf, int len) {
     unsigned int hash = 5381;
 
     while (len--)
@@ -70,31 +70,22 @@ static void _dictReset(dict *ht) {
 }
 
 /* Create a new hash table */
-dict *dictCreate(dictType *type, void *privDataPtr) {
+static dict *dictCreate(dictType *type, void *privDataPtr) {
     dict *ht = malloc(sizeof(*ht));
     _dictInit(ht,type,privDataPtr);
     return ht;
 }
 
 /* Initialize the hash table */
-int _dictInit(dict *ht, dictType *type, void *privDataPtr) {
+static int _dictInit(dict *ht, dictType *type, void *privDataPtr) {
     _dictReset(ht);
     ht->type = type;
     ht->privdata = privDataPtr;
     return DICT_OK;
 }
 
-/* Resize the table to the minimal size that contains all the elements,
- * but with the invariant of a USER/BUCKETS ration near to <= 1 */
-int dictResize(dict *ht) {
-    int minimal = ht->used;
-    if (minimal < DICT_HT_INITIAL_SIZE)
-        minimal = DICT_HT_INITIAL_SIZE;
-    return dictExpand(ht, minimal);
-}
-
 /* Expand or create the hashtable */
-int dictExpand(dict *ht, unsigned long size) {
+static int dictExpand(dict *ht, unsigned long size) {
     dict n; /* the new hashtable */
     unsigned long realsize = _dictNextPower(size), i;
 
@@ -141,7 +132,7 @@ int dictExpand(dict *ht, unsigned long size) {
 }
 
 /* Add an element to the target hash table */
-int dictAdd(dict *ht, void *key, void *val) {
+static int dictAdd(dict *ht, void *key, void *val) {
     int index;
     dictEntry *entry;
 
@@ -166,7 +157,7 @@ int dictAdd(dict *ht, void *key, void *val) {
  * Return 1 if the key was added from scratch, 0 if there was already an
  * element with such key and dictReplace() just performed a value update
  * operation. */
-int dictReplace(dict *ht, void *key, void *val) {
+static int dictReplace(dict *ht, void *key, void *val) {
     dictEntry *entry, auxentry;
 
     /* Try to add the element. If the key
@@ -188,47 +179,38 @@ int dictReplace(dict *ht, void *key, void *val) {
 }
 
 /* Search and remove an element */
-static int dictGenericDelete(dict *ht, const void *key, int nofree) {
+static int dictDelete(dict *ht, const void *key) {
     unsigned int h;
-    dictEntry *he, *prevHe;
+    dictEntry *de, *prevde;
 
     if (ht->size == 0)
         return DICT_ERR;
     h = dictHashKey(ht, key) & ht->sizemask;
-    he = ht->table[h];
+    de = ht->table[h];
 
-    prevHe = NULL;
-    while(he) {
-        if (dictCompareHashKeys(ht, key, he->key)) {
+    prevde = NULL;
+    while(de) {
+        if (dictCompareHashKeys(ht,key,de->key)) {
             /* Unlink the element from the list */
-            if (prevHe)
-                prevHe->next = he->next;
+            if (prevde)
+                prevde->next = de->next;
             else
-                ht->table[h] = he->next;
-            if (!nofree) {
-                dictFreeEntryKey(ht, he);
-                dictFreeEntryVal(ht, he);
-            }
-            free(he);
+                ht->table[h] = de->next;
+
+            dictFreeEntryKey(ht,de);
+            dictFreeEntryVal(ht,de);
+            free(de);
             ht->used--;
             return DICT_OK;
         }
-        prevHe = he;
-        he = he->next;
+        prevde = de;
+        de = de->next;
     }
     return DICT_ERR; /* not found */
 }
 
-int dictDelete(dict *ht, const void *key) {
-    return dictGenericDelete(ht,key,0);
-}
-
-int dictDeleteNoFree(dict *ht, const void *key) {
-    return dictGenericDelete(ht,key,1);
-}
-
 /* Destroy an entire hash table */
-int _dictClear(dict *ht) {
+static int _dictClear(dict *ht) {
     unsigned long i;
 
     /* Free all the elements */
@@ -253,12 +235,12 @@ int _dictClear(dict *ht) {
 }
 
 /* Clear & Release the hash table */
-void dictRelease(dict *ht) {
+static void dictRelease(dict *ht) {
     _dictClear(ht);
     free(ht);
 }
 
-dictEntry *dictFind(dict *ht, const void *key) {
+static dictEntry *dictFind(dict *ht, const void *key) {
     dictEntry *he;
     unsigned int h;
 
@@ -273,7 +255,7 @@ dictEntry *dictFind(dict *ht, const void *key) {
     return NULL;
 }
 
-dictIterator *dictGetIterator(dict *ht) {
+static dictIterator *dictGetIterator(dict *ht) {
     dictIterator *iter = malloc(sizeof(*iter));
 
     iter->ht = ht;
@@ -283,7 +265,7 @@ dictIterator *dictGetIterator(dict *ht) {
     return iter;
 }
 
-dictEntry *dictNext(dictIterator *iter) {
+static dictEntry *dictNext(dictIterator *iter) {
     while (1) {
         if (iter->entry == NULL) {
             iter->index++;
@@ -303,36 +285,8 @@ dictEntry *dictNext(dictIterator *iter) {
     return NULL;
 }
 
-void dictReleaseIterator(dictIterator *iter) {
+static void dictReleaseIterator(dictIterator *iter) {
     free(iter);
-}
-
-/* Return a random entry from the hash table. Useful to
- * implement randomized algorithms */
-dictEntry *dictGetRandomKey(dict *ht) {
-    dictEntry *he;
-    unsigned int h;
-    int listlen, listele;
-
-    if (ht->used == 0) return NULL;
-    do {
-        h = random() & ht->sizemask;
-        he = ht->table[h];
-    } while(he == NULL);
-
-    /* Now we found a non empty bucket, but it is a linked
-     * list and we need to get a random element from the list.
-     * The only sane way to do so is to count the element and
-     * select a random index. */
-    listlen = 0;
-    while(he) {
-        he = he->next;
-        listlen++;
-    }
-    listele = random() % listlen;
-    he = ht->table[h];
-    while(listele--) he = he->next;
-    return he;
 }
 
 /* ------------------------- private functions ------------------------------ */
@@ -380,9 +334,5 @@ static int _dictKeyIndex(dict *ht, const void *key) {
         he = he->next;
     }
     return h;
-}
-
-void dictEmpty(dict *ht) {
-    _dictClear(ht);
 }
 

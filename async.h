@@ -32,13 +32,13 @@
 #ifndef __HIREDIS_ASYNC_H
 #define __HIREDIS_ASYNC_H
 #include "hiredis.h"
-#include "dict.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct redisAsyncContext; /* need forward declaration of redisAsyncContext */
+struct dict; /* dictionary header is included in async.c */
 
 /* Reply callback prototype and container */
 typedef void (redisCallbackFn)(struct redisAsyncContext*, void*, void*);
@@ -95,8 +95,8 @@ typedef struct redisAsyncContext {
     /* Subscription callbacks */
     struct {
         redisCallbackList invalid;
-        dict *channels;
-        dict *patterns;
+        struct dict *channels;
+        struct dict *patterns;
     } sub;
 } redisAsyncContext;
 

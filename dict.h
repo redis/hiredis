@@ -1,4 +1,4 @@
-/* Hash Tables Implementation.
+/* Hash table implementation.
  *
  * This file implements in memory hash tables with insert/del/replace/find/
  * get-random-element operations. Hash tables will auto resize if needed
@@ -111,20 +111,16 @@ typedef struct dictIterator {
 #define dictSize(ht) ((ht)->used)
 
 /* API */
-dict *dictCreate(dictType *type, void *privDataPtr);
-int dictExpand(dict *ht, unsigned long size);
-int dictAdd(dict *ht, void *key, void *val);
-int dictReplace(dict *ht, void *key, void *val);
-int dictDelete(dict *ht, const void *key);
-int dictDeleteNoFree(dict *ht, const void *key);
-void dictRelease(dict *ht);
-dictEntry * dictFind(dict *ht, const void *key);
-int dictResize(dict *ht);
-dictIterator *dictGetIterator(dict *ht);
-dictEntry *dictNext(dictIterator *iter);
-void dictReleaseIterator(dictIterator *iter);
-dictEntry *dictGetRandomKey(dict *ht);
-unsigned int dictGenHashFunction(const unsigned char *buf, int len);
-void dictEmpty(dict *ht);
+static unsigned int dictGenHashFunction(const unsigned char *buf, int len);
+static dict *dictCreate(dictType *type, void *privDataPtr);
+static int dictExpand(dict *ht, unsigned long size);
+static int dictAdd(dict *ht, void *key, void *val);
+static int dictReplace(dict *ht, void *key, void *val);
+static int dictDelete(dict *ht, const void *key);
+static void dictRelease(dict *ht);
+static dictEntry * dictFind(dict *ht, const void *key);
+static dictIterator *dictGetIterator(dict *ht);
+static dictEntry *dictNext(dictIterator *iter);
+static void dictReleaseIterator(dictIterator *iter);
 
 #endif /* __DICT_H */
