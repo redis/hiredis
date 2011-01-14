@@ -171,7 +171,7 @@ the latter means an error occurred while reading a reply. Just as with the other
 the `err` field in the context can be used to find out what the cause of this error is.
 
 The following examples shows a simple pipeline (resulting in only a single call to `write(2)` and
-a single call to `write(2)`):
+a single call to `read(2)`):
 
     redisReply *reply;
     redisAppendCommand(context,"SET foo bar");
