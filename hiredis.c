@@ -605,6 +605,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     char **argv = NULL;
     int argc = 0, j;
     int totlen = 0;
+    int skip_space = 1;
 
     /* Abort if there is not target to set */
     if (target == NULL)
@@ -614,7 +615,9 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     current = sdsempty();
     while(*c != '\0') {
         if (*c != '%' || c[1] == '\0') {
-            if (*c == ' ') {
+            if (*c == '"') {
+                skip_space ^= 1;
+            } else if (*c == ' ' && skip_space) {
                 if (sdslen(current) != 0) {
                     addArgument(current, &argv, &argc, &totlen);
                     current = sdsempty();
