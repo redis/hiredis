@@ -541,7 +541,7 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
     /* Discard part of the buffer when we've consumed at least 1k, to avoid
      * doing unnecessary calls to memmove() in sds.c. */
     if (r->pos >= 1024) {
-        r->buf = sdsrange(r->buf,r->pos,r->len);
+        r->buf = sdsrange(r->buf,r->pos,-1);
         r->pos = 0;
         r->len = sdslen(r->buf);
     }
