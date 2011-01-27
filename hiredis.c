@@ -493,7 +493,7 @@ static void redisSetReplyReaderError(redisReader *r, sds err) {
     if (r->buf != NULL) {
         sdsfree(r->buf);
         r->buf = sdsempty();
-        r->pos = 0;
+        r->pos = r->len = 0;
     }
     r->ridx = -1;
     r->error = err;

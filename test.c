@@ -318,6 +318,15 @@ static void test_reply_reader(void) {
     ret = redisReplyReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_OK && reply == (void*)REDIS_REPLY_STATUS);
     redisReplyReaderFree(reader);
+
+    test("Properly reset state after protocol error: ");
+    reader = redisReplyReaderCreate();
+    redisReplyReaderSetReplyObjectFunctions(reader,NULL);
+    redisReplyReaderFeed(reader,(char*)"x",1);
+    ret = redisReplyReaderGetReply(reader,&reply);
+    assert(ret == REDIS_ERR);
+    ret = redisReplyReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK && reply == NULL)
 }
 
 static void test_throughput(void) {
