@@ -434,7 +434,7 @@ static int processItem(redisReader *r) {
     }
 }
 
-void *redisReplyReaderCreate() {
+void *redisReplyReaderCreate(void) {
     redisReader *r = calloc(sizeof(redisReader),1);
     r->error = NULL;
     r->fn = &defaultFunctions;
@@ -793,7 +793,7 @@ void __redisSetError(redisContext *c, int type, const sds errstr) {
     }
 }
 
-static redisContext *redisContextInit() {
+static redisContext *redisContextInit(void) {
     redisContext *c = calloc(sizeof(redisContext),1);
     c->err = 0;
     c->errstr = NULL;

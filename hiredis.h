@@ -129,7 +129,7 @@ typedef struct redisContext {
 } redisContext;
 
 void freeReplyObject(void *reply);
-void *redisReplyReaderCreate();
+void *redisReplyReaderCreate(void);
 int redisReplyReaderSetReplyObjectFunctions(void *reader, redisReplyObjectFunctions *fn);
 int redisReplyReaderSetPrivdata(void *reader, void *privdata);
 void *redisReplyReaderGetObject(void *reader);
