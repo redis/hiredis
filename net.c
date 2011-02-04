@@ -115,7 +115,7 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
 
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
-        memcpy(&to,timeout,sizeof(timeout));
+        to = *timeout;
         toptr = &to;
     }
 
