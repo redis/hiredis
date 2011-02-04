@@ -144,8 +144,10 @@ int redisFormatCommand(char **target, const char *format, ...);
 int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
 
 redisContext *redisConnect(const char *ip, int port);
+redisContext *redisConnectWithTimeout(const char *ip, int port, struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
 redisContext *redisConnectUnix(const char *path);
+redisContext *redisConnectUnixWithTimeout(const char *path, struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 int redisSetTimeout(redisContext *c, struct timeval tv);
 int redisSetReplyObjectFunctions(redisContext *c, redisReplyObjectFunctions *fn);
