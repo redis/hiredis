@@ -108,7 +108,7 @@ was received:
 * **`REDIS_REPLY_ARRAY`**:
     * A multi bulk reply. The number of elements in the multi bulk reply is stored in
       `reply->elements`. Every element in the multi bulk reply is a `redisReply` object as well
-      and can be accessed via `reply->elements[..index..]`.
+      and can be accessed via `reply->element[..index..]`.
       Redis may reply with nested arrays but this is fully supported.
 
 Replies should be freed using the `freeReplyObject()` function.
