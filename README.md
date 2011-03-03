@@ -177,7 +177,6 @@ a single call to `read(2)`):
     redisAppendCommand(context,"SET foo bar");
     redisAppendCommand(context,"GET foo");
     redisGetReply(context,&reply); // reply for SET
-    freeReplyObject(reply);
     redisGetReply(context,&reply); // reply for GET
     freeReplyObject(reply);
 
