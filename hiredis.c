@@ -596,7 +596,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     char *cmd = NULL; /* final command */
     int pos; /* position in final command */
     sds current; /* current argument */
-    int interpolated = 0; /* did we do interpolation on an argument? */
+    int touched = 0; /* was the current argument touched? */
     char **argv = NULL;
     int argc = 0, j;
     int totlen = 0;
@@ -610,13 +610,14 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     while(*c != '\0') {
         if (*c != '%' || c[1] == '\0') {
             if (*c == ' ') {
-                if (sdslen(current) != 0) {
+                if (touched) {
                     addArgument(current, &argv, &argc, &totlen);
                     current = sdsempty();
-                    interpolated = 0;
+                    touched = 0;
                 }
             } else {
                 current = sdscatlen(current,c,1);
+                touched = 1;
             }
         } else {
             switch(c[1]) {
@@ -625,14 +626,12 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                 size = strlen(arg);
                 if (size > 0)
                     current = sdscatlen(current,arg,size);
-                interpolated = 1;
                 break;
             case 'b':
                 arg = va_arg(ap,char*);
                 size = va_arg(ap,size_t);
                 if (size > 0)
                     current = sdscatlen(current,arg,size);
-                interpolated = 1;
                 break;
             case '%':
                 current = sdscat(current,"%");
@@ -678,7 +677,6 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                             _format[_l] = '\0';
                             va_copy(_cpy,ap);
                             current = sdscatvprintf(current,_format,_cpy);
-                            interpolated = 1;
                             va_end(_cpy);
 
                             /* Update current position (note: outer blocks
@@ -691,13 +689,14 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     va_arg(ap,void);
                 }
             }
+            touched = 1;
             c++;
         }
         c++;
     }
 
     /* Add the last argument if needed */
-    if (interpolated || sdslen(current) != 0) {
+    if (touched) {
         addArgument(current, &argv, &argc, &totlen);
     } else {
         sdsfree(current);

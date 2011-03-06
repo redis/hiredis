@@ -54,6 +54,12 @@ static void test_format_commands(void) {
         len == 4+4+(3+2)+4+(3+2)+4+(0+2));
     free(cmd);
 
+    test("Format command with an empty string in between proper interpolations: ");
+    len = redisFormatCommand(&cmd,"SET %s %s","","foo");
+    test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$0\r\n\r\n$3\r\nfoo\r\n",len) == 0 &&
+        len == 4+4+(3+2)+4+(0+2)+4+(3+2));
+    free(cmd);
+
     test("Format command with %%b string interpolation: ");
     len = redisFormatCommand(&cmd,"SET %b %b","foo",3,"b\0r",3);
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nb\0r\r\n",len) == 0 &&
