@@ -520,6 +520,13 @@ void redisReplyReaderFeed(void *reader, const char *buf, size_t len) {
 
     /* Copy the provided buffer. */
     if (buf != NULL && len >= 1) {
+        /* Destroy internal buffer when it is empty and is quite large. */
+        if (r->len == 0 && sdsavail(r->buf) > 16*1024) {
+            sdsfree(r->buf);
+            r->buf = sdsempty();
+            r->pos = 0;
+        }
+
         r->buf = sdscatlen(r->buf,buf,len);
         r->len = sdslen(r->buf);
     }
@@ -561,13 +568,6 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
     if (r->ridx == -1) {
         void *aux = r->reply;
         r->reply = NULL;
-
-        /* Destroy the buffer when it is empty and is quite large. */
-        if (r->len == 0 && sdsavail(r->buf) > 16*1024) {
-            sdsfree(r->buf);
-            r->buf = sdsempty();
-            r->pos = 0;
-        }
 
         /* Check if there actually *is* a reply. */
         if (r->error != NULL) {
