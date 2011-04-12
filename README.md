@@ -303,7 +303,33 @@ See the `adapters/` directory for bindings to *libev* and *libevent*.
 
 ## Reply parsing API
 
-To be done.
+Hiredis comes with a reply parsing API that makes it easy for writing higher level language bindings.
+
+The reply parsing API consists of the following functions:
+
+    void *redisReplyReaderCreate(void);
+    void redisReplyReaderFeed(void *reader, const char *buf, size_t len);
+    int redisReplyReaderGetReply(void *reader, void **reply);
+    int redisReplyReaderSetReplyObjectFunctions(void *reader, redisReplyObjectFunctions *fn);
+
+### Creating redisReader 
+
+The function `redisReplyReaderCreate` creates `redisReader` struct variable that primarily holds data read from the socket. 
+
+### Reading data
+
+The function `redisReplyReaderFeed` populates `buf` and `len` fields of `redisReader` with the data read from socket and it's length respectively.
+
+### Creating reply objects from the data in the socket
+
+The function `redisReplyReaderGetReply` creates `redisReply` and makes the function argument `reply` point to the created `redisReply` variable. For instance,
+if the response of type `REDIS_REPLY_STATUS` then the `str` field of `redisReply` will hold the status as a C string.  However, `redisReply` variables are not 
+directly created by `redisReplyReaderGetReply`. `redisReader` has a field `fn` of type `redisReplyObjectFunctions` that is essentially a set of pointers to functions. 
+
+So the function pointer `createString` points to a function that is called when a response of type `REDIS_REPLY_STATUS` is received. 
+Thus, the function `redisReplyReaderSetReplyObjectFunctions` can be used to tell hiredis to use a custom set of functions instead of the provided default.
+
+For example, the hiredis-rb [client](https://github.com/pietern/hiredis-rb/blob/master/ext/hiredis_ext/reader.c) calls `redisReplyReaderSetReplyObjectFunctions` to set the function pointers to custom functions that create Ruby objects.
 
 ## AUTHORS
 
