@@ -85,6 +85,12 @@ hiredis-%: %.o ${DYLIBNAME}
 test: hiredis-test
 	./hiredis-test
 
+check: hiredis-test
+	echo "daemonize yes\n pidfile /tmp/redis-check.pid\n port 56379" \
+		| redis-server -
+	./hiredis-test -p 56379 || (kill `cat /tmp/redis-check.pid` && false)
+	kill `cat /tmp/redis-check.pid`
+
 .c.o:
 	$(CC) -c $(CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
 
