@@ -41,13 +41,10 @@
 #include "sds.h"
 #include "util.h"
 
-#define REDIS_READER_OOM -2
-#define REDIS_READER_NEED_MORE_DATA -1
-#define REDIS_READER_OK 0
-
 typedef struct redisReader {
+    int err; /* Error flags, 0 when there is no error */
+    char errstr[128]; /* String representation of error when applicable */
     struct redisReplyObjectFunctions *fn;
-    sds error; /* holds optional error */
     void *reply; /* holds temporary reply */
 
     sds buf; /* read buffer */
@@ -64,7 +61,6 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
 static void *createArrayObject(const redisReadTask *task, int elements);
 static void *createIntegerObject(const redisReadTask *task, long long value);
 static void *createNilObject(const redisReadTask *task);
-static void redisSetReplyReaderError(redisReader *r, sds err);
 
 /* Default set of functions to build the reply. Keep in mind that such a
  * function returning NULL is interpreted as OOM. */
@@ -200,6 +196,45 @@ static void *createNilObject(const redisReadTask *task) {
     return r;
 }
 
+static void __redisReplyReaderSetError(redisReader *r, int type, const char *str) {
+    size_t len;
+
+    if (r->reply != NULL && r->fn && r->fn->freeObject) {
+        r->fn->freeObject(r->reply);
+        r->reply = NULL;
+    }
+
+    /* Clear input buffer on errors. */
+    if (r->buf != NULL) {
+        sdsfree(r->buf);
+        r->buf = NULL;
+        r->pos = r->len = 0;
+    }
+
+    /* Reset task stack. */
+    r->ridx = -1;
+
+    /* Set error. */
+    r->err = type;
+    len = strlen(str);
+    len = len < (sizeof(r->errstr)-1) ? len : (sizeof(r->errstr)-1);
+    memcpy(r->errstr,str,len);
+    r->errstr[len] = '\0';
+}
+
+static void __redisReplyReaderSetErrorProtocolByte(redisReader *r, char byte) {
+    char cbuf[8], sbuf[128];
+
+    chrtos(cbuf,sizeof(cbuf),byte);
+    snprintf(sbuf,sizeof(sbuf),
+        "Protocol error, got %s as reply type byte", cbuf);
+    __redisReplyReaderSetError(r,REDIS_ERR_PROTOCOL,sbuf);
+}
+
+static void __redisReplyReaderSetErrorOOM(redisReader *r) {
+    __redisReplyReaderSetError(r,REDIS_ERR_OOM,"Out of memory");
+}
+
 static char *readBytes(redisReader *r, unsigned int bytes) {
     char *p;
     if (r->len-r->pos >= bytes) {
@@ -326,16 +361,18 @@ static int processLineItem(redisReader *r) {
                 obj = (void*)(size_t)(cur->type);
         }
 
-        if (obj == NULL)
-            return REDIS_READER_OOM;
+        if (obj == NULL) {
+            __redisReplyReaderSetErrorOOM(r);
+            return REDIS_ERR;
+        }
 
         /* Set reply if this is the root object. */
         if (r->ridx == 0) r->reply = obj;
         moveToNextTask(r);
-        return REDIS_READER_OK;
+        return REDIS_OK;
     }
 
-    return REDIS_READER_NEED_MORE_DATA;
+    return REDIS_ERR;
 }
 
 static int processBulkItem(redisReader *r) {
@@ -374,19 +411,21 @@ static int processBulkItem(redisReader *r) {
 
         /* Proceed when obj was created. */
         if (success) {
-            if (obj == NULL)
-                return REDIS_READER_OOM;
+            if (obj == NULL) {
+                __redisReplyReaderSetErrorOOM(r);
+                return REDIS_ERR;
+            }
 
             r->pos += bytelen;
 
             /* Set reply if this is the root object. */
             if (r->ridx == 0) r->reply = obj;
             moveToNextTask(r);
-            return REDIS_READER_OK;
+            return REDIS_OK;
         }
     }
 
-    return REDIS_READER_NEED_MORE_DATA;
+    return REDIS_ERR;
 }
 
 static int processMultiBulkItem(redisReader *r) {
@@ -398,9 +437,9 @@ static int processMultiBulkItem(redisReader *r) {
 
     /* Set error for nested multi bulks with depth > 1 */
     if (r->ridx == 2) {
-        redisSetReplyReaderError(r,sdscatprintf(sdsempty(),
-            "No support for nested multi bulk replies with depth > 1"));
-        return -1;
+        __redisReplyReaderSetError(r,REDIS_ERR_PROTOCOL,
+            "No support for nested multi bulk replies with depth > 1");
+        return REDIS_ERR;
     }
 
     if ((p = readLine(r,NULL)) != NULL) {
@@ -413,8 +452,10 @@ static int processMultiBulkItem(redisReader *r) {
             else
                 obj = (void*)REDIS_REPLY_NIL;
 
-            if (obj == NULL)
-                return REDIS_READER_OOM;
+            if (obj == NULL) {
+                __redisReplyReaderSetErrorOOM(r);
+                return REDIS_ERR;
+            }
 
             moveToNextTask(r);
         } else {
@@ -423,8 +464,10 @@ static int processMultiBulkItem(redisReader *r) {
             else
                 obj = (void*)REDIS_REPLY_ARRAY;
 
-            if (obj == NULL)
-                return REDIS_READER_OOM;
+            if (obj == NULL) {
+                __redisReplyReaderSetErrorOOM(r);
+                return REDIS_ERR;
+            }
 
             /* Modify task stack when there are more than 0 elements. */
             if (elements > 0) {
@@ -444,16 +487,15 @@ static int processMultiBulkItem(redisReader *r) {
 
         /* Set reply if this is the root object. */
         if (root) r->reply = obj;
-        return REDIS_READER_OK;
+        return REDIS_OK;
     }
 
-    return REDIS_READER_NEED_MORE_DATA;
+    return REDIS_ERR;
 }
 
 static int processItem(redisReader *r) {
     redisReadTask *cur = &(r->rstack[r->ridx]);
     char *p;
-    sds byte;
 
     /* check if we need to read type */
     if (cur->type < 0) {
@@ -475,15 +517,12 @@ static int processItem(redisReader *r) {
                 cur->type = REDIS_REPLY_ARRAY;
                 break;
             default:
-                byte = sdscatrepr(sdsempty(),p,1);
-                redisSetReplyReaderError(r,sdscatprintf(sdsempty(),
-                    "Protocol error, got %s as reply type byte", byte));
-                sdsfree(byte);
-                return -1;
+                __redisReplyReaderSetErrorProtocolByte(r,*p);
+                return REDIS_ERR;
             }
         } else {
             /* could not consume 1 byte */
-            return -1;
+            return REDIS_ERR;
         }
     }
 
@@ -499,13 +538,14 @@ static int processItem(redisReader *r) {
         return processMultiBulkItem(r);
     default:
         assert(NULL);
-        return -1;
+        return REDIS_ERR; /* Avoid warning. */
     }
 }
 
 void *redisReplyReaderCreate(void) {
     redisReader *r = calloc(sizeof(redisReader),1);
-    r->error = NULL;
+    r->err = 0;
+    r->errstr[0] = '\0';
     r->fn = &defaultFunctions;
     r->buf = sdsempty();
     r->ridx = -1;
@@ -545,8 +585,6 @@ void *redisReplyReaderGetObject(void *reader) {
 
 void redisReplyReaderFree(void *reader) {
     redisReader *r = reader;
-    if (r->error != NULL)
-        sdsfree(r->error);
     if (r->reply != NULL && r->fn)
         r->fn->freeObject(r->reply);
     if (r->buf != NULL)
@@ -554,23 +592,9 @@ void redisReplyReaderFree(void *reader) {
     free(r);
 }
 
-static void redisSetReplyReaderError(redisReader *r, sds err) {
-    if (r->reply != NULL)
-        r->fn->freeObject(r->reply);
-
-    /* Clear remaining buffer when we see a protocol error. */
-    if (r->buf != NULL) {
-        sdsfree(r->buf);
-        r->buf = sdsempty();
-        r->pos = r->len = 0;
-    }
-    r->ridx = -1;
-    r->error = err;
-}
-
 char *redisReplyReaderGetError(void *reader) {
     redisReader *r = reader;
-    return r->error;
+    return r->errstr;
 }
 
 void redisReplyReaderFeed(void *reader, const char *buf, size_t len) {
@@ -592,9 +616,14 @@ void redisReplyReaderFeed(void *reader, const char *buf, size_t len) {
 
 int redisReplyReaderGetReply(void *reader, void **reply) {
     redisReader *r = reader;
-    int ret = REDIS_READER_OK;
 
-    if (reply != NULL) *reply = NULL;
+    /* Default target pointer to NULL. */
+    if (reply != NULL)
+        *reply = NULL;
+
+    /* Return early when this reader is in an erroneous state. */
+    if (r->err)
+        return REDIS_ERR;
 
     /* When the buffer is empty, there will never be a reply. */
     if (r->len == 0)
@@ -613,11 +642,11 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
 
     /* Process items in reply. */
     while (r->ridx >= 0)
-        if ((ret = processItem(r)) != REDIS_READER_OK)
+        if (processItem(r) != REDIS_OK)
             break;
 
-    /* Set errors on OOM. */
-    if (ret == REDIS_READER_OOM)
+    /* Return ASAP when an error occurred. */
+    if (r->err)
         return REDIS_ERR;
 
     /* Discard part of the buffer when we've consumed at least 1k, to avoid
@@ -630,15 +659,9 @@ int redisReplyReaderGetReply(void *reader, void **reply) {
 
     /* Emit a reply when there is one. */
     if (r->ridx == -1) {
-        void *aux = r->reply;
+        if (reply != NULL)
+            *reply = r->reply;
         r->reply = NULL;
-
-        /* Check if there actually *is* a reply. */
-        if (r->error != NULL) {
-            return REDIS_ERR;
-        } else {
-            if (reply != NULL) *reply = aux;
-        }
     }
     return REDIS_OK;
 }
@@ -1024,7 +1047,7 @@ int redisGetReplyFromReader(redisContext *c, void **reply) {
     __redisCreateReplyReader(c);
     if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
         __redisSetError(c,REDIS_ERR_PROTOCOL,
-            sdsnew(((redisReader*)c->reader)->error));
+            sdsnew(((redisReader*)c->reader)->errstr));
         return REDIS_ERR;
     }
     return REDIS_OK;

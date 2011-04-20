@@ -46,10 +46,11 @@
  * error that occured. REDIS_ERR_IO means there was an I/O error and you
  * should use the "errno" variable to find out what is wrong.
  * For other values, the "errstr" field will hold a description. */
-#define REDIS_ERR_IO 1 /* error in read or write */
-#define REDIS_ERR_EOF 3 /* eof */
-#define REDIS_ERR_PROTOCOL 4 /* protocol error */
-#define REDIS_ERR_OTHER 2 /* something else */
+#define REDIS_ERR_IO 1 /* Error in read or write */
+#define REDIS_ERR_EOF 3 /* End of file */
+#define REDIS_ERR_PROTOCOL 4 /* Protocol error */
+#define REDIS_ERR_OOM 5 /* Out of memory */
+#define REDIS_ERR_OTHER 2 /* Everything else... */
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
