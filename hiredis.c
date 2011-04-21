@@ -585,7 +585,7 @@ void *redisReplyReaderGetObject(void *reader) {
 
 void redisReplyReaderFree(void *reader) {
     redisReader *r = reader;
-    if (r->reply != NULL && r->fn)
+    if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
     if (r->buf != NULL)
         sdsfree(r->buf);
