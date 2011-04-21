@@ -152,15 +152,12 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
 
 /* Context for a connection to Redis */
 typedef struct redisContext {
+    int err; /* Error flags, 0 when there is no error */
+    char *errstr; /* String representation of error when applicable */
     int fd;
     int flags;
     char *obuf; /* Write buffer */
-    int err; /* Error flags, 0 when there is no error */
-    char *errstr; /* String representation of error when applicable */
-
-    /* Function set for reply buildup and reply reader */
-    redisReplyObjectFunctions *fn;
-    void *reader;
+    redisReader *reader; /* Protocol reader */
 } redisContext;
 
 redisContext *redisConnect(const char *ip, int port);
@@ -170,7 +167,6 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 int redisSetTimeout(redisContext *c, struct timeval tv);
-int redisSetReplyObjectFunctions(redisContext *c, redisReplyObjectFunctions *fn);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);

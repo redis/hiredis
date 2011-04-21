@@ -268,7 +268,7 @@ static void test_blocking_connection(void) {
 }
 
 static void test_reply_reader(void) {
-    void *reader;
+    redisReader *reader;
     void *reply;
     char *err;
     int ret;
@@ -308,7 +308,7 @@ static void test_reply_reader(void) {
 
     test("Works with NULL functions for reply: ");
     reader = redisReplyReaderCreate();
-    redisReplyReaderSetReplyObjectFunctions(reader,NULL);
+    reader->fn = NULL;
     redisReplyReaderFeed(reader,(char*)"+OK\r\n",5);
     ret = redisReplyReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_OK && reply == (void*)REDIS_REPLY_STATUS);
@@ -316,7 +316,7 @@ static void test_reply_reader(void) {
 
     test("Works when a single newline (\\r\\n) covers two calls to feed: ");
     reader = redisReplyReaderCreate();
-    redisReplyReaderSetReplyObjectFunctions(reader,NULL);
+    reader->fn = NULL;
     redisReplyReaderFeed(reader,(char*)"+OK\r",4);
     ret = redisReplyReaderGetReply(reader,&reply);
     assert(ret == REDIS_OK && reply == NULL);
@@ -327,7 +327,7 @@ static void test_reply_reader(void) {
 
     test("Don't reset state after protocol error: ");
     reader = redisReplyReaderCreate();
-    redisReplyReaderSetReplyObjectFunctions(reader,NULL);
+    reader->fn = NULL;
     redisReplyReaderFeed(reader,(char*)"x",1);
     ret = redisReplyReaderGetReply(reader,&reply);
     assert(ret == REDIS_ERR);

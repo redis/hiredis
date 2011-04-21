@@ -840,12 +840,16 @@ void __redisSetError(redisContext *c, int type, const sds errstr) {
 }
 
 static redisContext *redisContextInit(void) {
-    redisContext *c = calloc(sizeof(redisContext),1);
+    redisContext *c;
+
+    c = calloc(1,sizeof(redisContext));
+    if (c == NULL)
+        return NULL;
+
     c->err = 0;
     c->errstr = NULL;
     c->obuf = sdsempty();
-    c->fn = &defaultFunctions;
-    c->reader = NULL;
+    c->reader = redisReplyReaderCreate();
     return c;
 }
 
@@ -913,24 +917,6 @@ int redisSetTimeout(redisContext *c, struct timeval tv) {
     return REDIS_ERR;
 }
 
-/* Set the replyObjectFunctions to use. Returns REDIS_ERR when the reader
- * was already initialized and the function set could not be re-set.
- * Return REDIS_OK when they could be set. */
-int redisSetReplyObjectFunctions(redisContext *c, redisReplyObjectFunctions *fn) {
-    if (c->reader != NULL)
-        return REDIS_ERR;
-    c->fn = fn;
-    return REDIS_OK;
-}
-
-/* Helper function to lazily create a reply reader. */
-static void __redisCreateReplyReader(redisContext *c) {
-    if (c->reader == NULL) {
-        c->reader = redisReplyReaderCreate();
-        assert(redisReplyReaderSetReplyObjectFunctions(c->reader,c->fn) == REDIS_OK);
-    }
-}
-
 /* Use this function to handle a read event on the descriptor. It will try
  * and read some bytes from the socket and feed them to the reply parser.
  *
@@ -951,7 +937,6 @@ int redisBufferRead(redisContext *c) {
             sdsnew("Server closed the connection"));
         return REDIS_ERR;
     } else {
-        __redisCreateReplyReader(c);
         redisReplyReaderFeed(c->reader,buf,nread);
     }
     return REDIS_OK;
@@ -993,7 +978,6 @@ int redisBufferWrite(redisContext *c, int *done) {
 /* Internal helper function to try and get a reply from the reader,
  * or set an error in the context otherwise. */
 int redisGetReplyFromReader(redisContext *c, void **reply) {
-    __redisCreateReplyReader(c);
     if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
         __redisSetError(c,REDIS_ERR_PROTOCOL,
             sdsnew(((redisReader*)c->reader)->errstr));
