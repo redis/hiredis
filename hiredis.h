@@ -114,19 +114,7 @@ typedef struct redisReplyObjectFunctions {
     void (*freeObject)(void*);
 } redisReplyObjectFunctions;
 
-/* Context for a connection to Redis */
-typedef struct redisContext {
-    int fd;
-    int flags;
-    char *obuf; /* Write buffer */
-    int err; /* Error flags, 0 when there is no error */
-    char *errstr; /* String representation of error when applicable */
-
-    /* Function set for reply buildup and reply reader */
-    redisReplyObjectFunctions *fn;
-    void *reader;
-} redisContext;
-
+/* State for the protocol parser */
 typedef struct redisReader {
     int err; /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
@@ -157,6 +145,19 @@ int redisReplyReaderGetReply(redisReader *reader, void **reply);
 int redisvFormatCommand(char **target, const char *format, va_list ap);
 int redisFormatCommand(char **target, const char *format, ...);
 int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
+
+/* Context for a connection to Redis */
+typedef struct redisContext {
+    int fd;
+    int flags;
+    char *obuf; /* Write buffer */
+    int err; /* Error flags, 0 when there is no error */
+    char *errstr; /* String representation of error when applicable */
+
+    /* Function set for reply buildup and reply reader */
+    redisReplyObjectFunctions *fn;
+    void *reader;
+} redisContext;
 
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, struct timeval tv);
