@@ -996,7 +996,13 @@ int redisSetTimeout(redisContext *c, struct timeval tv) {
  * see if there is a reply available. */
 int redisBufferRead(redisContext *c) {
     char buf[2048];
-    int nread = read(c->fd,buf,sizeof(buf));
+    int nread;
+
+    /* Return early when the context has seen an error. */
+    if (c->err)
+        return REDIS_ERR;
+
+    nread = read(c->fd,buf,sizeof(buf));
     if (nread == -1) {
         if (errno == EAGAIN && !(c->flags & REDIS_BLOCK)) {
             /* Try again later */
@@ -1008,7 +1014,10 @@ int redisBufferRead(redisContext *c) {
         __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
         return REDIS_ERR;
     } else {
-        redisReaderFeed(c->reader,buf,nread);
+        if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
+            __redisSetError(c,c->reader->err,c->reader->errstr);
+            return REDIS_ERR;
+        }
     }
     return REDIS_OK;
 }
@@ -1024,6 +1033,11 @@ int redisBufferRead(redisContext *c) {
  */
 int redisBufferWrite(redisContext *c, int *done) {
     int nwritten;
+
+    /* Return early when the context has seen an error. */
+    if (c->err)
+        return REDIS_ERR;
+
     if (sdslen(c->obuf) > 0) {
         nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
         if (nwritten == -1) {
@@ -1050,7 +1064,7 @@ int redisBufferWrite(redisContext *c, int *done) {
  * or set an error in the context otherwise. */
 int redisGetReplyFromReader(redisContext *c, void **reply) {
     if (redisReaderGetReply(c->reader,reply) == REDIS_ERR) {
-        __redisSetError(c,REDIS_ERR_PROTOCOL,c->reader->errstr);
+        __redisSetError(c,c->reader->err,c->reader->errstr);
         return REDIS_ERR;
     }
     return REDIS_OK;
