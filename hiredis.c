@@ -29,6 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "fmacros.h"
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
