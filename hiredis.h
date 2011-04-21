@@ -114,8 +114,6 @@ typedef struct redisReplyObjectFunctions {
     void (*freeObject)(void*);
 } redisReplyObjectFunctions;
 
-struct redisContext; /* need forward declaration of redisContext */
-
 /* Context for a connection to Redis */
 typedef struct redisContext {
     int fd;
