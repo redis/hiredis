@@ -36,7 +36,6 @@
 #include "async.h"
 #include "dict.c"
 #include "sds.h"
-#include "util.h"
 
 /* Forward declaration of function in hiredis.c */
 void __redisAppendCommand(redisContext *c, char *cmd, size_t len);
@@ -163,7 +162,6 @@ static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
 
     /* Copy callback from stack to heap */
     cb = malloc(sizeof(*cb));
-    if (!cb) redisOOM();
     if (source != NULL) {
         memcpy(cb,source,sizeof(*cb));
         cb->next = NULL;

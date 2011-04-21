@@ -40,7 +40,6 @@
 #include "hiredis.h"
 #include "net.h"
 #include "sds.h"
-#include "util.h"
 
 static redisReply *createReplyObject(int type);
 static void *createStringObject(const redisReadTask *task, char *str, size_t len);
