@@ -542,16 +542,6 @@ redisReader *redisReplyReaderCreate(void) {
     return r;
 }
 
-/* Set the function set to build the reply. Returns REDIS_OK when there
- * is no temporary object and it can be set, REDIS_ERR otherwise. */
-int redisReplyReaderSetReplyObjectFunctions(redisReader *r, redisReplyObjectFunctions *fn) {
-    if (r->reply == NULL) {
-        r->fn = fn;
-        return REDIS_OK;
-    }
-    return REDIS_ERR;
-}
-
 void redisReplyReaderFree(redisReader *r) {
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);

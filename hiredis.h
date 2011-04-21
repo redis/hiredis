@@ -133,7 +133,6 @@ typedef struct redisReader {
 
 void freeReplyObject(void *reply);
 redisReader *redisReplyReaderCreate(void);
-int redisReplyReaderSetReplyObjectFunctions(redisReader *r, redisReplyObjectFunctions *fn);
 void redisReplyReaderFree(redisReader *r);
 void redisReplyReaderFeed(redisReader *r, const char *buf, size_t len);
 int redisReplyReaderGetReply(redisReader *r, void **reply);
