@@ -559,15 +559,6 @@ int redisReplyReaderSetPrivdata(redisReader *reader, void *privdata) {
     return REDIS_ERR;
 }
 
-/* External libraries wrapping hiredis might need access to the temporary
- * variable while the reply is built up. When the reader contains an
- * object in between receiving some bytes to parse, this object might
- * otherwise be free'd by garbage collection. */
-void *redisReplyReaderGetObject(redisReader *reader) {
-    redisReader *r = reader;
-    return r->reply;
-}
-
 void redisReplyReaderFree(redisReader *reader) {
     redisReader *r = reader;
     if (r->reply != NULL && r->fn && r->fn->freeObject)
@@ -575,11 +566,6 @@ void redisReplyReaderFree(redisReader *reader) {
     if (r->buf != NULL)
         sdsfree(r->buf);
     free(r);
-}
-
-char *redisReplyReaderGetError(redisReader *reader) {
-    redisReader *r = reader;
-    return r->errstr;
 }
 
 void redisReplyReaderFeed(redisReader *reader, const char *buf, size_t len) {

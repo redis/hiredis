@@ -135,11 +135,13 @@ void freeReplyObject(void *reply);
 redisReader *redisReplyReaderCreate(void);
 int redisReplyReaderSetReplyObjectFunctions(redisReader *reader, redisReplyObjectFunctions *fn);
 int redisReplyReaderSetPrivdata(redisReader *reader, void *privdata);
-void *redisReplyReaderGetObject(redisReader *reader);
-char *redisReplyReaderGetError(redisReader *reader);
 void redisReplyReaderFree(redisReader *ptr);
 void redisReplyReaderFeed(redisReader *reader, const char *buf, size_t len);
 int redisReplyReaderGetReply(redisReader *reader, void **reply);
+
+/* Backwards compatibility, can be removed on big version bump. */
+#define redisReplyReaderGetObject(_r) (((redisReader*)(r))->reply)
+#define redisReplyReaderGetError(_r) (((redisReader*)(r))->errstr)
 
 /* Functions to format a command according to the protocol. */
 int redisvFormatCommand(char **target, const char *format, va_list ap);
