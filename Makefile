@@ -10,7 +10,7 @@ OPTIMIZATION?=-O3
 ifeq ($(uname_S),SunOS)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -D__EXTENSIONS__ -D_XPG6 $(ARCH) $(PROF)
   CCLINK?=-ldl -lnsl -lsocket -lm -lpthread
-  LDFLAGS?=-L. -Wl,-R,.
+  LDFLAGS?=-L.
   DYLIBNAME?=libhiredis.so
   DYLIB_MAKE_CMD?=$(CC) -G -o ${DYLIBNAME} ${OBJ}
   STLIBNAME?=libhiredis.a
@@ -19,7 +19,7 @@ else
 ifeq ($(uname_S),Darwin)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
-  LDFLAGS?=-L. -Wl,-rpath,.
+  LDFLAGS?=-L.
   OBJARCH?=-arch i386 -arch x86_64
   DYLIBNAME?=libhiredis.dylib
   DYLIB_MAKE_CMD?=libtool -dynamic -o ${DYLIBNAME} -lm ${DEBUG} - ${OBJ}
@@ -28,7 +28,7 @@ ifeq ($(uname_S),Darwin)
 else
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
-  LDFLAGS?=-L. -Wl,-rpath,.
+  LDFLAGS?=-L.
   DYLIBNAME?=libhiredis.so
   DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,${DYLIBNAME} -o ${DYLIBNAME} ${OBJ}
   STLIBNAME?=libhiredis.a
@@ -64,23 +64,23 @@ dynamic: ${DYLIBNAME}
 static: ${STLIBNAME}
 
 # Binaries:
-hiredis-example-libevent: example-libevent.c adapters/libevent.h ${DYLIBNAME}
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) -lhiredis -levent example-libevent.c
+hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
+	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) $(STLIBNAME) example-libevent.c -levent
 
-hiredis-example-libev: example-libev.c adapters/libev.h ${DYLIBNAME}
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) -lhiredis -lev example-libev.c
+hiredis-example-libev: example-libev.c adapters/libev.h $(STLIBNAME)
+	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) $(STLIBNAME) example-libev.c -lev
 
 ifndef AE_DIR
 hiredis-example-ae:
 	@echo "Please specify AE_DIR (e.g. <redis repository>/src)"
 	@false
 else
-hiredis-example-ae: example-ae.c adapters/ae.h ${DYLIBNAME}
-	$(CC) -o $@ $(CCOPT) $(DEBUG) -I$(AE_DIR) $(LDFLAGS) -lhiredis example-ae.c $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o
+hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -I$(AE_DIR) $(LDFLAGS) $(STLIBNAME) example-ae.c $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o
 endif
 
-hiredis-%: %.o ${DYLIBNAME}
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) -lhiredis $<
+hiredis-%: %.o $(STLIBNAME)
+	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) $(STLIBNAME) $<
 
 test: hiredis-test
 	./hiredis-test
