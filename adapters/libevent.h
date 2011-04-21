@@ -1,4 +1,3 @@
-#include <sys/types.h>
 #include <event.h>
 #include "../hiredis.h"
 #include "../async.h"
