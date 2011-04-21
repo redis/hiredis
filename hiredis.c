@@ -528,7 +528,12 @@ static int processItem(redisReader *r) {
 }
 
 redisReader *redisReplyReaderCreate(void) {
-    redisReader *r = calloc(sizeof(redisReader),1);
+    redisReader *r;
+
+    r = calloc(sizeof(redisReader),1);
+    if (r == NULL)
+        return NULL;
+
     r->err = 0;
     r->errstr[0] = '\0';
     r->fn = &defaultFunctions;
