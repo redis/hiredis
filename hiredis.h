@@ -134,14 +134,14 @@ typedef struct redisReader {
 void freeReplyObject(void *reply);
 redisReader *redisReplyReaderCreate(void);
 int redisReplyReaderSetReplyObjectFunctions(redisReader *r, redisReplyObjectFunctions *fn);
-int redisReplyReaderSetPrivdata(redisReader *r, void *privdata);
 void redisReplyReaderFree(redisReader *r);
 void redisReplyReaderFeed(redisReader *r, const char *buf, size_t len);
 int redisReplyReaderGetReply(redisReader *r, void **reply);
 
 /* Backwards compatibility, can be removed on big version bump. */
-#define redisReplyReaderGetObject(_r) (((redisReader*)(r))->reply)
-#define redisReplyReaderGetError(_r) (((redisReader*)(r))->errstr)
+#define redisReplyReaderSetPrivdata(_r, _p) (int)(((redisReader*)(_r))->privdata = (_p))
+#define redisReplyReaderGetObject(_r) (((redisReader*)(_r))->reply)
+#define redisReplyReaderGetError(_r) (((redisReader*)(_r))->errstr)
 
 /* Functions to format a command according to the protocol. */
 int redisvFormatCommand(char **target, const char *format, va_list ap);

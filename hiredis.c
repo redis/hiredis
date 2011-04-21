@@ -552,16 +552,6 @@ int redisReplyReaderSetReplyObjectFunctions(redisReader *r, redisReplyObjectFunc
     return REDIS_ERR;
 }
 
-/* Set the private data field that is used in the read tasks. This argument can
- * be used to curry arbitrary data to the custom reply object functions. */
-int redisReplyReaderSetPrivdata(redisReader *r, void *privdata) {
-    if (r->reply == NULL) {
-        r->privdata = privdata;
-        return REDIS_OK;
-    }
-    return REDIS_ERR;
-}
-
 void redisReplyReaderFree(redisReader *r) {
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
