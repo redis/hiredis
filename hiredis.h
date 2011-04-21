@@ -133,11 +133,11 @@ typedef struct redisReader {
 
 void freeReplyObject(void *reply);
 redisReader *redisReplyReaderCreate(void);
-int redisReplyReaderSetReplyObjectFunctions(redisReader *reader, redisReplyObjectFunctions *fn);
-int redisReplyReaderSetPrivdata(redisReader *reader, void *privdata);
-void redisReplyReaderFree(redisReader *ptr);
-void redisReplyReaderFeed(redisReader *reader, const char *buf, size_t len);
-int redisReplyReaderGetReply(redisReader *reader, void **reply);
+int redisReplyReaderSetReplyObjectFunctions(redisReader *r, redisReplyObjectFunctions *fn);
+int redisReplyReaderSetPrivdata(redisReader *r, void *privdata);
+void redisReplyReaderFree(redisReader *r);
+void redisReplyReaderFeed(redisReader *r, const char *buf, size_t len);
+int redisReplyReaderGetReply(redisReader *r, void **reply);
 
 /* Backwards compatibility, can be removed on big version bump. */
 #define redisReplyReaderGetObject(_r) (((redisReader*)(r))->reply)

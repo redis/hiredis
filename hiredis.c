@@ -544,8 +544,7 @@ redisReader *redisReplyReaderCreate(void) {
 
 /* Set the function set to build the reply. Returns REDIS_OK when there
  * is no temporary object and it can be set, REDIS_ERR otherwise. */
-int redisReplyReaderSetReplyObjectFunctions(redisReader *reader, redisReplyObjectFunctions *fn) {
-    redisReader *r = reader;
+int redisReplyReaderSetReplyObjectFunctions(redisReader *r, redisReplyObjectFunctions *fn) {
     if (r->reply == NULL) {
         r->fn = fn;
         return REDIS_OK;
@@ -555,8 +554,7 @@ int redisReplyReaderSetReplyObjectFunctions(redisReader *reader, redisReplyObjec
 
 /* Set the private data field that is used in the read tasks. This argument can
  * be used to curry arbitrary data to the custom reply object functions. */
-int redisReplyReaderSetPrivdata(redisReader *reader, void *privdata) {
-    redisReader *r = reader;
+int redisReplyReaderSetPrivdata(redisReader *r, void *privdata) {
     if (r->reply == NULL) {
         r->privdata = privdata;
         return REDIS_OK;
@@ -564,8 +562,7 @@ int redisReplyReaderSetPrivdata(redisReader *reader, void *privdata) {
     return REDIS_ERR;
 }
 
-void redisReplyReaderFree(redisReader *reader) {
-    redisReader *r = reader;
+void redisReplyReaderFree(redisReader *r) {
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
     if (r->buf != NULL)
@@ -573,9 +570,7 @@ void redisReplyReaderFree(redisReader *reader) {
     free(r);
 }
 
-void redisReplyReaderFeed(redisReader *reader, const char *buf, size_t len) {
-    redisReader *r = reader;
-
+void redisReplyReaderFeed(redisReader *r, const char *buf, size_t len) {
     /* Copy the provided buffer. */
     if (buf != NULL && len >= 1) {
         /* Destroy internal buffer when it is empty and is quite large. */
@@ -590,9 +585,7 @@ void redisReplyReaderFeed(redisReader *reader, const char *buf, size_t len) {
     }
 }
 
-int redisReplyReaderGetReply(redisReader *reader, void **reply) {
-    redisReader *r = reader;
-
+int redisReplyReaderGetReply(redisReader *r, void **reply) {
     /* Default target pointer to NULL. */
     if (reply != NULL)
         *reply = NULL;
