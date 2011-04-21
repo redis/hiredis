@@ -129,15 +129,31 @@ typedef struct redisContext {
     void *reader;
 } redisContext;
 
+typedef struct redisReader {
+    int err; /* Error flags, 0 when there is no error */
+    char errstr[128]; /* String representation of error when applicable */
+
+    char *buf; /* Read buffer */
+    size_t pos; /* Buffer cursor */
+    size_t len; /* Buffer length */
+
+    redisReadTask rstack[3];
+    int ridx; /* Index of current read task */
+    void *reply; /* Temporary reply pointer */
+
+    redisReplyObjectFunctions *fn;
+    void *privdata;
+} redisReader;
+
 void freeReplyObject(void *reply);
-void *redisReplyReaderCreate(void);
-int redisReplyReaderSetReplyObjectFunctions(void *reader, redisReplyObjectFunctions *fn);
-int redisReplyReaderSetPrivdata(void *reader, void *privdata);
-void *redisReplyReaderGetObject(void *reader);
-char *redisReplyReaderGetError(void *reader);
-void redisReplyReaderFree(void *ptr);
-void redisReplyReaderFeed(void *reader, const char *buf, size_t len);
-int redisReplyReaderGetReply(void *reader, void **reply);
+redisReader *redisReplyReaderCreate(void);
+int redisReplyReaderSetReplyObjectFunctions(redisReader *reader, redisReplyObjectFunctions *fn);
+int redisReplyReaderSetPrivdata(redisReader *reader, void *privdata);
+void *redisReplyReaderGetObject(redisReader *reader);
+char *redisReplyReaderGetError(redisReader *reader);
+void redisReplyReaderFree(redisReader *ptr);
+void redisReplyReaderFeed(redisReader *reader, const char *buf, size_t len);
+int redisReplyReaderGetReply(redisReader *reader, void **reply);
 
 /* Functions to format a command according to the protocol. */
 int redisvFormatCommand(char **target, const char *format, va_list ap);

@@ -41,21 +41,6 @@
 #include "sds.h"
 #include "util.h"
 
-typedef struct redisReader {
-    int err; /* Error flags, 0 when there is no error */
-    char errstr[128]; /* String representation of error when applicable */
-    struct redisReplyObjectFunctions *fn;
-    void *reply; /* holds temporary reply */
-
-    sds buf; /* read buffer */
-    size_t pos; /* buffer cursor */
-    size_t len; /* buffer length */
-
-    redisReadTask rstack[3]; /* stack of read tasks */
-    int ridx; /* index of stack */
-    void *privdata; /* user-settable arbitrary field */
-} redisReader;
-
 static redisReply *createReplyObject(int type);
 static void *createStringObject(const redisReadTask *task, char *str, size_t len);
 static void *createArrayObject(const redisReadTask *task, int elements);
@@ -542,7 +527,7 @@ static int processItem(redisReader *r) {
     }
 }
 
-void *redisReplyReaderCreate(void) {
+redisReader *redisReplyReaderCreate(void) {
     redisReader *r = calloc(sizeof(redisReader),1);
     r->err = 0;
     r->errstr[0] = '\0';
@@ -554,7 +539,7 @@ void *redisReplyReaderCreate(void) {
 
 /* Set the function set to build the reply. Returns REDIS_OK when there
  * is no temporary object and it can be set, REDIS_ERR otherwise. */
-int redisReplyReaderSetReplyObjectFunctions(void *reader, redisReplyObjectFunctions *fn) {
+int redisReplyReaderSetReplyObjectFunctions(redisReader *reader, redisReplyObjectFunctions *fn) {
     redisReader *r = reader;
     if (r->reply == NULL) {
         r->fn = fn;
@@ -565,7 +550,7 @@ int redisReplyReaderSetReplyObjectFunctions(void *reader, redisReplyObjectFuncti
 
 /* Set the private data field that is used in the read tasks. This argument can
  * be used to curry arbitrary data to the custom reply object functions. */
-int redisReplyReaderSetPrivdata(void *reader, void *privdata) {
+int redisReplyReaderSetPrivdata(redisReader *reader, void *privdata) {
     redisReader *r = reader;
     if (r->reply == NULL) {
         r->privdata = privdata;
@@ -578,12 +563,12 @@ int redisReplyReaderSetPrivdata(void *reader, void *privdata) {
  * variable while the reply is built up. When the reader contains an
  * object in between receiving some bytes to parse, this object might
  * otherwise be free'd by garbage collection. */
-void *redisReplyReaderGetObject(void *reader) {
+void *redisReplyReaderGetObject(redisReader *reader) {
     redisReader *r = reader;
     return r->reply;
 }
 
-void redisReplyReaderFree(void *reader) {
+void redisReplyReaderFree(redisReader *reader) {
     redisReader *r = reader;
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
@@ -592,12 +577,12 @@ void redisReplyReaderFree(void *reader) {
     free(r);
 }
 
-char *redisReplyReaderGetError(void *reader) {
+char *redisReplyReaderGetError(redisReader *reader) {
     redisReader *r = reader;
     return r->errstr;
 }
 
-void redisReplyReaderFeed(void *reader, const char *buf, size_t len) {
+void redisReplyReaderFeed(redisReader *reader, const char *buf, size_t len) {
     redisReader *r = reader;
 
     /* Copy the provided buffer. */
@@ -614,7 +599,7 @@ void redisReplyReaderFeed(void *reader, const char *buf, size_t len) {
     }
 }
 
-int redisReplyReaderGetReply(void *reader, void **reply) {
+int redisReplyReaderGetReply(redisReader *reader, void **reply) {
     redisReader *r = reader;
 
     /* Default target pointer to NULL. */
