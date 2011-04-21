@@ -1107,31 +1107,65 @@ int redisGetReply(redisContext *c, void **reply) {
  * is used, you need to call redisGetReply yourself to retrieve
  * the reply (or replies in pub/sub).
  */
-void __redisAppendCommand(redisContext *c, char *cmd, size_t len) {
-    c->obuf = sdscatlen(c->obuf,cmd,len);
+int __redisAppendCommand(redisContext *c, char *cmd, size_t len) {
+    sds newbuf;
+
+    newbuf = sdscatlen(c->obuf,cmd,len);
+    if (newbuf == NULL) {
+        __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
+        return REDIS_ERR;
+    }
+
+    c->obuf = newbuf;
+    return REDIS_OK;
 }
 
-void redisvAppendCommand(redisContext *c, const char *format, va_list ap) {
+int redisvAppendCommand(redisContext *c, const char *format, va_list ap) {
     char *cmd;
     int len;
+
     len = redisvFormatCommand(&cmd,format,ap);
-    __redisAppendCommand(c,cmd,len);
+    if (len == -1) {
+        __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
+        return REDIS_ERR;
+    }
+
+    if (__redisAppendCommand(c,cmd,len) != REDIS_OK) {
+        free(cmd);
+        return REDIS_ERR;
+    }
+
     free(cmd);
+    return REDIS_OK;
 }
 
-void redisAppendCommand(redisContext *c, const char *format, ...) {
+int redisAppendCommand(redisContext *c, const char *format, ...) {
     va_list ap;
+    int ret;
+
     va_start(ap,format);
-    redisvAppendCommand(c,format,ap);
+    ret = redisvAppendCommand(c,format,ap);
     va_end(ap);
+    return ret;
 }
 
-void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
+int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
     char *cmd;
     int len;
+
     len = redisFormatCommandArgv(&cmd,argc,argv,argvlen);
-    __redisAppendCommand(c,cmd,len);
+    if (len == -1) {
+        __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
+        return REDIS_ERR;
+    }
+
+    if (__redisAppendCommand(c,cmd,len) != REDIS_OK) {
+        free(cmd);
+        return REDIS_ERR;
+    }
+
     free(cmd);
+    return REDIS_OK;
 }
 
 /* Helper function for the redisCommand* family of functions.
@@ -1145,26 +1179,21 @@ void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const 
  * otherwise. When NULL is returned in a blocking context, the error field
  * in the context will be set.
  */
-static void *__redisCommand(redisContext *c, char *cmd, size_t len) {
-    void *aux = NULL;
-    __redisAppendCommand(c,cmd,len);
+static void *__redisBlockForReply(redisContext *c) {
+    void *reply;
 
     if (c->flags & REDIS_BLOCK) {
-        if (redisGetReply(c,&aux) == REDIS_OK)
-            return aux;
-        return NULL;
+        if (redisGetReply(c,&reply) != REDIS_OK)
+            return NULL;
+        return reply;
     }
     return NULL;
 }
 
 void *redisvCommand(redisContext *c, const char *format, va_list ap) {
-    char *cmd;
-    int len;
-    void *reply = NULL;
-    len = redisvFormatCommand(&cmd,format,ap);
-    reply = __redisCommand(c,cmd,len);
-    free(cmd);
-    return reply;
+    if (redisvAppendCommand(c,format,ap) != REDIS_OK)
+        return NULL;
+    return __redisBlockForReply(c);
 }
 
 void *redisCommand(redisContext *c, const char *format, ...) {
@@ -1177,11 +1206,7 @@ void *redisCommand(redisContext *c, const char *format, ...) {
 }
 
 void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
-    char *cmd;
-    int len;
-    void *reply = NULL;
-    len = redisFormatCommandArgv(&cmd,argc,argv,argvlen);
-    reply = __redisCommand(c,cmd,len);
-    free(cmd);
-    return reply;
+    if (redisAppendCommandArgv(c,argc,argv,argvlen) != REDIS_OK)
+        return NULL;
+    return __redisBlockForReply(c);
 }

@@ -184,9 +184,9 @@ int redisGetReplyFromReader(redisContext *c, void **reply);
 
 /* Write a command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
-void redisvAppendCommand(redisContext *c, const char *format, va_list ap);
-void redisAppendCommand(redisContext *c, const char *format, ...);
-void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+int redisvAppendCommand(redisContext *c, const char *format, va_list ap);
+int redisAppendCommand(redisContext *c, const char *format, ...);
+int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
 
 /* Issue a command to Redis. In a blocking context, it is identical to calling
  * redisAppendCommand, followed by redisGetReply. The function will return
