@@ -131,7 +131,7 @@ typedef struct redisReader {
     void *privdata;
 } redisReader;
 
-void freeReplyObject(void *reply);
+/* Public API for the protocol parser. */
 redisReader *redisReplyReaderCreate(void);
 void redisReplyReaderFree(redisReader *r);
 void redisReplyReaderFeed(redisReader *r, const char *buf, size_t len);
@@ -141,6 +141,9 @@ int redisReplyReaderGetReply(redisReader *r, void **reply);
 #define redisReplyReaderSetPrivdata(_r, _p) (int)(((redisReader*)(_r))->privdata = (_p))
 #define redisReplyReaderGetObject(_r) (((redisReader*)(_r))->reply)
 #define redisReplyReaderGetError(_r) (((redisReader*)(_r))->errstr)
+
+/* Function to free the reply objects hiredis returns by default. */
+void freeReplyObject(void *reply);
 
 /* Functions to format a command according to the protocol. */
 int redisvFormatCommand(char **target, const char *format, va_list ap);
