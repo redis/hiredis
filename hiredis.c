@@ -181,7 +181,7 @@ static void *createNilObject(const redisReadTask *task) {
     return r;
 }
 
-static void __redisReplyReaderSetError(redisReader *r, int type, const char *str) {
+static void __redisReaderSetError(redisReader *r, int type, const char *str) {
     size_t len;
 
     if (r->reply != NULL && r->fn && r->fn->freeObject) {
@@ -207,17 +207,17 @@ static void __redisReplyReaderSetError(redisReader *r, int type, const char *str
     r->errstr[len] = '\0';
 }
 
-static void __redisReplyReaderSetErrorProtocolByte(redisReader *r, char byte) {
+static void __redisReaderSetErrorProtocolByte(redisReader *r, char byte) {
     char cbuf[8], sbuf[128];
 
     chrtos(cbuf,sizeof(cbuf),byte);
     snprintf(sbuf,sizeof(sbuf),
         "Protocol error, got %s as reply type byte", cbuf);
-    __redisReplyReaderSetError(r,REDIS_ERR_PROTOCOL,sbuf);
+    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,sbuf);
 }
 
-static void __redisReplyReaderSetErrorOOM(redisReader *r) {
-    __redisReplyReaderSetError(r,REDIS_ERR_OOM,"Out of memory");
+static void __redisReaderSetErrorOOM(redisReader *r) {
+    __redisReaderSetError(r,REDIS_ERR_OOM,"Out of memory");
 }
 
 static char *readBytes(redisReader *r, unsigned int bytes) {
@@ -347,7 +347,7 @@ static int processLineItem(redisReader *r) {
         }
 
         if (obj == NULL) {
-            __redisReplyReaderSetErrorOOM(r);
+            __redisReaderSetErrorOOM(r);
             return REDIS_ERR;
         }
 
@@ -397,7 +397,7 @@ static int processBulkItem(redisReader *r) {
         /* Proceed when obj was created. */
         if (success) {
             if (obj == NULL) {
-                __redisReplyReaderSetErrorOOM(r);
+                __redisReaderSetErrorOOM(r);
                 return REDIS_ERR;
             }
 
@@ -422,7 +422,7 @@ static int processMultiBulkItem(redisReader *r) {
 
     /* Set error for nested multi bulks with depth > 1 */
     if (r->ridx == 2) {
-        __redisReplyReaderSetError(r,REDIS_ERR_PROTOCOL,
+        __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
             "No support for nested multi bulk replies with depth > 1");
         return REDIS_ERR;
     }
@@ -438,7 +438,7 @@ static int processMultiBulkItem(redisReader *r) {
                 obj = (void*)REDIS_REPLY_NIL;
 
             if (obj == NULL) {
-                __redisReplyReaderSetErrorOOM(r);
+                __redisReaderSetErrorOOM(r);
                 return REDIS_ERR;
             }
 
@@ -450,7 +450,7 @@ static int processMultiBulkItem(redisReader *r) {
                 obj = (void*)REDIS_REPLY_ARRAY;
 
             if (obj == NULL) {
-                __redisReplyReaderSetErrorOOM(r);
+                __redisReaderSetErrorOOM(r);
                 return REDIS_ERR;
             }
 
@@ -502,7 +502,7 @@ static int processItem(redisReader *r) {
                 cur->type = REDIS_REPLY_ARRAY;
                 break;
             default:
-                __redisReplyReaderSetErrorProtocolByte(r,*p);
+                __redisReaderSetErrorProtocolByte(r,*p);
                 return REDIS_ERR;
             }
         } else {
@@ -527,7 +527,7 @@ static int processItem(redisReader *r) {
     }
 }
 
-redisReader *redisReplyReaderCreate(void) {
+redisReader *redisReaderCreate(void) {
     redisReader *r;
 
     r = calloc(sizeof(redisReader),1);
@@ -542,7 +542,7 @@ redisReader *redisReplyReaderCreate(void) {
     return r;
 }
 
-void redisReplyReaderFree(redisReader *r) {
+void redisReaderFree(redisReader *r) {
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
     if (r->buf != NULL)
@@ -550,7 +550,7 @@ void redisReplyReaderFree(redisReader *r) {
     free(r);
 }
 
-void redisReplyReaderFeed(redisReader *r, const char *buf, size_t len) {
+void redisReaderFeed(redisReader *r, const char *buf, size_t len) {
     /* Copy the provided buffer. */
     if (buf != NULL && len >= 1) {
         /* Destroy internal buffer when it is empty and is quite large. */
@@ -565,7 +565,7 @@ void redisReplyReaderFeed(redisReader *r, const char *buf, size_t len) {
     }
 }
 
-int redisReplyReaderGetReply(redisReader *r, void **reply) {
+int redisReaderGetReply(redisReader *r, void **reply) {
     /* Default target pointer to NULL. */
     if (reply != NULL)
         *reply = NULL;
@@ -854,7 +854,7 @@ static redisContext *redisContextInit(void) {
     c->err = 0;
     c->errstr[0] = '\0';
     c->obuf = sdsempty();
-    c->reader = redisReplyReaderCreate();
+    c->reader = redisReaderCreate();
     return c;
 }
 
@@ -864,7 +864,7 @@ void redisFree(redisContext *c) {
     if (c->obuf != NULL)
         sdsfree(c->obuf);
     if (c->reader != NULL)
-        redisReplyReaderFree(c->reader);
+        redisReaderFree(c->reader);
     free(c);
 }
 
@@ -939,7 +939,7 @@ int redisBufferRead(redisContext *c) {
         __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
         return REDIS_ERR;
     } else {
-        redisReplyReaderFeed(c->reader,buf,nread);
+        redisReaderFeed(c->reader,buf,nread);
     }
     return REDIS_OK;
 }
@@ -980,7 +980,7 @@ int redisBufferWrite(redisContext *c, int *done) {
 /* Internal helper function to try and get a reply from the reader,
  * or set an error in the context otherwise. */
 int redisGetReplyFromReader(redisContext *c, void **reply) {
-    if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
+    if (redisReaderGetReply(c->reader,reply) == REDIS_ERR) {
         __redisSetError(c,REDIS_ERR_PROTOCOL,c->reader->errstr);
         return REDIS_ERR;
     }

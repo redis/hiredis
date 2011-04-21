@@ -132,12 +132,16 @@ typedef struct redisReader {
 } redisReader;
 
 /* Public API for the protocol parser. */
-redisReader *redisReplyReaderCreate(void);
-void redisReplyReaderFree(redisReader *r);
-void redisReplyReaderFeed(redisReader *r, const char *buf, size_t len);
-int redisReplyReaderGetReply(redisReader *r, void **reply);
+redisReader *redisReaderCreate(void);
+void redisReaderFree(redisReader *r);
+void redisReaderFeed(redisReader *r, const char *buf, size_t len);
+int redisReaderGetReply(redisReader *r, void **reply);
 
 /* Backwards compatibility, can be removed on big version bump. */
+#define redisReplyReaderCreate redisReaderCreate
+#define redisReplyReaderFree redisReaderFree
+#define redisReplyReaderFeed redisReaderFeed
+#define redisReplyReaderGetReply redisReaderGetReply
 #define redisReplyReaderSetPrivdata(_r, _p) (int)(((redisReader*)(_r))->privdata = (_p))
 #define redisReplyReaderGetObject(_r) (((redisReader*)(_r))->reply)
 #define redisReplyReaderGetError(_r) (((redisReader*)(_r))->errstr)
