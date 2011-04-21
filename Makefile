@@ -8,7 +8,7 @@ BINS = hiredis-example hiredis-test
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 OPTIMIZATION?=-O3
 ifeq ($(uname_S),SunOS)
-  CFLAGS?=-std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -D__EXTENSIONS__ -D_XPG6 $(ARCH) $(PROF)
+  CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -D__EXTENSIONS__ -D_XPG6 $(ARCH) $(PROF)
   CCLINK?=-ldl -lnsl -lsocket -lm -lpthread
   LDFLAGS?=-L. -Wl,-R,.
   DYLIBNAME?=libhiredis.so
@@ -17,7 +17,7 @@ ifeq ($(uname_S),SunOS)
   STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
 else
 ifeq ($(uname_S),Darwin)
-  CFLAGS?=-std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
+  CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
   LDFLAGS?=-L. -Wl,-rpath,.
   OBJARCH?=-arch i386 -arch x86_64
@@ -26,7 +26,7 @@ ifeq ($(uname_S),Darwin)
   STLIBNAME?=libhiredis.a
   STLIB_MAKE_CMD?=libtool -static -o ${STLIBNAME} - ${OBJ}
 else
-  CFLAGS?=-std=c99 -pedantic $(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
+  CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
   LDFLAGS?=-L. -Wl,-rpath,.
   DYLIBNAME?=libhiredis.so
@@ -86,7 +86,7 @@ test: hiredis-test
 	./hiredis-test
 
 .c.o:
-	$(CC) -c $(CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
+	$(CC) -std=c99 -pedantic -c $(CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
 	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
