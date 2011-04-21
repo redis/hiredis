@@ -828,14 +828,19 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     return totlen;
 }
 
-void __redisSetError(redisContext *c, int type, const sds errstr) {
+void __redisSetError(redisContext *c, int type, const char *str) {
+    size_t len;
+
     c->err = type;
-    if (errstr != NULL) {
-        c->errstr = errstr;
+    if (str != NULL) {
+        len = strlen(str);
+        len = len < (sizeof(c->errstr)-1) ? len : (sizeof(c->errstr)-1);
+        memcpy(c->errstr,str,len);
+        c->errstr[len] = '\0';
     } else {
         /* Only REDIS_ERR_IO may lack a description! */
         assert(type == REDIS_ERR_IO);
-        c->errstr = sdsnew(strerror(errno));
+        strerror_r(errno,c->errstr,sizeof(c->errstr));
     }
 }
 
@@ -847,7 +852,7 @@ static redisContext *redisContextInit(void) {
         return NULL;
 
     c->err = 0;
-    c->errstr = NULL;
+    c->errstr[0] = '\0';
     c->obuf = sdsempty();
     c->reader = redisReplyReaderCreate();
     return c;
@@ -856,8 +861,6 @@ static redisContext *redisContextInit(void) {
 void redisFree(redisContext *c) {
     if (c->fd > 0)
         close(c->fd);
-    if (c->errstr != NULL)
-        sdsfree(c->errstr);
     if (c->obuf != NULL)
         sdsfree(c->obuf);
     if (c->reader != NULL)
@@ -933,8 +936,7 @@ int redisBufferRead(redisContext *c) {
             return REDIS_ERR;
         }
     } else if (nread == 0) {
-        __redisSetError(c,REDIS_ERR_EOF,
-            sdsnew("Server closed the connection"));
+        __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
         return REDIS_ERR;
     } else {
         redisReplyReaderFeed(c->reader,buf,nread);
@@ -979,8 +981,7 @@ int redisBufferWrite(redisContext *c, int *done) {
  * or set an error in the context otherwise. */
 int redisGetReplyFromReader(redisContext *c, void **reply) {
     if (redisReplyReaderGetReply(c->reader,reply) == REDIS_ERR) {
-        __redisSetError(c,REDIS_ERR_PROTOCOL,
-            sdsnew(((redisReader*)c->reader)->errstr));
+        __redisSetError(c,REDIS_ERR_PROTOCOL,c->reader->errstr);
         return REDIS_ERR;
     }
     return REDIS_OK;

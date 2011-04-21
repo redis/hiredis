@@ -153,7 +153,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
 /* Context for a connection to Redis */
 typedef struct redisContext {
     int err; /* Error flags, 0 when there is no error */
-    char *errstr; /* String representation of error when applicable */
+    char errstr[128]; /* String representation of error when applicable */
     int fd;
     int flags;
     char *obuf; /* Write buffer */
