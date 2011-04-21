@@ -539,6 +539,11 @@ redisReader *redisReaderCreate(void) {
     r->errstr[0] = '\0';
     r->fn = &defaultFunctions;
     r->buf = sdsempty();
+    if (r->buf == NULL) {
+        free(r);
+        return NULL;
+    }
+
     r->ridx = -1;
     return r;
 }
@@ -551,7 +556,13 @@ void redisReaderFree(redisReader *r) {
     free(r);
 }
 
-void redisReaderFeed(redisReader *r, const char *buf, size_t len) {
+int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
+    sds newbuf;
+
+    /* Return early when this reader is in an erroneous state. */
+    if (r->err)
+        return REDIS_ERR;
+
     /* Copy the provided buffer. */
     if (buf != NULL && len >= 1) {
         /* Destroy internal buffer when it is empty and is quite large. */
@@ -559,11 +570,22 @@ void redisReaderFeed(redisReader *r, const char *buf, size_t len) {
             sdsfree(r->buf);
             r->buf = sdsempty();
             r->pos = 0;
+
+            /* r->buf should not be NULL since we just free'd a larger one. */
+            assert(r->buf != NULL);
         }
 
-        r->buf = sdscatlen(r->buf,buf,len);
+        newbuf = sdscatlen(r->buf,buf,len);
+        if (newbuf == NULL) {
+            __redisReaderSetErrorOOM(r);
+            return REDIS_ERR;
+        }
+
+        r->buf = newbuf;
         r->len = sdslen(r->buf);
     }
+
+    return REDIS_OK;
 }
 
 int redisReaderGetReply(redisReader *r, void **reply) {
