@@ -15,9 +15,9 @@ ifeq ($(uname_S),SunOS)
   DYLIBSUFFIX=so
   STLIBSUFFIX=a
   DYLIBNAME?=$(LIBNAME).$(DYLIBSUFFIX)
-  DYLIB_MAKE_CMD?=$(CC) -G -o $(DYLIBNAME) $(OBJ)
+  DYLIB_MAKE_CMD?=$(CC) -G -o $(DYLIBNAME)
   STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
-  STLIB_MAKE_CMD?=ar rcs $(STLIBNAME) $(OBJ)
+  STLIB_MAKE_CMD?=ar rcs $(STLIBNAME)
 else
 ifeq ($(uname_S),Darwin)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
@@ -27,9 +27,9 @@ ifeq ($(uname_S),Darwin)
   DYLIBSUFFIX=dylib
   STLIBSUFFIX=a
   DYLIBNAME?=$(LIBNAME).$(DYLIBSUFFIX)
-  DYLIB_MAKE_CMD?=libtool -dynamic -o $(DYLIBNAME) -lm $(DEBUG) - $(OBJ)
+  DYLIB_MAKE_CMD?=libtool -dynamic -o $(DYLIBNAME) -lm $(DEBUG) -
   STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
-  STLIB_MAKE_CMD?=libtool -static -o $(STLIBNAME) - $(OBJ)
+  STLIB_MAKE_CMD?=libtool -static -o $(STLIBNAME) -
 else
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
@@ -37,9 +37,9 @@ else
   DYLIBSUFFIX=so
   STLIBSUFFIX=a
   DYLIBNAME?=$(LIBNAME).$(DYLIBSUFFIX)
-  DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,$(DYLIBNAME) -o $(DYLIBNAME) $(OBJ)
+  DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,$(DYLIBNAME) -o $(DYLIBNAME)
   STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
-  STLIB_MAKE_CMD?=ar rcs $(STLIBNAME) $(OBJ)
+  STLIB_MAKE_CMD?=ar rcs $(STLIBNAME)
 endif
 endif
 
@@ -64,10 +64,10 @@ sds.o: sds.c sds.h
 test.o: test.c hiredis.h
 
 $(DYLIBNAME): $(OBJ)
-	$(DYLIB_MAKE_CMD)
+	$(DYLIB_MAKE_CMD) $(OBJ)
 
 $(STLIBNAME): $(OBJ)
-	$(STLIB_MAKE_CMD)
+	$(STLIB_MAKE_CMD) $(OBJ)
 
 dynamic: $(DYLIBNAME)
 static: $(STLIBNAME)
