@@ -23,6 +23,7 @@ ifeq ($(uname_S),SunOS)
   DYLIB_MAKE_CMD?=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME)
   STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
   STLIB_MAKE_CMD?=ar rcs $(STLIBNAME)
+  INSTALL= cp -r
 else
 ifeq ($(uname_S),Darwin)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
@@ -37,6 +38,7 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAKE_CMD?=libtool -dynamic -o $(DYLIBNAME) -install_name $(DYLIB_MINOR_NAME) -lm $(DEBUG) -
   STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
   STLIB_MAKE_CMD?=libtool -static -o $(STLIBNAME) -
+  INSTALL= cp -a
 else
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
@@ -49,6 +51,7 @@ else
   DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
   STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
   STLIB_MAKE_CMD?=ar rcs $(STLIBNAME)
+  INSTALL= cp -a
 endif
 endif
 
@@ -60,7 +63,6 @@ INCLUDE_PATH?=include/hiredis
 LIBRARY_PATH?=lib
 INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
 INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
-INSTALL= cp -a
 
 all: $(DYLIBNAME) $(BINS)
 
