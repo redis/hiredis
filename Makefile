@@ -53,7 +53,7 @@ INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
 INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
 INSTALL= cp -a
 
-all: ${DYLIBNAME} ${BINS}
+all: $(DYLIBNAME) $(BINS)
 
 # Deps (use make dep to generate this)
 net.o: net.c fmacros.h net.h hiredis.h
@@ -63,14 +63,14 @@ hiredis.o: hiredis.c fmacros.h hiredis.h net.h sds.h
 sds.o: sds.c sds.h
 test.o: test.c hiredis.h
 
-${DYLIBNAME}: ${OBJ}
-	${DYLIB_MAKE_CMD}
+$(DYLIBNAME): $(OBJ)
+	$(DYLIB_MAKE_CMD)
 
-${STLIBNAME}: ${OBJ}
-	${STLIB_MAKE_CMD}
+$(STLIBNAME): $(OBJ)
+	$(STLIB_MAKE_CMD)
 
-dynamic: ${DYLIBNAME}
-static: ${STLIBNAME}
+dynamic: $(DYLIBNAME)
+static: $(STLIBNAME)
 
 # Binaries:
 hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
@@ -98,7 +98,7 @@ test: hiredis-test
 	$(CC) -std=c99 -pedantic -c $(CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
-	rm -rf ${DYLIBNAME} ${STLIBNAME} $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
+	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
