@@ -2,8 +2,9 @@
 # Copyright (C) 2010 Salvatore Sanfilippo <antirez at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ = net.o hiredis.o sds.o async.o
-BINS = hiredis-example hiredis-test
+OBJ=net.o hiredis.o sds.o async.o
+BINS=hiredis-example hiredis-test
+LIBNAME=libhiredis
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 OPTIMIZATION?=-O3
@@ -11,28 +12,34 @@ ifeq ($(uname_S),SunOS)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -D__EXTENSIONS__ -D_XPG6 $(ARCH) $(PROF)
   CCLINK?=-ldl -lnsl -lsocket -lm -lpthread
   LDFLAGS?=-L.
-  DYLIBNAME?=libhiredis.so
-  DYLIB_MAKE_CMD?=$(CC) -G -o ${DYLIBNAME} ${OBJ}
-  STLIBNAME?=libhiredis.a
-  STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
+  DYLIBSUFFIX=so
+  STLIBSUFFIX=a
+  DYLIBNAME?=$(LIBNAME).$(DYLIBSUFFIX)
+  DYLIB_MAKE_CMD?=$(CC) -G -o $(DYLIBNAME) $(OBJ)
+  STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
+  STLIB_MAKE_CMD?=ar rcs $(STLIBNAME) $(OBJ)
 else
 ifeq ($(uname_S),Darwin)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
   LDFLAGS?=-L.
   OBJARCH?=-arch i386 -arch x86_64
-  DYLIBNAME?=libhiredis.dylib
-  DYLIB_MAKE_CMD?=libtool -dynamic -o ${DYLIBNAME} -lm ${DEBUG} - ${OBJ}
-  STLIBNAME?=libhiredis.a
-  STLIB_MAKE_CMD?=libtool -static -o ${STLIBNAME} - ${OBJ}
+  DYLIBSUFFIX=dylib
+  STLIBSUFFIX=a
+  DYLIBNAME?=$(LIBNAME).$(DYLIBSUFFIX)
+  DYLIB_MAKE_CMD?=libtool -dynamic -o $(DYLIBNAME) -lm $(DEBUG) - $(OBJ)
+  STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
+  STLIB_MAKE_CMD?=libtool -static -o $(STLIBNAME) - $(OBJ)
 else
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   CCLINK?=-lm -pthread
   LDFLAGS?=-L.
-  DYLIBNAME?=libhiredis.so
-  DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,${DYLIBNAME} -o ${DYLIBNAME} ${OBJ}
-  STLIBNAME?=libhiredis.a
-  STLIB_MAKE_CMD?=ar rcs ${STLIBNAME} ${OBJ}
+  DYLIBSUFFIX=so
+  STLIBSUFFIX=a
+  DYLIBNAME?=$(LIBNAME).$(DYLIBSUFFIX)
+  DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,$(DYLIBNAME) -o $(DYLIBNAME) $(OBJ)
+  STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
+  STLIB_MAKE_CMD?=ar rcs $(STLIBNAME) $(OBJ)
 endif
 endif
 
