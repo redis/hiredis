@@ -74,10 +74,10 @@ static: $(STLIBNAME)
 
 # Binaries:
 hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) $(STLIBNAME) example-libevent.c -levent
+	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) -levent example-libevent.c $(STLIBNAME)
 
 hiredis-example-libev: example-libev.c adapters/libev.h $(STLIBNAME)
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) $(STLIBNAME) example-libev.c -lev
+	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) -lev example-libev.c $(STLIBNAME)
 
 ifndef AE_DIR
 hiredis-example-ae:
@@ -85,11 +85,11 @@ hiredis-example-ae:
 	@false
 else
 hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
-	$(CC) -o $@ $(CCOPT) $(DEBUG) -I$(AE_DIR) $(LDFLAGS) $(STLIBNAME) example-ae.c $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o
+	$(CC) -o $@ $(CCOPT) $(DEBUG) -I$(AE_DIR) $(LDFLAGS) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
 endif
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) $(STLIBNAME) $<
+	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
 	./hiredis-test
