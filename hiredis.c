@@ -356,7 +356,12 @@ static int processLineItem(redisReader *r) {
     char *p;
     int len;
 
+    cur->poff = (r->pos-r->roff)-1;
+    cur->coff = cur->poff+1;
     if ((p = readLine(r,&len)) != NULL) {
+        cur->plen = 1+len+2; /* include \r\n */
+        cur->clen = len;
+
         if (cur->type == REDIS_REPLY_INTEGER) {
             if (r->fn && r->fn->createInteger)
                 obj = r->fn->createInteger(cur,readLongLong(p));
@@ -395,10 +400,13 @@ static int processBulkItem(redisReader *r) {
     p = r->buf+r->pos;
     s = seekNewline(p,r->len-r->pos);
     if (s != NULL) {
-        p = r->buf+r->pos;
         bytelen = s-(r->buf+r->pos)+2; /* include \r\n */
-        len = readLongLong(p);
+        cur->poff = (r->pos-r->roff)-1;
+        cur->plen = bytelen+1;
+        cur->coff = cur->poff+1+bytelen;
+        cur->clen = 0;
 
+        len = readLongLong(p);
         if (len < 0) {
             /* The nil object can always be created. */
             if (r->fn && r->fn->createNil)
@@ -410,6 +418,8 @@ static int processBulkItem(redisReader *r) {
             /* Only continue when the buffer contains the entire bulk item. */
             bytelen += len+2; /* include \r\n */
             if (r->pos+bytelen <= r->len) {
+                cur->plen += len+2;
+                cur->clen = len;
                 if (r->fn && r->fn->createString)
                     obj = r->fn->createString(cur,s+2,len);
                 else
@@ -451,7 +461,12 @@ static int processMultiBulkItem(redisReader *r) {
         return REDIS_ERR;
     }
 
+    cur->poff = (r->pos-r->roff)-1;
+    cur->coff = 0;
     if ((p = readLine(r,NULL)) != NULL) {
+        cur->plen = (r->pos-r->roff)-cur->poff; /* includes \r\n */
+        cur->clen = 0;
+
         elements = readLongLong(p);
         root = (r->ridx == 0);
 
@@ -588,7 +603,7 @@ int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
 
     /* Copy the provided buffer. */
     if (buf != NULL && len >= 1) {
-        /* Destroy internal buffer when it is empty and is quite large. */
+        /* Destroy buffer when it is empty and is quite large. */
         if (r->len == 0 && sdsavail(r->buf) > 16*1024) {
             sdsfree(r->buf);
             r->buf = sdsempty();
@@ -596,6 +611,15 @@ int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
 
             /* r->buf should not be NULL since we just free'd a larger one. */
             assert(r->buf != NULL);
+        }
+
+        /* Discard consumed part of the buffer when the offset for the reply
+         * that is currently being read is high enough. */
+        if (r->roff >= 1024) {
+            r->buf = sdsrange(r->buf,r->roff,-1);
+            r->pos -= r->roff;
+            r->roff = 0;
+            r->len = sdslen(r->buf);
         }
 
         newbuf = sdscatlen(r->buf,buf,len);
@@ -633,6 +657,7 @@ int redisReaderGetReply(redisReader *r, void **reply) {
         r->rstack[0].parent = NULL;
         r->rstack[0].privdata = r->privdata;
         r->ridx = 0;
+        r->roff = r->pos; /* Start offset in buffer. */
     }
 
     /* Process items in reply. */
@@ -644,14 +669,6 @@ int redisReaderGetReply(redisReader *r, void **reply) {
     if (r->err)
         return REDIS_ERR;
 
-    /* Discard part of the buffer when we've consumed at least 1k, to avoid
-     * doing unnecessary calls to memmove() in sds.c. */
-    if (r->pos >= 1024) {
-        r->buf = sdsrange(r->buf,r->pos,-1);
-        r->pos = 0;
-        r->len = sdslen(r->buf);
-    }
-
     /* Emit a reply when there is one. */
     if (r->ridx == -1) {
         if (reply != NULL)
@@ -659,6 +676,17 @@ int redisReaderGetReply(redisReader *r, void **reply) {
         r->reply = NULL;
     }
     return REDIS_OK;
+}
+
+const char *redisReaderGetRaw(redisReader *r, size_t *len) {
+    /* ridx == -1: No or a full reply has been read. */
+    /* pos > roff: Buffer position is larger than start offset, meaning
+     *   the buffer has not yet been truncated. */
+    if (r->ridx == -1 && r->pos > r->roff) {
+        if (len) *len = (r->pos-r->roff);
+        return r->buf+r->roff;
+    }
+    return NULL;
 }
 
 /* Calculate the number of bytes needed to represent an integer as string. */
