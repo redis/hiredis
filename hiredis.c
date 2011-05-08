@@ -690,6 +690,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     int argc = 0;
     int totlen = 0;
     int j;
+    char lastquote = 0;
 
     /* Abort if there is not target to set */
     if (target == NULL)
@@ -702,7 +703,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     while(*c != '\0') {
         if (*c != '%' || c[1] == '\0') {
-            if (*c == ' ') {
+            if (*c == ' ' && lastquote == 0) {
                 if (touched) {
                     newargv = realloc(curargv,sizeof(char*)*(argc+1));
                     if (newargv == NULL) goto err;
@@ -715,6 +716,8 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     if (curarg == NULL) goto err;
                     touched = 0;
                 }
+            } else if ((*c == '\"' || *c == '\'') && (lastquote == 0 || lastquote == *c)) {
+                lastquote ^= *c;
             } else {
                 newarg = sdscatlen(curarg,c,1);
                 if (newarg == NULL) goto err;
