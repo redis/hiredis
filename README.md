@@ -116,6 +116,12 @@ Note that this function will take care of freeing sub-replies objects
 contained in arrays and nested arrays, so there is no need for the user to
 free the sub replies (it is actually harmful and will corrupt the memory).
 
+**Important:** the current version of hiredis (0.10.0) free's replies when the
+asynchronous API is used. This means you should not call `freeReplyObject` when
+you use this API. The reply is cleaned up by hiredis _after_ the callback
+returns. This behavior will probably change in future releases, so make sure to
+keep an eye on the changelog when upgrading (see issue #39).
+
 ### Cleaning up
 
 To disconnect and free the context the following function can be used:
