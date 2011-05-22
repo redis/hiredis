@@ -10,6 +10,24 @@
 
 #include "hiredis.h"
 
+enum connection_type {
+    CONN_TCP,
+    CONN_UNIX
+};
+
+struct config {
+    enum connection_type type;
+
+    struct {
+        const char *host;
+        int port;
+    } tcp;
+
+    struct {
+        const char *path;
+    } unix;
+};
+
 /* The following lines make up our testing "framework" :) */
 static int tests = 0, fails = 0;
 #define test(_s) { printf("#%02d ", ++tests); printf(_s); }
@@ -21,16 +39,60 @@ static long long usec(void) {
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
-static int use_unix = 0;
-static int port = 6379;
-static redisContext *blocking_context = NULL;
-static void __connect(redisContext **target) {
-    *target = blocking_context = (use_unix ?
-        redisConnectUnix("/tmp/redis.sock") : redisConnect((char*)"127.0.0.1", port));
-    if (blocking_context->err) {
-        printf("Connection error: %s\n", blocking_context->errstr);
+static redisContext *select_database(redisContext *c) {
+    redisReply *reply;
+
+    /* Switch to DB 9 for testing, now that we know we can chat. */
+    reply = redisCommand(c,"SELECT 9");
+    assert(reply != NULL);
+    freeReplyObject(reply);
+
+    /* Make sure the DB is emtpy */
+    reply = redisCommand(c,"DBSIZE");
+    assert(reply != NULL);
+    if (reply->type == REDIS_REPLY_INTEGER && reply->integer == 0) {
+        /* Awesome, DB 9 is empty and we can continue. */
+        freeReplyObject(reply);
+    } else {
+        printf("Database #9 is not empty, test can not continue\n");
         exit(1);
     }
+
+    return c;
+}
+
+static void disconnect(redisContext *c) {
+    redisReply *reply;
+
+    /* Make sure we're on DB 9. */
+    reply = redisCommand(c,"SELECT 9");
+    assert(reply != NULL);
+    freeReplyObject(reply);
+    reply = redisCommand(c,"FLUSHDB");
+    assert(reply != NULL);
+    freeReplyObject(reply);
+
+    /* Free the context as well. */
+    redisFree(c);
+}
+
+static redisContext *connect(struct config config) {
+    redisContext *c;
+
+    if (config.type == CONN_TCP) {
+        c = redisConnect(config.tcp.host, config.tcp.port);
+    } else if (config.type == CONN_UNIX) {
+        c = redisConnectUnix(config.unix.path);
+    } else {
+        assert(NULL);
+    }
+
+    if (c->err) {
+        printf("Connection error: %s\n", c->errstr);
+        exit(1);
+    }
+
+    return select_database(c);
 }
 
 static void test_format_commands(void) {
@@ -121,151 +183,6 @@ static void test_format_commands(void) {
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(7+2)+4+(3+2));
     free(cmd);
-}
-
-static void test_blocking_connection(void) {
-    redisContext *c;
-    redisReply *reply;
-    int major, minor;
-
-    test("Returns error when host cannot be resolved: ");
-    c = redisConnect((char*)"idontexist.local", port);
-    test_cond(c->err == REDIS_ERR_OTHER &&
-        strcmp(c->errstr,"Can't resolve: idontexist.local") == 0);
-    redisFree(c);
-
-    test("Returns error when the port is not open: ");
-    c = redisConnect((char*)"localhost", 56380);
-    test_cond(c->err == REDIS_ERR_IO &&
-        strcmp(c->errstr,"Connection refused") == 0);
-    redisFree(c);
-
-    __connect(&c);
-    test("Is able to deliver commands: ");
-    reply = redisCommand(c,"PING");
-    test_cond(reply->type == REDIS_REPLY_STATUS &&
-        strcasecmp(reply->str,"pong") == 0)
-    freeReplyObject(reply);
-
-    /* Switch to DB 9 for testing, now that we know we can chat. */
-    reply = redisCommand(c,"SELECT 9");
-    freeReplyObject(reply);
-
-    /* Make sure the DB is emtpy */
-    reply = redisCommand(c,"DBSIZE");
-    if (reply->type != REDIS_REPLY_INTEGER || reply->integer != 0) {
-        printf("Database #9 is not empty, test can not continue\n");
-        exit(1);
-    }
-    freeReplyObject(reply);
-
-    test("Is a able to send commands verbatim: ");
-    reply = redisCommand(c,"SET foo bar");
-    test_cond (reply->type == REDIS_REPLY_STATUS &&
-        strcasecmp(reply->str,"ok") == 0)
-    freeReplyObject(reply);
-
-    test("%%s String interpolation works: ");
-    reply = redisCommand(c,"SET %s %s","foo","hello world");
-    freeReplyObject(reply);
-    reply = redisCommand(c,"GET foo");
-    test_cond(reply->type == REDIS_REPLY_STRING &&
-        strcmp(reply->str,"hello world") == 0);
-    freeReplyObject(reply);
-
-    test("%%b String interpolation works: ");
-    reply = redisCommand(c,"SET %b %b","foo",3,"hello\x00world",11);
-    freeReplyObject(reply);
-    reply = redisCommand(c,"GET foo");
-    test_cond(reply->type == REDIS_REPLY_STRING &&
-        memcmp(reply->str,"hello\x00world",11) == 0)
-
-    test("Binary reply length is correct: ");
-    test_cond(reply->len == 11)
-    freeReplyObject(reply);
-
-    test("Can parse nil replies: ");
-    reply = redisCommand(c,"GET nokey");
-    test_cond(reply->type == REDIS_REPLY_NIL)
-    freeReplyObject(reply);
-
-    /* test 7 */
-    test("Can parse integer replies: ");
-    reply = redisCommand(c,"INCR mycounter");
-    test_cond(reply->type == REDIS_REPLY_INTEGER && reply->integer == 1)
-    freeReplyObject(reply);
-
-    test("Can parse multi bulk replies: ");
-    freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
-    freeReplyObject(redisCommand(c,"LPUSH mylist bar"));
-    reply = redisCommand(c,"LRANGE mylist 0 -1");
-    test_cond(reply->type == REDIS_REPLY_ARRAY &&
-              reply->elements == 2 &&
-              !memcmp(reply->element[0]->str,"bar",3) &&
-              !memcmp(reply->element[1]->str,"foo",3))
-    freeReplyObject(reply);
-
-    /* m/e with multi bulk reply *before* other reply.
-     * specifically test ordering of reply items to parse. */
-    test("Can handle nested multi bulk replies: ");
-    freeReplyObject(redisCommand(c,"MULTI"));
-    freeReplyObject(redisCommand(c,"LRANGE mylist 0 -1"));
-    freeReplyObject(redisCommand(c,"PING"));
-    reply = (redisCommand(c,"EXEC"));
-    test_cond(reply->type == REDIS_REPLY_ARRAY &&
-              reply->elements == 2 &&
-              reply->element[0]->type == REDIS_REPLY_ARRAY &&
-              reply->element[0]->elements == 2 &&
-              !memcmp(reply->element[0]->element[0]->str,"bar",3) &&
-              !memcmp(reply->element[0]->element[1]->str,"foo",3) &&
-              reply->element[1]->type == REDIS_REPLY_STATUS &&
-              strcasecmp(reply->element[1]->str,"pong") == 0);
-    freeReplyObject(reply);
-
-    {
-        /* Find out Redis version to determine the path for the next test */
-        const char *field = "redis_version:";
-        char *p, *eptr;
-
-        reply = redisCommand(c,"INFO");
-        p = strstr(reply->str,field);
-        major = strtol(p+strlen(field),&eptr,10);
-        p = eptr+1; /* char next to the first "." */
-        minor = strtol(p,&eptr,10);
-        freeReplyObject(reply);
-    }
-
-    test("Returns I/O error when the connection is lost: ");
-    reply = redisCommand(c,"QUIT");
-    if (major >= 2 && minor > 0) {
-        /* > 2.0 returns OK on QUIT and read() should be issued once more
-         * to know the descriptor is at EOF. */
-        test_cond(strcasecmp(reply->str,"OK") == 0 &&
-            redisGetReply(c,(void**)&reply) == REDIS_ERR);
-        freeReplyObject(reply);
-    } else {
-        test_cond(reply == NULL);
-    }
-
-    /* On 2.0, QUIT will cause the connection to be closed immediately and
-     * the read(2) for the reply on QUIT will set the error to EOF.
-     * On >2.0, QUIT will return with OK and another read(2) needed to be
-     * issued to find out the socket was closed by the server. In both
-     * conditions, the error will be set to EOF. */
-    assert(c->err == REDIS_ERR_EOF &&
-        strcmp(c->errstr,"Server closed the connection") == 0);
-    redisFree(c);
-
-    __connect(&c);
-    test("Returns I/O error on socket timeout: ");
-    struct timeval tv = { 0, 1000 };
-    assert(redisSetTimeout(c,tv) == REDIS_OK);
-    test_cond(redisGetReply(c,(void**)&reply) == REDIS_ERR &&
-        c->err == REDIS_ERR_IO && errno == EAGAIN);
-    redisFree(c);
-
-    /* Context should be connected */
-    __connect(&c);
 }
 
 static void test_reply_reader(void) {
@@ -424,11 +341,160 @@ static void test_reader_functions(void) {
     redisReaderFree(reader);
 }
 
-static void test_throughput(void) {
+static void test_blocking_connection_errors(void) {
+    redisContext *c;
+
+    test("Returns error when host cannot be resolved: ");
+    c = redisConnect((char*)"idontexist.local", 6379);
+    test_cond(c->err == REDIS_ERR_OTHER &&
+        strcmp(c->errstr,"Can't resolve: idontexist.local") == 0);
+    redisFree(c);
+
+    test("Returns error when the port is not open: ");
+    c = redisConnect((char*)"localhost", 1);
+    test_cond(c->err == REDIS_ERR_IO &&
+        strcmp(c->errstr,"Connection refused") == 0);
+    redisFree(c);
+
+    test("Returns error when the unix socket path doesn't accept connections: ");
+    c = redisConnectUnix((char*)"/tmp/idontexist.sock");
+    test_cond(c->err == REDIS_ERR_IO); /* Don't care about the message... */
+    redisFree(c);
+}
+
+static void test_blocking_connection(struct config config) {
+    redisContext *c;
+    redisReply *reply;
+
+    c = connect(config);
+
+    test("Is able to deliver commands: ");
+    reply = redisCommand(c,"PING");
+    test_cond(reply->type == REDIS_REPLY_STATUS &&
+        strcasecmp(reply->str,"pong") == 0)
+    freeReplyObject(reply);
+
+    test("Is a able to send commands verbatim: ");
+    reply = redisCommand(c,"SET foo bar");
+    test_cond (reply->type == REDIS_REPLY_STATUS &&
+        strcasecmp(reply->str,"ok") == 0)
+    freeReplyObject(reply);
+
+    test("%%s String interpolation works: ");
+    reply = redisCommand(c,"SET %s %s","foo","hello world");
+    freeReplyObject(reply);
+    reply = redisCommand(c,"GET foo");
+    test_cond(reply->type == REDIS_REPLY_STRING &&
+        strcmp(reply->str,"hello world") == 0);
+    freeReplyObject(reply);
+
+    test("%%b String interpolation works: ");
+    reply = redisCommand(c,"SET %b %b","foo",3,"hello\x00world",11);
+    freeReplyObject(reply);
+    reply = redisCommand(c,"GET foo");
+    test_cond(reply->type == REDIS_REPLY_STRING &&
+        memcmp(reply->str,"hello\x00world",11) == 0)
+
+    test("Binary reply length is correct: ");
+    test_cond(reply->len == 11)
+    freeReplyObject(reply);
+
+    test("Can parse nil replies: ");
+    reply = redisCommand(c,"GET nokey");
+    test_cond(reply->type == REDIS_REPLY_NIL)
+    freeReplyObject(reply);
+
+    /* test 7 */
+    test("Can parse integer replies: ");
+    reply = redisCommand(c,"INCR mycounter");
+    test_cond(reply->type == REDIS_REPLY_INTEGER && reply->integer == 1)
+    freeReplyObject(reply);
+
+    test("Can parse multi bulk replies: ");
+    freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
+    freeReplyObject(redisCommand(c,"LPUSH mylist bar"));
+    reply = redisCommand(c,"LRANGE mylist 0 -1");
+    test_cond(reply->type == REDIS_REPLY_ARRAY &&
+              reply->elements == 2 &&
+              !memcmp(reply->element[0]->str,"bar",3) &&
+              !memcmp(reply->element[1]->str,"foo",3))
+    freeReplyObject(reply);
+
+    /* m/e with multi bulk reply *before* other reply.
+     * specifically test ordering of reply items to parse. */
+    test("Can handle nested multi bulk replies: ");
+    freeReplyObject(redisCommand(c,"MULTI"));
+    freeReplyObject(redisCommand(c,"LRANGE mylist 0 -1"));
+    freeReplyObject(redisCommand(c,"PING"));
+    reply = (redisCommand(c,"EXEC"));
+    test_cond(reply->type == REDIS_REPLY_ARRAY &&
+              reply->elements == 2 &&
+              reply->element[0]->type == REDIS_REPLY_ARRAY &&
+              reply->element[0]->elements == 2 &&
+              !memcmp(reply->element[0]->element[0]->str,"bar",3) &&
+              !memcmp(reply->element[0]->element[1]->str,"foo",3) &&
+              reply->element[1]->type == REDIS_REPLY_STATUS &&
+              strcasecmp(reply->element[1]->str,"pong") == 0);
+    freeReplyObject(reply);
+
+    disconnect(c);
+}
+
+static void test_blocking_io_errors(struct config config) {
+    redisContext *c;
+    redisReply *reply;
+    int major, minor;
+
+    /* Connect to target given by config. */
+    c = connect(config);
+    {
+        /* Find out Redis version to determine the path for the next test */
+        const char *field = "redis_version:";
+        char *p, *eptr;
+
+        reply = redisCommand(c,"INFO");
+        p = strstr(reply->str,field);
+        major = strtol(p+strlen(field),&eptr,10);
+        p = eptr+1; /* char next to the first "." */
+        minor = strtol(p,&eptr,10);
+        freeReplyObject(reply);
+    }
+
+    test("Returns I/O error when the connection is lost: ");
+    reply = redisCommand(c,"QUIT");
+    if (major >= 2 && minor > 0) {
+        /* > 2.0 returns OK on QUIT and read() should be issued once more
+         * to know the descriptor is at EOF. */
+        test_cond(strcasecmp(reply->str,"OK") == 0 &&
+            redisGetReply(c,(void**)&reply) == REDIS_ERR);
+        freeReplyObject(reply);
+    } else {
+        test_cond(reply == NULL);
+    }
+
+    /* On 2.0, QUIT will cause the connection to be closed immediately and
+     * the read(2) for the reply on QUIT will set the error to EOF.
+     * On >2.0, QUIT will return with OK and another read(2) needed to be
+     * issued to find out the socket was closed by the server. In both
+     * conditions, the error will be set to EOF. */
+    assert(c->err == REDIS_ERR_EOF &&
+        strcmp(c->errstr,"Server closed the connection") == 0);
+    redisFree(c);
+
+    c = connect(config);
+    test("Returns I/O error on socket timeout: ");
+    struct timeval tv = { 0, 1000 };
+    assert(redisSetTimeout(c,tv) == REDIS_OK);
+    test_cond(redisGetReply(c,(void**)&reply) == REDIS_ERR &&
+        c->err == REDIS_ERR_IO && errno == EAGAIN);
+    redisFree(c);
+}
+
+static void test_throughput(struct config config) {
+    redisContext *c = connect(config);
+    redisReply **replies;
     int i, num;
     long long t1, t2;
-    redisContext *c = blocking_context;
-    redisReply **replies;
 
     test("Throughput:\n");
     for (i = 0; i < 500; i++)
@@ -485,18 +551,8 @@ static void test_throughput(void) {
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
     free(replies);
     printf("\t(%dx LRANGE with 500 elements (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
-}
 
-static void cleanup(void) {
-    redisContext *c = blocking_context;
-    redisReply *reply;
-
-    /* Make sure we're on DB 9 */
-    reply = redisCommand(c,"SELECT 9");
-    assert(reply != NULL); freeReplyObject(reply);
-    reply = redisCommand(c,"FLUSHDB");
-    assert(reply != NULL); freeReplyObject(reply);
-    redisFree(c);
+    disconnect(c);
 }
 
 // static long __test_callback_flags = 0;
@@ -599,21 +655,54 @@ static void cleanup(void) {
 // }
 
 int main(int argc, char **argv) {
-    if (argc > 1) {
-        if (strcmp(argv[1],"-s") == 0)
-            use_unix = 1;
-        if ((strcmp(argv[1],"-p") == 0) && (argc == 3))
-            port = atoi(argv[2]);
+    struct config cfg = {
+        .tcp = {
+            .host = "127.0.0.1",
+            .port = 6379
+        },
+        .unix = {
+            .path = "/tmp/redis.sock"
+        }
+    };
+
+    /* Ignore broken pipe signal (for I/O error tests). */
+    signal(SIGPIPE, SIG_IGN);
+
+    /* Parse command line options. */
+    argv++; argc--;
+    while (argc) {
+        if (argc >= 2 && !strcmp(argv[0],"-h")) {
+            argv++; argc--;
+            cfg.tcp.host = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0],"-p")) {
+            argv++; argc--;
+            cfg.tcp.port = atoi(argv[0]);
+        } else if (argc >= 2 && !strcmp(argv[0],"-s")) {
+            argv++; argc--;
+            cfg.unix.path = argv[0];
+        } else {
+            fprintf(stderr, "Invalid argument: %s\n", argv[0]);
+            exit(1);
+        }
+        argv++; argc--;
     }
 
-    signal(SIGPIPE, SIG_IGN);
     test_format_commands();
     test_reply_reader();
     test_reader_functions();
-    test_blocking_connection();
-    // test_nonblocking_connection();
-    test_throughput();
-    cleanup();
+    test_blocking_connection_errors();
+
+    printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
+    cfg.type = CONN_TCP;
+    test_blocking_connection(cfg);
+    test_blocking_io_errors(cfg);
+    test_throughput(cfg);
+
+    printf("\nTesting against Unix socket connection (%s):\n", cfg.unix.path);
+    cfg.type = CONN_UNIX;
+    test_blocking_connection(cfg);
+    test_blocking_io_errors(cfg);
+    test_throughput(cfg);
 
     if (fails == 0) {
         printf("ALL TESTS PASSED\n");
