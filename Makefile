@@ -106,10 +106,15 @@ test: hiredis-test
 	./hiredis-test
 
 check: hiredis-test
-	echo "daemonize yes\n pidfile /tmp/redis-check.pid\n port 56379" \
-		| redis-server -
-	./hiredis-test -p 56379 || (kill `cat /tmp/redis-check.pid` && false)
-	kill `cat /tmp/redis-check.pid`
+	echo \
+		"daemonize yes\n" \
+		"pidfile /tmp/hiredis-test-redis.pid\n" \
+		"port 56379\n" \
+		"bind 127.0.0.1\n" \
+		"unixsocket /tmp/hiredis-test-redis.sock" \
+			| redis-server -
+	./hiredis-test -h 127.0.0.1 -p 56379 -s /tmp/hiredis-test-redis.sock || true
+	kill `cat /tmp/hiredis-test-redis.pid`
 
 .c.o:
 	$(CC) -std=c99 -pedantic -c $(CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
