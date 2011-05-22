@@ -22,10 +22,11 @@ static long long usec(void) {
 }
 
 static int use_unix = 0;
+static int port = 6379;
 static redisContext *blocking_context = NULL;
 static void __connect(redisContext **target) {
     *target = blocking_context = (use_unix ?
-        redisConnectUnix("/tmp/redis.sock") : redisConnect((char*)"127.0.0.1", 6379));
+        redisConnectUnix("/tmp/redis.sock") : redisConnect((char*)"127.0.0.1", port));
     if (blocking_context->err) {
         printf("Connection error: %s\n", blocking_context->errstr);
         exit(1);
@@ -128,7 +129,7 @@ static void test_blocking_connection(void) {
     int major, minor;
 
     test("Returns error when host cannot be resolved: ");
-    c = redisConnect((char*)"idontexist.local", 6379);
+    c = redisConnect((char*)"idontexist.local", port);
     test_cond(c->err == REDIS_ERR_OTHER &&
         strcmp(c->errstr,"Can't resolve: idontexist.local") == 0);
     redisFree(c);
@@ -517,7 +518,7 @@ static void cleanup(void) {
 // static redisContext *__connect_nonblock() {
 //     /* Reset callback flags */
 //     __test_callback_flags = 0;
-//     return redisConnectNonBlock("127.0.0.1", 6379, NULL);
+//     return redisConnectNonBlock("127.0.0.1", port, NULL);
 // }
 //
 // static void test_nonblocking_connection() {
@@ -601,6 +602,8 @@ int main(int argc, char **argv) {
     if (argc > 1) {
         if (strcmp(argv[1],"-s") == 0)
             use_unix = 1;
+        if ((strcmp(argv[1],"-p") == 0) && (argc == 3))
+            port = atoi(argv[2]);
     }
 
     signal(SIGPIPE, SIG_IGN);
