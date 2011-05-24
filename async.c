@@ -362,12 +362,12 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
          * get a reply before pub/sub messages arrive. */
         if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
             // error reply before any callbacks were setup
-            if ( ((redisReply*)reply)->type == REDIS_REPLY_ERROR ) {                                                                   
-                c->err = REDIS_ERR_OTHER;                                                                                              
-                err_len = strlen(((redisReply*)reply)->str);                                                                           
-                err_len = err_len < (sizeof(c->errstr)-1) ? err_len : (sizeof(c->errstr)-1);                                           
-                memcpy(c->errstr, ((redisReply*)reply)->str, err_len);                                                                 
-                c->errstr[err_len] = '\0';                                                                                             
+            if ( !(c->flags & REDIS_SUBSCRIBED) && ((redisReply*)reply)->type == REDIS_REPLY_ERROR ) {
+                c->err = REDIS_ERR_OTHER;
+                err_len = strlen(((redisReply*)reply)->str);
+                err_len = err_len < (sizeof(c->errstr)-1) ? err_len : (sizeof(c->errstr)-1);
+                memcpy(c->errstr, ((redisReply*)reply)->str, err_len);
+                c->errstr[err_len] = '\0';
                 __redisAsyncDisconnect(ac);
                 return;
             }
