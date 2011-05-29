@@ -113,7 +113,8 @@ check: hiredis-test
 		"bind 127.0.0.1\n" \
 		"unixsocket /tmp/hiredis-test-redis.sock" \
 			| redis-server -
-	./hiredis-test -h 127.0.0.1 -p 56379 -s /tmp/hiredis-test-redis.sock || true
+	./hiredis-test -h 127.0.0.1 -p 56379 -s /tmp/hiredis-test-redis.sock || \
+			( kill `cat /tmp/hiredis-test-redis.pid` && false )
 	kill `cat /tmp/hiredis-test-redis.pid`
 
 .c.o:

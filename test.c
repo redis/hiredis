@@ -704,10 +704,11 @@ int main(int argc, char **argv) {
     test_blocking_io_errors(cfg);
     test_throughput(cfg);
 
-    if (fails == 0) {
-        printf("ALL TESTS PASSED\n");
-    } else {
+    if (fails) {
         printf("*** %d TESTS FAILED ***\n", fails);
+        return 1;
     }
+
+    printf("ALL TESTS PASSED\n");
     return 0;
 }
