@@ -77,7 +77,7 @@ void freeReplyObject(void *reply) {
     case REDIS_REPLY_INTEGER:
         break; /* Nothing to free */
     case REDIS_REPLY_ARRAY:
-        if (r->elements > 0 && r->element != NULL) {
+        if (r->element != NULL) {
             for (j = 0; j < r->elements; j++)
                 if (r->element[j] != NULL)
                     freeReplyObject(r->element[j]);
@@ -133,10 +133,12 @@ static void *createArrayObject(const redisReadTask *task, int elements) {
     if (r == NULL)
         return NULL;
 
-    r->element = calloc(elements,sizeof(redisReply*));
-    if (r->element == NULL) {
-        freeReplyObject(r);
-        return NULL;
+    if (elements > 0) {
+        r->element = calloc(elements,sizeof(redisReply*));
+        if (r->element == NULL) {
+            freeReplyObject(r);
+            return NULL;
+        }
     }
 
     r->elements = elements;

@@ -247,6 +247,18 @@ static void test_reply_reader(void) {
     assert(ret == REDIS_ERR);
     ret = redisReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_ERR && reply == NULL);
+    redisReaderFree(reader);
+
+    /* Regression test for issue #45 on GitHub. */
+    test("Don't do empty allocation for empty multi bulk: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader,(char*)"*0\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
+        ((redisReply*)reply)->elements == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void *test_create_string(const redisReadTask *task, char *str, size_t len) {
