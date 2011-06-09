@@ -664,6 +664,7 @@ int main(int argc, char **argv) {
             .path = "/tmp/redis.sock"
         }
     };
+    int throughput = 1;
 
     /* Ignore broken pipe signal (for I/O error tests). */
     signal(SIGPIPE, SIG_IGN);
@@ -680,6 +681,8 @@ int main(int argc, char **argv) {
         } else if (argc >= 2 && !strcmp(argv[0],"-s")) {
             argv++; argc--;
             cfg.unix.path = argv[0];
+        } else if (argc >= 1 && !strcmp(argv[0],"--skip-throughput")) {
+            throughput = 0;
         } else {
             fprintf(stderr, "Invalid argument: %s\n", argv[0]);
             exit(1);
@@ -696,13 +699,13 @@ int main(int argc, char **argv) {
     cfg.type = CONN_TCP;
     test_blocking_connection(cfg);
     test_blocking_io_errors(cfg);
-    test_throughput(cfg);
+    if (throughput) test_throughput(cfg);
 
     printf("\nTesting against Unix socket connection (%s):\n", cfg.unix.path);
     cfg.type = CONN_UNIX;
     test_blocking_connection(cfg);
     test_blocking_io_errors(cfg);
-    test_throughput(cfg);
+    if (throughput) test_throughput(cfg);
 
     if (fails) {
         printf("*** %d TESTS FAILED ***\n", fails);
