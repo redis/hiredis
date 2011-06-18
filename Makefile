@@ -9,6 +9,9 @@ LIBNAME=libhiredis
 HIREDIS_MAJOR=0
 HIREDIS_MINOR=10
 
+# Fallback to gcc when $CC is not in $PATH.
+CC:=$(shell sh -c 'type $(CC) 2>/dev/null 1>/dev/null && echo $(CC) || echo gcc')
+
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 OPTIMIZATION?=-O3
 ifeq ($(uname_S),SunOS)
@@ -48,7 +51,7 @@ else
   DYLIB_MINOR_NAME?=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR).$(HIREDIS_MINOR)
   DYLIB_MAJOR_NAME?=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR)
   DYLIBNAME?=$(LIBNAME).$(DYLIBSUFFIX)
-  DYLIB_MAKE_CMD?=gcc -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
+  DYLIB_MAKE_CMD?=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
   STLIBNAME?=$(LIBNAME).$(STLIBSUFFIX)
   STLIB_MAKE_CMD?=ar rcs $(STLIBNAME)
   INSTALL= cp -a
