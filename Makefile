@@ -13,8 +13,9 @@ HIREDIS_MINOR=10
 # Fallback to gcc when $CC is not in $PATH.
 CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
 OPTIMIZATION?=-O3
-CFLAGS=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
-LDFLAGS=
+WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings
+REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(ARCH) $(PROF)
+REAL_LDFLAGS=$(LDFLAGS)
 DEBUG?= -g -ggdb
 
 DYLIBSUFFIX=so
@@ -28,7 +29,7 @@ STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 ifeq ($(uname_S),SunOS)
-  LDFLAGS=-ldl -lnsl -lsocket
+  LDFLAGS+=-ldl -lnsl -lsocket
   DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME)
   STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
   INSTALL= cp -r
@@ -66,10 +67,10 @@ static: $(STLIBNAME)
 
 # Binaries:
 hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $(DEBUG) $(LDFLAGS) -levent example-libevent.c $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(DEBUG) $(REAL_LDFLAGS) -levent example-libevent.c $(STLIBNAME)
 
 hiredis-example-libev: example-libev.c adapters/libev.h $(STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $(DEBUG) $(LDFLAGS) -lev example-libev.c $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(DEBUG) $(REAL_LDFLAGS) -lev example-libev.c $(STLIBNAME)
 
 ifndef AE_DIR
 hiredis-example-ae:
@@ -77,11 +78,11 @@ hiredis-example-ae:
 	@false
 else
 hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $(DEBUG) -I$(AE_DIR) $(LDFLAGS) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(DEBUG) -I$(AE_DIR) $(REAL_LDFLAGS) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
 endif
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) -o $@ $(CFLAGS) $(DEBUG) $(LDFLAGS) $< $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(DEBUG) $(REAL_LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
 	./hiredis-test
@@ -99,7 +100,7 @@ check: hiredis-test
 	kill `cat /tmp/hiredis-test-redis.pid`
 
 .c.o:
-	$(CC) -std=c99 -pedantic -c $(CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
+	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
 
 clean:
 	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
