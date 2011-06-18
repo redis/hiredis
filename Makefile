@@ -13,7 +13,7 @@ HIREDIS_MINOR=10
 # Fallback to gcc when $CC is not in $PATH.
 CC:=$(shell sh -c 'type $(CC) 2>/dev/null 1>/dev/null && echo $(CC) || echo gcc')
 OPTIMIZATION?=-O3
-CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
+CFLAGS=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
 LDFLAGS=
 DEBUG?= -g -ggdb
 
@@ -28,7 +28,7 @@ STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 ifeq ($(uname_S),SunOS)
-  LDFLAGS?=-ldl -lnsl -lsocket
+  LDFLAGS=-ldl -lnsl -lsocket
   DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME)
   STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
   INSTALL= cp -r
