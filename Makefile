@@ -12,24 +12,29 @@ HIREDIS_MINOR=10
 
 # Fallback to gcc when $CC is not in $PATH.
 CC:=$(shell sh -c 'type $(CC) 2>/dev/null 1>/dev/null && echo $(CC) || echo gcc')
+OPTIMIZATION?=-O3
+CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
+LDFLAGS=
+DEBUG?= -g -ggdb
+
+DYLIBSUFFIX=so
+STLIBSUFFIX=a
+DYLIB_MINOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR).$(HIREDIS_MINOR)
+DYLIB_MAJOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR)
+DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
+DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
+STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
+STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
+INSTALL= cp -a
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
-OPTIMIZATION?=-O3
 ifeq ($(uname_S),SunOS)
-  CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W $(ARCH) $(PROF)
   LDFLAGS?=-ldl -lnsl -lsocket
-  DYLIBSUFFIX=so
-  STLIBSUFFIX=a
-  DYLIB_MINOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR).$(HIREDIS_MINOR)
-  DYLIB_MAJOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR)
-  DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
   DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME)
-  STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
   STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
   INSTALL= cp -r
-else
+endif
 ifeq ($(uname_S),Darwin)
-  CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
   OBJARCH?=-arch i386 -arch x86_64
   DYLIBSUFFIX=dylib
   STLIBSUFFIX=a
@@ -39,22 +44,7 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAKE_CMD=libtool -dynamic -o $(DYLIBNAME) -install_name $(DYLIB_MINOR_NAME) -lm $(DEBUG) -
   STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
   STLIB_MAKE_CMD=libtool -static -o $(STLIBNAME) -
-  INSTALL= cp -a
-else
-  CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
-  DYLIBSUFFIX=so
-  STLIBSUFFIX=a
-  DYLIB_MINOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR).$(HIREDIS_MINOR)
-  DYLIB_MAJOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR)
-  DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
-  DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
-  STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
-  STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
-  INSTALL= cp -a
 endif
-endif
-
-DEBUG?= -g -ggdb
 
 PREFIX?=/usr/local
 INCLUDE_PATH?=include/hiredis
