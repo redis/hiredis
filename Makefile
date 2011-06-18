@@ -14,9 +14,9 @@ HIREDIS_MINOR=10
 CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
 OPTIMIZATION?=-O3
 WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings
-REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(ARCH) $(PROF)
-REAL_LDFLAGS=$(LDFLAGS)
 DEBUG?= -g -ggdb
+REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(ARCH) $(PROF) $(DEBUG)
+REAL_LDFLAGS=$(LDFLAGS)
 
 DYLIBSUFFIX=so
 STLIBSUFFIX=a
@@ -67,10 +67,10 @@ static: $(STLIBNAME)
 
 # Binaries:
 hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(DEBUG) $(REAL_LDFLAGS) -levent example-libevent.c $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -levent example-libevent.c $(STLIBNAME)
 
 hiredis-example-libev: example-libev.c adapters/libev.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(DEBUG) $(REAL_LDFLAGS) -lev example-libev.c $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -lev example-libev.c $(STLIBNAME)
 
 ifndef AE_DIR
 hiredis-example-ae:
@@ -78,11 +78,11 @@ hiredis-example-ae:
 	@false
 else
 hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(DEBUG) -I$(AE_DIR) $(REAL_LDFLAGS) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) -I$(AE_DIR) $(REAL_LDFLAGS) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
 endif
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(DEBUG) $(REAL_LDFLAGS) $< $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
 	./hiredis-test
@@ -100,7 +100,7 @@ check: hiredis-test
 	kill `cat /tmp/hiredis-test-redis.pid`
 
 .c.o:
-	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $(OBJARCH) $(DEBUG) $(COMPILE_TIME) $<
+	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $(OBJARCH) $(COMPILE_TIME) $<
 
 clean:
 	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
