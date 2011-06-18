@@ -1,5 +1,6 @@
 # Hiredis Makefile
-# Copyright (C) 2010 Salvatore Sanfilippo <antirez at gmail dot com>
+# Copyright (C) 2010-2011 Salvatore Sanfilippo <antirez at gmail dot com>
+# Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
 OBJ=net.o hiredis.o sds.o async.o
