@@ -16,7 +16,7 @@ uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 OPTIMIZATION?=-O3
 ifeq ($(uname_S),SunOS)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -D__EXTENSIONS__ -D_XPG6 $(ARCH) $(PROF)
-  CCLINK?=-ldl -lnsl -lsocket -lm -lpthread
+  CCLINK?=-ldl -lnsl -lsocket
   LDFLAGS?=-L.
   DYLIBSUFFIX=so
   STLIBSUFFIX=a
@@ -30,7 +30,7 @@ ifeq ($(uname_S),SunOS)
 else
 ifeq ($(uname_S),Darwin)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
-  CCLINK?=-lm -pthread
+  CCLINK?=
   LDFLAGS?=-L.
   OBJARCH?=-arch i386 -arch x86_64
   DYLIBSUFFIX=dylib
@@ -44,7 +44,7 @@ ifeq ($(uname_S),Darwin)
   INSTALL= cp -a
 else
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
-  CCLINK?=-lm -pthread
+  CCLINK?=
   LDFLAGS?=-L.
   DYLIBSUFFIX=so
   STLIBSUFFIX=a
