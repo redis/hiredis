@@ -208,7 +208,10 @@ int redisContextConnectTcp(redisContext *c, const char *addr, int port, struct t
         if (redisSetBlocking(c,s,0) != REDIS_OK)
             goto error;
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
-            if (errno == EINPROGRESS && !blocking) {
+            if (errno == EHOSTUNREACH) {
+                close(s);
+                continue;
+            } else if (errno == EINPROGRESS && !blocking) {
                 /* This is ok. */
             } else {
                 if (redisContextWaitReady(c,s,timeout) != REDIS_OK)
