@@ -25,7 +25,6 @@ DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
 DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
-INSTALL= cp -a
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 ifeq ($(uname_S),SunOS)
@@ -45,12 +44,6 @@ ifeq ($(uname_S),Darwin)
   STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
   STLIB_MAKE_CMD=libtool -static -o $(STLIBNAME) -
 endif
-
-PREFIX?=/usr/local
-INCLUDE_PATH?=include/hiredis
-LIBRARY_PATH?=lib
-INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
-INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
 
 all: $(DYLIBNAME) $(BINS)
 
@@ -114,6 +107,19 @@ clean:
 dep:
 	$(CC) -MM *.c
 
+# Installation related variables and target
+PREFIX?=/usr/local
+INCLUDE_PATH?=include/hiredis
+LIBRARY_PATH?=lib
+INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
+INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
+
+ifeq ($(uname_S),SunOS)
+  INSTALL?= cp -r
+endif
+
+INSTALL?= cp -a
+
 install: $(DYLIBNAME) $(STLIBNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
 	$(INSTALL) hiredis.h async.h adapters $(INSTALL_INCLUDE_PATH)
@@ -121,7 +127,6 @@ install: $(DYLIBNAME) $(STLIBNAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MAJOR_NAME) $(DYLIBNAME)
 	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
-
 
 32bit:
 	@echo ""
