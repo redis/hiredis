@@ -142,3 +142,5 @@ gcov:
 
 noopt:
 	$(MAKE) OPTIMIZATION=""
+
+.PHONY: all test check clean dep install 32bit gprof gcov noopt
