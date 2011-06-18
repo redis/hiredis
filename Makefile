@@ -17,8 +17,7 @@ uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 OPTIMIZATION?=-O3
 ifeq ($(uname_S),SunOS)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W $(ARCH) $(PROF)
-  CCLINK?=-ldl -lnsl -lsocket
-  LDFLAGS?=-L.
+  LDFLAGS?=-ldl -lnsl -lsocket
   DYLIBSUFFIX=so
   STLIBSUFFIX=a
   DYLIB_MINOR_NAME?=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR).$(HIREDIS_MINOR)
@@ -31,8 +30,6 @@ ifeq ($(uname_S),SunOS)
 else
 ifeq ($(uname_S),Darwin)
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
-  CCLINK?=
-  LDFLAGS?=-L.
   OBJARCH?=-arch i386 -arch x86_64
   DYLIBSUFFIX=dylib
   STLIBSUFFIX=a
@@ -45,8 +42,6 @@ ifeq ($(uname_S),Darwin)
   INSTALL= cp -a
 else
   CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -Wstrict-prototypes -Wwrite-strings $(ARCH) $(PROF)
-  CCLINK?=
-  LDFLAGS?=-L.
   DYLIBSUFFIX=so
   STLIBSUFFIX=a
   DYLIB_MINOR_NAME?=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR).$(HIREDIS_MINOR)
@@ -59,7 +54,6 @@ else
 endif
 endif
 
-CCOPT= $(CFLAGS) $(CCLINK)
 DEBUG?= -g -ggdb
 
 PREFIX?=/usr/local
@@ -89,10 +83,10 @@ static: $(STLIBNAME)
 
 # Binaries:
 hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) -levent example-libevent.c $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $(DEBUG) $(LDFLAGS) -levent example-libevent.c $(STLIBNAME)
 
 hiredis-example-libev: example-libev.c adapters/libev.h $(STLIBNAME)
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) -lev example-libev.c $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $(DEBUG) $(LDFLAGS) -lev example-libev.c $(STLIBNAME)
 
 ifndef AE_DIR
 hiredis-example-ae:
@@ -100,11 +94,11 @@ hiredis-example-ae:
 	@false
 else
 hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
-	$(CC) -o $@ $(CCOPT) $(DEBUG) -I$(AE_DIR) $(LDFLAGS) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $(DEBUG) -I$(AE_DIR) $(LDFLAGS) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
 endif
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) -o $@ $(CCOPT) $(DEBUG) $(LDFLAGS) $< $(STLIBNAME)
+	$(CC) -o $@ $(CFLAGS) $(DEBUG) $(LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
 	./hiredis-test
