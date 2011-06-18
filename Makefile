@@ -16,7 +16,7 @@ CC:=$(shell sh -c 'type $(CC) 2>/dev/null 1>/dev/null && echo $(CC) || echo gcc'
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 OPTIMIZATION?=-O3
 ifeq ($(uname_S),SunOS)
-  CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W -D__EXTENSIONS__ -D_XPG6 $(ARCH) $(PROF)
+  CFLAGS?=$(OPTIMIZATION) -fPIC -Wall -W $(ARCH) $(PROF)
   CCLINK?=-ldl -lnsl -lsocket
   LDFLAGS?=-L.
   DYLIBSUFFIX=so
