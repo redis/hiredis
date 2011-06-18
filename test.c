@@ -77,7 +77,7 @@ static void disconnect(redisContext *c) {
 }
 
 static redisContext *connect(struct config config) {
-    redisContext *c;
+    redisContext *c = NULL;
 
     if (config.type == CONN_TCP) {
         c = redisConnect(config.tcp.host, config.tcp.port);
@@ -455,6 +455,7 @@ static void test_blocking_connection(struct config config) {
 static void test_blocking_io_errors(struct config config) {
     redisContext *c;
     redisReply *reply;
+    void *_reply;
     int major, minor;
 
     /* Connect to target given by config. */
@@ -478,7 +479,7 @@ static void test_blocking_io_errors(struct config config) {
         /* > 2.0 returns OK on QUIT and read() should be issued once more
          * to know the descriptor is at EOF. */
         test_cond(strcasecmp(reply->str,"OK") == 0 &&
-            redisGetReply(c,(void**)&reply) == REDIS_ERR);
+            redisGetReply(c,&_reply) == REDIS_ERR);
         freeReplyObject(reply);
     } else {
         test_cond(reply == NULL);
@@ -497,7 +498,7 @@ static void test_blocking_io_errors(struct config config) {
     test("Returns I/O error on socket timeout: ");
     struct timeval tv = { 0, 1000 };
     assert(redisSetTimeout(c,tv) == REDIS_OK);
-    test_cond(redisGetReply(c,(void**)&reply) == REDIS_ERR &&
+    test_cond(redisGetReply(c,&_reply) == REDIS_ERR &&
         c->err == REDIS_ERR_IO && errno == EAGAIN);
     redisFree(c);
 }
