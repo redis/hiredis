@@ -35,7 +35,6 @@ ifeq ($(uname_S),SunOS)
   INSTALL= cp -r
 endif
 ifeq ($(uname_S),Darwin)
-  OBJARCH?=-arch i386 -arch x86_64
   DYLIBSUFFIX=dylib
   STLIBSUFFIX=a
   DYLIB_MINOR_NAME=$(LIBNAME).$(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(DYLIBSUFFIX)
@@ -100,7 +99,7 @@ check: hiredis-test
 	kill `cat /tmp/hiredis-test-redis.pid`
 
 .c.o:
-	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $(OBJARCH) $(COMPILE_TIME) $<
+	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
 clean:
 	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
