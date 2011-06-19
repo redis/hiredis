@@ -131,7 +131,7 @@ install: $(DYLIBNAME) $(STLIBNAME)
 	$(MAKE) CFLAGS="-m32" LDFLAGS="-m32"
 
 gprof:
-	$(MAKE) CFLAGS="-pg"
+	$(MAKE) CFLAGS="-pg" LDFLAGS="-pg"
 
 gcov:
 	$(MAKE) CFLAGS="-fprofile-arcs -ftest-coverage" LDFLAGS="-fprofile-arcs"
