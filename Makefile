@@ -30,7 +30,7 @@ STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
 # Platform-specific overrides
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 ifeq ($(uname_S),SunOS)
-  LDFLAGS+=-ldl -lnsl -lsocket
+  REAL_LDFLAGS+= -ldl -lnsl -lsocket
   DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
   INSTALL= cp -r
 endif
