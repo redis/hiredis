@@ -27,22 +27,18 @@ DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
 
+# Platform-specific overrides
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 ifeq ($(uname_S),SunOS)
   LDFLAGS+=-ldl -lnsl -lsocket
   DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME)
-  STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
   INSTALL= cp -r
 endif
 ifeq ($(uname_S),Darwin)
   DYLIBSUFFIX=dylib
-  STLIBSUFFIX=a
   DYLIB_MINOR_NAME=$(LIBNAME).$(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(DYLIBSUFFIX)
   DYLIB_MAJOR_NAME=$(LIBNAME).$(HIREDIS_MAJOR).$(DYLIBSUFFIX)
-  DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
-  DYLIB_MAKE_CMD=libtool -dynamic -o $(DYLIBNAME) -install_name $(DYLIB_MINOR_NAME) -lm $(DEBUG) -
-  STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
-  STLIB_MAKE_CMD=libtool -static -o $(STLIBNAME) -
+  DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
 endif
 
 all: $(DYLIBNAME) $(BINS)
