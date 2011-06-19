@@ -15,7 +15,7 @@ CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
 OPTIMIZATION?=-O3
 WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings
 DEBUG?= -g -ggdb
-REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(ARCH) $(PROF) $(DEBUG)
+REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(DEBUG)
 REAL_LDFLAGS=$(LDFLAGS)
 
 DYLIBSUFFIX=so
@@ -126,15 +126,15 @@ install: $(DYLIBNAME) $(STLIBNAME)
 
 32bit:
 	@echo ""
-	@echo "WARNING: if it fails under Linux you probably need to install libc6-dev-i386"
+	@echo "WARNING: if this fails under Linux you probably need to install libc6-dev-i386"
 	@echo ""
-	$(MAKE) ARCH="-m32"
+	$(MAKE) CFLAGS="-m32" LDFLAGS="-m32"
 
 gprof:
-	$(MAKE) PROF="-pg"
+	$(MAKE) CFLAGS="-pg"
 
 gcov:
-	$(MAKE) PROF="-fprofile-arcs -ftest-coverage"
+	$(MAKE) CFLAGS="-fprofile-arcs -ftest-coverage" LDFLAGS="-fprofile-arcs"
 
 noopt:
 	$(MAKE) OPTIMIZATION=""
