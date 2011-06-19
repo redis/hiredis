@@ -136,6 +136,12 @@ gprof:
 gcov:
 	$(MAKE) CFLAGS="-fprofile-arcs -ftest-coverage" LDFLAGS="-fprofile-arcs"
 
+coverage: gcov
+	make check
+	mkdir -p tmp/lcov
+	lcov -d . -c -o tmp/lcov/hiredis.info
+	genhtml --legend -o tmp/lcov/report tmp/lcov/hiredis.info
+
 noopt:
 	$(MAKE) OPTIMIZATION=""
 
