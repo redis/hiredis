@@ -81,7 +81,7 @@ hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
 endif
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) $< $(STLIBNAME)
+	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
 	./hiredis-test
