@@ -98,11 +98,6 @@ typedef struct redisReply {
 } redisReply;
 
 typedef struct redisReadTask {
-    size_t poff; /* Protocol offset */
-    size_t plen; /* Protocol length */
-    size_t coff; /* Content offset */
-    size_t clen; /* Content length */
-
     int type;
     int elements; /* number of elements in multibulk container */
     int idx; /* index in parent (array) object */
@@ -127,7 +122,6 @@ typedef struct redisReader {
     char *buf; /* Read buffer */
     size_t pos; /* Buffer cursor */
     size_t len; /* Buffer length */
-    size_t roff; /* Reply offset */
 
     redisReadTask rstack[3];
     int ridx; /* Index of current read task */
@@ -142,7 +136,6 @@ redisReader *redisReaderCreate(void);
 void redisReaderFree(redisReader *r);
 int redisReaderFeed(redisReader *r, const char *buf, size_t len);
 int redisReaderGetReply(redisReader *r, void **reply);
-const char *redisReaderGetRaw(redisReader *r, size_t *len);
 
 /* Backwards compatibility, can be removed on big version bump. */
 #define redisReplyReaderCreate redisReaderCreate

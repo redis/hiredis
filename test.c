@@ -262,98 +262,6 @@ static void test_reply_reader(void) {
     redisReaderFree(reader);
 }
 
-static void *test_create_string(const redisReadTask *task, char *str, size_t len) {
-    redisReader *r = (redisReader*)task->privdata;
-    const char *roff = r->buf+r->roff;
-    ((void)str); ((void)len);
-
-    assert(task->plen > 0);
-    assert(task->clen > 0);
-    switch(task->type) {
-    case REDIS_REPLY_STATUS:
-        assert(strncmp("+status\r\n", roff+task->poff, task->plen) == 0);
-        assert(strncmp("status", roff+task->coff, task->clen) == 0);
-        break;
-    case REDIS_REPLY_ERROR:
-        assert(strncmp("-error\r\n", roff+task->poff, task->plen) == 0);
-        assert(strncmp("error", roff+task->coff, task->clen) == 0);
-        break;
-    case REDIS_REPLY_STRING: /* bulk */
-        assert(strncmp("$4\r\nbulk\r\n", roff+task->poff, task->plen) == 0);
-        assert(strncmp("bulk", roff+task->coff, task->clen) == 0);
-        break;
-    default:
-        assert(NULL);
-    }
-    return (void*)1;
-}
-
-static void *test_create_array(const redisReadTask *task, int len) {
-    redisReader *r = (redisReader*)task->privdata;
-    const char *roff = r->buf+r->roff;
-    ((void)len);
-
-    assert(task->plen > 0);
-    assert(task->clen == 0);
-    assert(strncmp("*5\r\n", roff+task->poff, task->plen) == 0);
-    return (void*)1;
-}
-
-static void *test_create_integer(const redisReadTask *task, long long value) {
-    redisReader *r = (redisReader*)task->privdata;
-    const char *roff = r->buf+r->roff;
-    ((void)value);
-
-    assert(task->plen > 0);
-    assert(task->clen > 0);
-    assert(strncmp(":1234\r\n", roff+task->poff, task->plen) == 0);
-    assert(strncmp("1234", roff+task->coff, task->clen) == 0);
-    return (void*)1;
-}
-
-static void *test_create_nil(const redisReadTask *task) {
-    redisReader *r = (redisReader*)task->privdata;
-    const char *roff = r->buf+r->roff;
-
-    assert(task->plen > 0);
-    assert(task->clen == 0);
-    assert(strncmp("$-1\r\n", roff+task->poff, task->plen) == 0);
-    return (void*)1;
-}
-
-static redisReplyObjectFunctions test_reader_fn = {
-    test_create_string,
-    test_create_array,
-    test_create_integer,
-    test_create_nil,
-    NULL
-};
-
-static void test_reader_functions(void) {
-    redisReader *reader;
-    const char *input;
-    int ret;
-    void *obj;
-
-    input =
-        "*5\r\n"
-        "$-1\r\n"
-        ":1234\r\n"
-        "+status\r\n"
-        "-error\r\n"
-        "$4\r\nbulk\r\n";
-
-    test("Custom object functions in reply reader: ");
-    reader = redisReaderCreate();
-    reader->fn = &test_reader_fn;
-    reader->privdata = reader;
-
-    redisReaderFeed(reader,input,strlen(input));
-    ret = redisReaderGetReply(reader,&obj);
-    test_cond(ret == REDIS_OK && obj == (void*)1);
-    redisReaderFree(reader);
-}
-
 static void test_blocking_connection_errors(void) {
     redisContext *c;
 
@@ -706,7 +614,6 @@ int main(int argc, char **argv) {
 
     test_format_commands();
     test_reply_reader();
-    test_reader_functions();
     test_blocking_connection_errors();
 
     printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
