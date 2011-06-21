@@ -33,7 +33,9 @@
 #define __HIREDIS_H
 #include <stdio.h> /* for size_t */
 #include <stdarg.h> /* for va_list */
+#ifndef HIREDIS_WIN
 #include <sys/time.h> /* for struct timeval */
+#endif
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 10

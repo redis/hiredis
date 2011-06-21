@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "hiredis.h"
 
 int main(void) {
@@ -10,7 +11,7 @@ int main(void) {
     redisReply *reply;
 
     struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-    c = redisConnectWithTimeout((char*)"127.0.0.2", 6379, timeout);
+    c = redisConnectWithTimeout((char*)"192.168.1.12", 6379, timeout);
     if (c->err) {
         printf("Connection error: %s\n", c->errstr);
         exit(1);
