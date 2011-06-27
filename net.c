@@ -117,8 +117,6 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
     struct timeval to;
     struct timeval *toptr = NULL;
     fd_set wfd;
-    int err;
-    socklen_t errlen;
 
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
@@ -143,27 +141,32 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
             return REDIS_ERR;
         }
 
-        err = 0;
-        errlen = sizeof(err);
-        if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-            __redisSetErrorFromErrno(c,REDIS_ERR_IO,"getsockopt(SO_ERROR)");
-            close(fd);
-            return REDIS_ERR;
-        }
-
-        if (err) {
-            errno = err;
-            __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-            close(fd);
-            return REDIS_ERR;
-        }
-
         return REDIS_OK;
     }
 
     __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
     close(fd);
     return REDIS_ERR;
+}
+
+int redisCheckSocketError(redisContext *c, int fd) {
+    int err = 0;
+    socklen_t errlen = sizeof(err);
+
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
+        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"getsockopt(SO_ERROR)");
+        close(fd);
+        return REDIS_ERR;
+    }
+
+    if (err) {
+        errno = err;
+        __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
+        close(fd);
+        return REDIS_ERR;
+    }
+
+    return REDIS_OK;
 }
 
 int redisContextSetTimeout(redisContext *c, struct timeval tv) {
