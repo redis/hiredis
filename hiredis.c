@@ -799,8 +799,9 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     }
 
                     /* Consume and discard vararg */
-#ifndef HIREDIS_WIN
-/* this does not compile under MSVC */
+#ifdef HIREDIS_WIN
+                    va_arg(ap,char*);
+#else
                     va_arg(ap,void);
 #endif
                 }

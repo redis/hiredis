@@ -157,7 +157,11 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
         toptr = &to;
     }
 
+#ifdef HIREDIS_WIN
     if (errno == EINPROGRESS || errno == WSAEWOULDBLOCK) {
+#else
+    if (errno == EINPROGRESS) {
+#endif
         FD_ZERO(&wfd);
         FD_SET(fd, &wfd);
 

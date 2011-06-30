@@ -33,7 +33,7 @@
 #include "fmacros.h"
 #include <string.h>
 #ifndef HIREDIS_WIN
-# include <strings.h>
+#include <strings.h>
 #endif
 #include <assert.h>
 #include <ctype.h>
