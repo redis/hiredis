@@ -14,13 +14,14 @@
 } while(0)
 
 #define RESET_PROTOCOL_T(ptr) do {                                     \
-    (ptr)->poff = 0;                                                   \
-    (ptr)->plen = 0;                                                   \
-    (ptr)->coff = 0;                                                   \
-    (ptr)->clen = 0;                                                   \
-    (ptr)->type = 0;                                                   \
-    (ptr)->remaining = -1;                                             \
-    (ptr)->data = NULL;                                                \
+    redis_protocol_t *__tmp = (ptr);                                   \
+    __tmp->poff = 0;                                                   \
+    __tmp->plen = 0;                                                   \
+    __tmp->coff = 0;                                                   \
+    __tmp->clen = 0;                                                   \
+    __tmp->type = 0;                                                   \
+    __tmp->remaining = -1;                                             \
+    __tmp->data = NULL;                                                \
 } while(0)
 
 #define PARSER_STATES(X)                                               \
