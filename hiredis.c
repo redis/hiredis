@@ -29,10 +29,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "config.h"
 #include "fmacros.h"
 #include <string.h>
 #include <stdlib.h>
+#ifndef HIREDIS_WIN
 #include <unistd.h>
+#endif
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
@@ -796,7 +799,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     }
 
                     /* Consume and discard vararg */
-                    va_arg(ap,void);
+                    va_arg(ap,char*);
                 }
             }
 
@@ -832,7 +835,12 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     pos = sprintf(cmd,"*%d\r\n",argc);
     for (j = 0; j < argc; j++) {
+#ifdef HIREDIS_WIN
+        /* %zu not understood by VS2008 */
+        pos += sprintf(cmd+pos,"$%lu\r\n",sdslen(curargv[j]));
+#else
         pos += sprintf(cmd+pos,"$%zu\r\n",sdslen(curargv[j]));
+#endif
         memcpy(cmd+pos,curargv[j],sdslen(curargv[j]));
         pos += sdslen(curargv[j]);
         sdsfree(curargv[j]);
@@ -941,6 +949,19 @@ void __redisSetError(redisContext *c, int type, const char *str) {
 static redisContext *redisContextInit(void) {
     redisContext *c;
 
+#ifdef HIREDIS_WIN
+    /* fireup Windows socket stuff */
+    WORD wVersionRequested = MAKEWORD(2, 0);
+    WSADATA wsaData;
+    int ret;
+
+    ret = WSAStartup(wVersionRequested, &wsaData);
+    if (ret != 0) {
+        fprintf(stderr, "error: WSAStartup() failed: %d\n", ret);
+        return NULL;
+    }
+#endif
+
     c = calloc(1,sizeof(redisContext));
     if (c == NULL)
         return NULL;
@@ -954,7 +975,11 @@ static redisContext *redisContextInit(void) {
 
 void redisFree(redisContext *c) {
     if (c->fd > 0)
+#ifdef HIREDIS_WIN
+        closesocket(c->fd);
+#else
         close(c->fd);
+#endif
     if (c->obuf != NULL)
         sdsfree(c->obuf);
     if (c->reader != NULL)
@@ -986,6 +1011,8 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
     return c;
 }
 
+#ifndef HIREDIS_WIN
+/* no Unix Domaind stuff */
 redisContext *redisConnectUnix(const char *path) {
     redisContext *c = redisContextInit();
     c->flags |= REDIS_BLOCK;
@@ -1006,6 +1033,7 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
     redisContextConnectUnix(c,path,NULL);
     return c;
 }
+#endif
 
 /* Set read/write timeout on a blocking socket. */
 int redisSetTimeout(redisContext *c, struct timeval tv) {
@@ -1027,7 +1055,11 @@ int redisBufferRead(redisContext *c) {
     if (c->err)
         return REDIS_ERR;
 
+#ifdef HIREDIS_WIN
+    nread = recv(c->fd,buf,sizeof(buf),0);
+#else
     nread = read(c->fd,buf,sizeof(buf));
+#endif
     if (nread == -1) {
         if (errno == EAGAIN && !(c->flags & REDIS_BLOCK)) {
             /* Try again later */
@@ -1064,7 +1096,12 @@ int redisBufferWrite(redisContext *c, int *done) {
         return REDIS_ERR;
 
     if (sdslen(c->obuf) > 0) {
+#ifdef HIREDIS_WIN
+        /* not treated as a file */
+        nwritten = send(c->fd,c->obuf,sdslen(c->obuf),0);
+#else
         nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
+#endif
         if (nwritten == -1) {
             if (errno == EAGAIN && !(c->flags & REDIS_BLOCK)) {
                 /* Try again later */
