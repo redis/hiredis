@@ -185,8 +185,36 @@ void test_array(void) {
     free_parser(p);
 }
 
+void test_integer(void) {
+    redis_parser_t *p = new_parser();
+    redis_protocol_t *res;
+
+    const char *buf = ":1234\r\n";
+    size_t len = 7;
+
+    /* Parse and check resulting protocol_t */
+    reset_cb_log();
+    assert(redis_parser_execute(p, &res, buf, len) == len);
+    assert(res != NULL);
+    assert(res->type == REDIS_INTEGER_T);
+    assert(res->poff == 0);
+    assert(res->plen == 7);
+    assert(res->coff == 1);
+    assert(res->clen == 4);
+
+    /* Check callbacks */
+    assert(cb_log_idx == 1);
+    assert(cb_log[0].integer_value == 1234);
+
+    /* Chunked check */
+    test_char_by_char(res, buf, len);
+
+    free_parser(p);
+}
+
 int main(int argc, char **argv) {
     test_string();
     test_array();
+    test_integer();
     return 0;
 }

@@ -265,7 +265,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 goto done;
 
             l_integer_lf_integer_t:
-                /* Any integer is OK */
+                /* Setup content offset and length */
+                cur->coff = cur->poff + 1;
+                cur->clen = nread - cur->coff - 1; /* remove \r */
                 CALLBACK(integer, i64);
                 goto done;
             }
