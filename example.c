@@ -4,6 +4,10 @@
 
 #include "hiredis.h"
 
+#ifdef HIREDIS_WIN
+#define snprintf sprintf_s
+#endif
+
 int main(void) {
     unsigned int j;
     redisContext *c;

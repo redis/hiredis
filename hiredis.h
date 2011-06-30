@@ -31,9 +31,20 @@
 
 #ifndef __HIREDIS_H
 #define __HIREDIS_H
+
+#if defined(_MSC_VER)
+#define HIREDIS_WIN 1
+#endif
+
 #include <stdio.h> /* for size_t */
 #include <stdarg.h> /* for va_list */
+
+#ifndef HIREDIS_WIN
 #include <sys/time.h> /* for struct timeval */
+#else
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 10
