@@ -110,6 +110,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
     int stackidx;
     unsigned char state;
 
+    /* Reset destination */
+    if (dst) *dst = NULL;
+
     /* Reset root protocol object for new messages */
     if (parser->stackidx == -1) {
         RESET_PROTOCOL_T(&stack[0]);
@@ -321,10 +324,20 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
         }
     }
 
-error:
+    /* Set destination pointer when full message was read */
+    if (stackidx == -1) {
+        if (dst) *dst = &stack[0];
+    }
+
+finalize:
 
     parser->nread = nread;
     parser->stackidx = stackidx;
     parser->state = state;
     return pos-buf;
+
+error:
+
+    /* TODO: set some kind of error */
+    goto finalize;
 }
