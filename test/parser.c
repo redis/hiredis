@@ -82,6 +82,11 @@ redis_parser_t *new_parser(void) {
     return parser;
 }
 
+void reinitialize(redis_parser_t *parser) {
+    reset_cb_log();
+    redis_parser_init(parser, &callbacks);
+}
+
 void free_parser(redis_parser_t *parser) {
     free(parser);
 }
@@ -208,6 +213,72 @@ void test_integer(void) {
 
     /* Chunked check */
     test_char_by_char(res, buf, len);
+
+    /* Negative sign */
+    buf = ":-123\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf));
+    assert(res != NULL);
+    assert(cb_log_idx == 1 && cb_log[0].integer_value == -123);
+    test_char_by_char(res, buf, strlen(buf));
+
+    /* Positive sign */
+    buf = ":+123\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf));
+    assert(res != NULL);
+    assert(cb_log_idx == 1 && cb_log[0].integer_value == 123);
+    test_char_by_char(res, buf, strlen(buf));
+
+    /* Start with 0 */
+    buf = ":0123\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == 1);
+    assert(res == NULL);
+
+    /* Start with non-digit */
+    buf = ":x123\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == 1);
+    assert(res == NULL);
+
+    /* Non-digit in the middle */
+    buf = ":12x3\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == 3);
+    assert(res == NULL);
+
+    /* Non-digit at the end */
+    buf = ":123x\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == 4);
+    assert(res == NULL);
+
+    /* Signed 64-bit maximum */
+    buf = ":9223372036854775807\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf));
+    assert(res != NULL);
+    assert(cb_log_idx == 1 && cb_log[0].integer_value == 9223372036854775807LL);
+
+    /* Signed 64-bit maximum overflow */
+    buf = ":9223372036854775808\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-2);
+    assert(res == NULL);
+
+    /* Signed 64-bit minimum */
+    buf = ":-9223372036854775808\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf));
+    assert(res != NULL);
+    assert(cb_log_idx == 1 && cb_log[0].integer_value == -9223372036854775808LL);
+
+    /* Signed 64-bit minimum overflow (or underflow...) */
+    buf = ":-9223372036854775809\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-2);
+    assert(res == NULL);
 
     free_parser(p);
 }
