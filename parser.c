@@ -311,6 +311,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 cur = &stack[stackidx];
                 if (cur->type == REDIS_ARRAY_T && cur->remaining) {
                     RESET_PROTOCOL_T(&stack[++stackidx]);
+                    cur->remaining--;
                     break;
                 }
                 stackidx--;
