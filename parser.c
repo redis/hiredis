@@ -316,6 +316,12 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     cur->remaining--;
                     break;
                 }
+
+                /* Aggregate plen for nested objects */
+                if (stackidx > 0) {
+                    stack[stackidx-1].plen += cur->plen;
+                }
+
                 stackidx--;
             }
 
