@@ -61,6 +61,6 @@ struct redis_parser_s {
 };
 
 void redis_parser_init(redis_parser_t *parser, const redis_parser_cb_t *callbacks);
-size_t redis_parser_execute(redis_parser_t *parser, const char *buf, size_t len, redis_protocol_t *dst);
+size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len);
 
 #endif // __REDIS_PARSER_H

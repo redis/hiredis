@@ -101,7 +101,7 @@ void redis_parser_init(redis_parser_t *parser, const redis_parser_cb_t *callback
  * no full message was parsed and the return value is smaller than the number
  * of bytes that were available, an error occured and the parser should be
  * re-initialized before parsing more data. */
-size_t redis_parser_execute(redis_parser_t *parser, const char *buf, size_t len, redis_protocol_t *dst) {
+size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len) {
     redis_protocol_t *stack = parser->stack;
     const redis_parser_cb_t *callbacks = parser->callbacks;
     const char *pos;
