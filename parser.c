@@ -140,6 +140,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             switch (state) {
             case s_type_char:
             {
+                cur->poff = nread;
+
                 switch (ch) {
                 case '$':
                     cur->type = REDIS_STRING_T;
