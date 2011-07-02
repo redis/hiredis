@@ -247,53 +247,42 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 /* Protocol length can be set regardless of type */
                 cur->plen = nread - cur->poff + 1; /* include \n */
 
-                /* This should be done in the state machine itself, but I don't
-                 * want to dup the integer states for these three types. */
-                switch (cur->type) {
-                case REDIS_STRING_T:  goto l_integer_lf_string_t;
-                case REDIS_ARRAY_T:   goto l_integer_lf_array_t;
-                case REDIS_INTEGER_T: goto l_integer_lf_integer_t;
-                default:
-                    assert(NULL && "unexpected object type in s_integer_lf");
-                    goto error;
+                if (cur->type == REDIS_STRING_T) {
+                    if (i64.i64 < 0) { /* nil bulk */
+                        CALLBACK(nil);
+                        goto done;
+                    }
+
+                    /* Setup content offset and length */
+                    cur->coff = nread + 1; /* include \n */
+                    cur->clen = (unsigned)i64.i64;
+                    cur->plen += cur->clen + 2; /* include \r\n */
+
+                    /* Store remaining bytes for a complete bulk */
+                    cur->remaining = (unsigned)i64.i64;
+                    TRANSITION(bulk);
                 }
 
-            l_integer_lf_string_t:
-                /* Trap the nil bulk */
-                if (i64.i64 < 0) {
-                    CALLBACK(nil);
+                if (cur->type == REDIS_ARRAY_T) {
+                    if (i64.i64 < 0) { /* nil multi bulk */
+                        CALLBACK(nil);
+                        goto done;
+                    }
+
+                    cur->remaining = (unsigned)i64.i64;
+                    CALLBACK(array, cur->remaining);
                     goto done;
                 }
 
-                /* Setup content offset length. Note that the content length is
-                 * known upfront, but not necessarily valid (we may see EOF
-                 * before seeing the last content byte). */
-                cur->coff = nread + 1; /* include \n */
-                cur->clen = (unsigned)i64.i64;
-                cur->plen += cur->clen + 2; /* include \r\n */
-
-                /* Store remaining bytes for a complete bulk */
-                cur->remaining = (unsigned)i64.i64;
-                state = s_bulk;
-                break;
-
-            l_integer_lf_array_t:
-                /* Trap the nil multi bulk */
-                if (i64.i64 < 0) {
-                    CALLBACK(nil);
+                if (cur->type == REDIS_INTEGER_T) {
+                    /* Setup content offset and length */
+                    cur->coff = cur->poff + 1;
+                    cur->clen = nread - cur->coff - 1; /* remove \r */
+                    CALLBACK(integer, i64.i64);
                     goto done;
                 }
 
-                cur->remaining = (unsigned)i64.i64;
-                CALLBACK(array, cur->remaining);
-                goto done;
-
-            l_integer_lf_integer_t:
-                /* Setup content offset and length */
-                cur->coff = cur->poff + 1;
-                cur->clen = nread - cur->coff - 1; /* remove \r */
-                CALLBACK(integer, i64.i64);
-                goto done;
+                assert(NULL && "unexpected object type in s_integer_lf");
             }
 
             case s_bulk:
