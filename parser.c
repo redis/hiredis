@@ -111,7 +111,7 @@ void redis_parser_init(redis_parser_t *parser, const redis_parser_cb_t *callback
 }
 
 /* Execute the parser against len bytes in buf. When a full message was read,
- * the "dst" pointer is populated with the address of the root object ( this
+ * the "dst" pointer is populated with the address of the root object (this
  * address is a static offset in the redis_parser_t struct, but may change in
  * the future). This pointer is set to NULL when no full message could be
  * parsed. This function returns the number of bytes that could be parsed. When
