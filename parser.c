@@ -48,6 +48,18 @@ static const char * strstate[] = {
 };
 #undef _ENUM_GEN
 
+#define TRANSITION(st) do {     \
+    state = s_##st;             \
+    pos++; nread++;             \
+    if (pos < end) {            \
+        ch = *pos;              \
+        goto l_##st;            \
+    }                           \
+                                \
+    /* No more data */          \
+    goto finalize;              \
+} while(0)
+
 #ifdef DEBUG
 #define LOG(fmt, args...) do {           \
     fprintf(stderr, fmt "\n" , ## args); \
@@ -147,24 +159,19 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 switch (ch) {
                 case '$':
                     cur->type = REDIS_STRING_T;
-                    state = s_integer_sign;
-                    break;
+                    TRANSITION(integer_sign);
                 case '*':
                     cur->type = REDIS_ARRAY_T;
-                    state = s_integer_sign;
-                    break;
+                    TRANSITION(integer_sign);
                 case ':':
                     cur->type = REDIS_INTEGER_T;
-                    state = s_integer_sign;
-                    break;
+                    TRANSITION(integer_sign);
                 case '+':
                     cur->type = REDIS_STATUS_T;
-                    state = s_line;
-                    break;
+                    assert(NULL);
                 case '-':
                     cur->type = REDIS_ERROR_T;
-                    state = s_line;
-                    break;
+                    assert(NULL);
                 default:
                     goto error;
                 }
@@ -172,17 +179,23 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             case s_integer_sign:
+            l_integer_sign:
             {
                 i64.neg = (ch == '-');
                 i64.ui64 = 0;
-                state = s_integer_start;
 
                 /* Break when char was consumed */
-                if (ch == '-' || ch == '+')
-                    break;
+                if (ch == '-' || ch == '+') {
+                    TRANSITION(integer_start);
+                }
 
-                /* Char was not consumed, jump to s_integer_start */
-                goto l_integer_start;
+                /* First integer character */
+                if (ch >= '1' && ch <= '9') {
+                    i64.ui64 = ch - '0';
+                    TRANSITION(integer_body);
+                }
+
+                goto error;
             }
 
             case s_integer_start:
@@ -190,14 +203,14 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             {
                 if (ch >= '1' && ch <= '9') {
                     i64.ui64 = ch - '0';
-                    state = s_integer_body;
-                } else {
-                    goto error;
+                    TRANSITION(integer_body);
                 }
-                break;
+
+                goto error;
             }
 
             case s_integer_body:
+            l_integer_body:
             {
                 if (ch >= '0' && ch <= '9') {
                     if (i64.ui64 > (UINT64_MAX / 10)) /* Overflow */
@@ -206,6 +219,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     if (i64.ui64 > (UINT64_MAX - (ch-'0'))) /* Overflow */
                         goto error;
                     i64.ui64 += ch - '0';
+                    TRANSITION(integer_body);
                 } else if (ch == '\r') {
                     /* Check if the uint64_t can be safely casted to int64_t */
                     if (i64.neg) {
@@ -217,15 +231,14 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                             goto error;
                         i64.i64 = i64.ui64;
                     }
-
-                    state = s_integer_lf;
-                } else {
-                    goto error;
+                    TRANSITION(integer_lf);
                 }
-                break;
+
+                goto error;
             }
 
             case s_integer_lf:
+            l_integer_lf:
             {
                 if (ch != '\n') {
                     goto error;
@@ -241,7 +254,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 case REDIS_ARRAY_T:   goto l_integer_lf_array_t;
                 case REDIS_INTEGER_T: goto l_integer_lf_integer_t;
                 default:
-                    assert(NULL);
+                    assert(NULL && "unexpected object type in s_integer_lf");
                     goto error;
                 }
 
@@ -284,6 +297,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             case s_bulk:
+            l_bulk:
             {
                 size_t len = cur->remaining;
 
@@ -300,11 +314,11 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     goto error;
                 }
 
-                state = s_bulk_lf;
-                break;
+                TRANSITION(bulk_lf);
             }
 
             case s_bulk_lf:
+            l_bulk_lf:
             {
                 if (ch != '\n') {
                     goto error;
