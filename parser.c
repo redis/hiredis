@@ -127,6 +127,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
     int stackidx;
     unsigned char state;
     struct redis_parser_int64_s i64;
+    redis_protocol_t *cur;
+    char ch;
 
     /* Reset destination */
     if (dst) *dst = NULL;
@@ -148,15 +150,11 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
     i64 = parser->i64;
 
     while (pos < end && stackidx >= 0) {
-        redis_protocol_t *cur = &stack[stackidx];
+        cur = &stack[stackidx];
         cur->parent = stackidx > 0 ? &stack[stackidx-1] : NULL;
+        ch = *pos;
 
-        while (pos < end) {
-            char ch = *pos;
-
-            LOG("state: %-18s char: %4s", strstate[state], chrtos(ch));
-
-            switch (state) {
+        switch (state) {
             case s_type_char:
             l_type_char:
             {
@@ -330,13 +328,10 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 goto error;
             }
+        }
 
-            default:
-                assert(NULL);
-            }
-
-            /* Transitions should be made from within the switch */
-            assert(NULL && "invalid code path");
+        /* Transitions should be made from within the switch */
+        assert(NULL && "invalid code path");
 
         done:
             /* Message is done when root object is done */
@@ -357,12 +352,10 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 stackidx--;
             }
 
-            /* When an object is done, always move back to start state */
+            /* Always move back to start state */
             state = s_type_char;
-
             pos++; nread++;
-            break;
-        }
+            continue;
     }
 
     /* Set destination pointer when full message was read */
