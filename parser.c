@@ -32,6 +32,7 @@
     X(integer_body)                                                    \
     X(integer_lf)                                                      \
     X(bulk)                                                            \
+    X(bulk_cr)                                                         \
     X(bulk_lf)                                                         \
     X(line)                                                            \
     X(line_lf)                                                         \
@@ -48,16 +49,20 @@ static const char * strstate[] = {
 };
 #undef _ENUM_GEN
 
-#define TRANSITION(st) do {     \
-    state = s_##st;             \
-    pos++; nread++;             \
-    if (pos < end) {            \
-        ch = *pos;              \
-        goto l_##st;            \
-    }                           \
-                                \
-    /* No more data */          \
-    goto finalize;              \
+#define TRANSITION(st) do {                      \
+    pos++; nread++;                              \
+    TRANSITION_WITHOUT_POS_INCR(st);             \
+} while(0)
+
+#define TRANSITION_WITHOUT_POS_INCR(st) do {     \
+    state = s_##st;                              \
+    if (pos < end) {                             \
+        ch = *pos;                               \
+        goto l_##st;                             \
+    }                                            \
+                                                 \
+    /* No more data */                           \
+    goto finalize;                               \
 } while(0)
 
 #ifdef DEBUG
@@ -153,6 +158,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
             switch (state) {
             case s_type_char:
+            l_type_char:
             {
                 cur->poff = nread;
 
@@ -172,10 +178,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 case '-':
                     cur->type = REDIS_ERROR_T;
                     assert(NULL);
-                default:
-                    goto error;
                 }
-                break;
+
+                goto error;
             }
 
             case s_integer_sign:
@@ -290,37 +295,48 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             {
                 size_t len = cur->remaining;
 
-                if (len) {
-                    if ((end-pos) < len) len = (end-pos);
-                    CALLBACK(string, pos, len);
+                /* Everything can be read */
+                if (len <= (end-pos)) {
                     cur->remaining -= len;
-                    pos += len - 1; nread += len - 1;
-                    break;
+                    CALLBACK(string, pos, len);
+                    pos += len; nread += len;
+                    TRANSITION_WITHOUT_POS_INCR(bulk_cr);
                 }
 
-                /* No remaining bytes for this bulk */
-                if (ch != '\r') {
-                    goto error;
+                /* Not everything can be read */
+                len = (end-pos);
+                cur->remaining -= len;
+                CALLBACK(string, pos, len);
+                pos += len; nread += len;
+                goto finalize;
+            }
+
+            case s_bulk_cr:
+            l_bulk_cr:
+            {
+                if (ch == '\r') {
+                    TRANSITION(bulk_lf);
                 }
 
-                TRANSITION(bulk_lf);
+                goto error;
             }
 
             case s_bulk_lf:
             l_bulk_lf:
             {
-                if (ch != '\n') {
-                    goto error;
+                if (ch == '\n') {
+                    goto done;
                 }
-                goto done;
+
+                goto error;
             }
 
             default:
                 assert(NULL);
             }
 
-            pos++; nread++;
-            continue;
+            /* Transitions should be made from within the switch */
+            assert(NULL && "invalid code path");
 
         done:
             /* Message is done when root object is done */
