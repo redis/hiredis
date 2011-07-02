@@ -109,6 +109,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
     size_t nread;
     int stackidx;
     unsigned char state;
+    struct redis_parser_int64_s i64;
 
     /* Reset destination */
     if (dst) *dst = NULL;
@@ -127,6 +128,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
     nread = parser->nread;
     stackidx = parser->stackidx;
     state = parser->state;
+    i64 = parser->i64;
 
     while (pos < end && stackidx >= 0) {
         redis_protocol_t *cur = &stack[stackidx];
@@ -171,8 +173,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
             case s_integer_sign:
             {
-                parser->i64.neg = (ch == '-');
-                parser->i64.ui64 = 0;
+                i64.neg = (ch == '-');
+                i64.ui64 = 0;
                 state = s_integer_start;
 
                 /* Break when char was consumed */
@@ -187,7 +189,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             l_integer_start:
             {
                 if (ch >= '1' && ch <= '9') {
-                    parser->i64.ui64 = ch - '0';
+                    i64.ui64 = ch - '0';
                     state = s_integer_body;
                 } else {
                     goto error;
@@ -198,22 +200,22 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             case s_integer_body:
             {
                 if (ch >= '0' && ch <= '9') {
-                    if (parser->i64.ui64 > (UINT64_MAX / 10)) /* Overflow */
+                    if (i64.ui64 > (UINT64_MAX / 10)) /* Overflow */
                         goto error;
-                    parser->i64.ui64 *= 10;
-                    if (parser->i64.ui64 > (UINT64_MAX - (ch-'0'))) /* Overflow */
+                    i64.ui64 *= 10;
+                    if (i64.ui64 > (UINT64_MAX - (ch-'0'))) /* Overflow */
                         goto error;
-                    parser->i64.ui64 += ch - '0';
+                    i64.ui64 += ch - '0';
                 } else if (ch == '\r') {
                     /* Check if the uint64_t can be safely casted to int64_t */
-                    if (parser->i64.neg) {
-                        if (parser->i64.ui64 > ((uint64_t)(-(INT64_MIN+1))+1)) /* Overflow */
+                    if (i64.neg) {
+                        if (i64.ui64 > ((uint64_t)(-(INT64_MIN+1))+1)) /* Overflow */
                             goto error;
-                        parser->i64.i64 = -parser->i64.ui64;
+                        i64.i64 = -i64.ui64;
                     } else {
-                        if (parser->i64.ui64 > INT64_MAX) /* Overflow */
+                        if (i64.ui64 > INT64_MAX) /* Overflow */
                             goto error;
-                        parser->i64.i64 = parser->i64.ui64;
+                        i64.i64 = i64.ui64;
                     }
 
                     state = s_integer_lf;
@@ -245,7 +247,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
             l_integer_lf_string_t:
                 /* Trap the nil bulk */
-                if (parser->i64.i64 < 0) {
+                if (i64.i64 < 0) {
                     CALLBACK(nil);
                     goto done;
                 }
@@ -254,22 +256,22 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                  * known upfront, but not necessarily valid (we may see EOF
                  * before seeing the last content byte). */
                 cur->coff = nread + 1; /* include \n */
-                cur->clen = (unsigned)parser->i64.i64;
+                cur->clen = (unsigned)i64.i64;
                 cur->plen += cur->clen + 2; /* include \r\n */
 
                 /* Store remaining bytes for a complete bulk */
-                cur->remaining = (unsigned)parser->i64.i64;
+                cur->remaining = (unsigned)i64.i64;
                 state = s_bulk;
                 break;
 
             l_integer_lf_array_t:
                 /* Trap the nil multi bulk */
-                if (parser->i64.i64 < 0) {
+                if (i64.i64 < 0) {
                     CALLBACK(nil);
                     goto done;
                 }
 
-                cur->remaining = (unsigned)parser->i64.i64;
+                cur->remaining = (unsigned)i64.i64;
                 CALLBACK(array, cur->remaining);
                 goto done;
 
@@ -277,7 +279,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 /* Setup content offset and length */
                 cur->coff = cur->poff + 1;
                 cur->clen = nread - cur->coff - 1; /* remove \r */
-                CALLBACK(integer, parser->i64.i64);
+                CALLBACK(integer, i64.i64);
                 goto done;
             }
 
@@ -354,6 +356,7 @@ finalize:
     parser->nread = nread;
     parser->stackidx = stackidx;
     parser->state = state;
+    parser->i64 = i64;
     return pos-buf;
 
 error:

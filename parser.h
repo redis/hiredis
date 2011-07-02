@@ -54,7 +54,7 @@ struct redis_parser_s {
     unsigned char state;
 
     /* private: temporary integer (integer reply, bulk length) */
-    struct {
+    struct redis_parser_int64_s {
         int neg; /* sign */
         uint64_t ui64; /* accumulator */
         int64_t i64; /* result */
