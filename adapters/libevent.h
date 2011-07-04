@@ -1,3 +1,5 @@
+#ifndef __HIREDIS_LIBEVENT_H__
+#define __HIREDIS_LIBEVENT_H__
 #include <event.h>
 #include "../hiredis.h"
 #include "../async.h"
@@ -7,46 +9,46 @@ typedef struct redisLibeventEvents {
     struct event rev, wev;
 } redisLibeventEvents;
 
-void redisLibeventReadEvent(int fd, short event, void *arg) {
+static void redisLibeventReadEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
     redisLibeventEvents *e = (redisLibeventEvents*)arg;
     redisAsyncHandleRead(e->context);
 }
 
-void redisLibeventWriteEvent(int fd, short event, void *arg) {
+static void redisLibeventWriteEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
     redisLibeventEvents *e = (redisLibeventEvents*)arg;
     redisAsyncHandleWrite(e->context);
 }
 
-void redisLibeventAddRead(void *privdata) {
+static void redisLibeventAddRead(void *privdata) {
     redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_add(&e->rev,NULL);
 }
 
-void redisLibeventDelRead(void *privdata) {
+static void redisLibeventDelRead(void *privdata) {
     redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_del(&e->rev);
 }
 
-void redisLibeventAddWrite(void *privdata) {
+static void redisLibeventAddWrite(void *privdata) {
     redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_add(&e->wev,NULL);
 }
 
-void redisLibeventDelWrite(void *privdata) {
+static void redisLibeventDelWrite(void *privdata) {
     redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_del(&e->wev);
 }
 
-void redisLibeventCleanup(void *privdata) {
+static void redisLibeventCleanup(void *privdata) {
     redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_del(&e->rev);
     event_del(&e->wev);
     free(e);
 }
 
-int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
+static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
     redisContext *c = &(ac->c);
     redisLibeventEvents *e;
 
@@ -73,3 +75,4 @@ int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
     event_base_set(base,&e->wev);
     return REDIS_OK;
 }
+#endif
