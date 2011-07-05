@@ -394,6 +394,8 @@ void test_nil(void) {
 }
 
 int main(int argc, char **argv) {
+    printf("redis_protocol_t: %lu bytes\n", sizeof(redis_protocol_t));
+    printf("redis_parser_t: %lu bytes\n", sizeof(redis_parser_t));
     test_string();
     test_empty_string();
     test_array();
