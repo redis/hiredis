@@ -153,6 +153,34 @@ void test_string(void) {
     free_parser(p);
 }
 
+void test_empty_string(void) {
+    redis_parser_t *p = new_parser();
+    redis_protocol_t *res;
+
+    const char *buf = "$0\r\n\r\n";
+    size_t len = 6;
+
+    /* Parse and check resulting protocol_t */
+    reset_cb_log();
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
+    assert(res != NULL);
+    assert(res->type == REDIS_STRING_T);
+    assert(res->poff == 0);
+    assert(res->plen == 6);
+    assert(res->coff == 4);
+    assert(res->clen == 0);
+
+    /* Check callbacks */
+    assert(cb_log_idx == 1);
+    assert(cb_log[0].string_buf == buf+4);
+    assert(cb_log[0].string_len == 0);
+
+    /* Chunked check */
+    test_char_by_char(res, buf, len);
+
+    free_parser(p);
+}
+
 void test_array(void) {
     redis_parser_t *p = new_parser();
     redis_protocol_t *res;
@@ -200,6 +228,31 @@ void test_array(void) {
     free_parser(p);
 }
 
+void test_empty_array(void) {
+    redis_parser_t *p = new_parser();
+    redis_protocol_t *res;
+
+    const char *buf = "*0\r\n";
+    size_t len = 4;
+
+    /* Parse and check resulting protocol_t */
+    reset_cb_log();
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
+    assert(res != NULL);
+    assert(res->type == REDIS_ARRAY_T);
+    assert(res->poff == 0);
+    assert(res->plen == 4);
+
+    /* Check callbacks */
+    assert(cb_log_idx == 1);
+    assert(cb_log[0].array_len == 0);
+
+    /* Chunked check */
+    test_char_by_char(res, buf, len);
+
+    free_parser(p);
+}
+
 void test_integer(void) {
     redis_parser_t *p = new_parser();
     redis_protocol_t *res;
@@ -239,6 +292,26 @@ void test_integer(void) {
     assert(res != NULL);
     assert(cb_log_idx == 1 && cb_log[0].integer_value == 123);
     test_char_by_char(res, buf, strlen(buf));
+
+    /* Zero */
+    buf = ":0\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf));
+    assert(res != NULL);
+    assert(cb_log_idx == 1 && cb_log[0].integer_value == 0);
+    test_char_by_char(res, buf, strlen(buf));
+
+    /* Signed zero, positive */
+    buf = ":+0\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == 2);
+    assert(res == NULL);
+
+    /* Signed zero, negative */
+    buf = ":-0\r\n";
+    reinitialize(p);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == 2);
+    assert(res == NULL);
 
     /* Start with 0 */
     buf = ":0123\r\n";
@@ -293,9 +366,38 @@ void test_integer(void) {
     free_parser(p);
 }
 
+void test_nil(void) {
+    redis_parser_t *p = new_parser();
+    redis_protocol_t *res;
+
+    const char *buf = "$-1\r\n";
+    size_t len = 7;
+
+    /* Parse and check resulting protocol_t */
+    reset_cb_log();
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
+    assert(res != NULL);
+    assert(res->type == REDIS_INTEGER_T);
+    assert(res->poff == 0);
+    assert(res->plen == 7);
+    assert(res->coff == 1);
+    assert(res->clen == 4);
+
+    /* Check callbacks */
+    assert(cb_log_idx == 1);
+    assert(cb_log[0].integer_value == 1234);
+
+    /* Chunked check */
+    test_char_by_char(res, buf, len);
+
+    free_parser(p);
+}
+
 int main(int argc, char **argv) {
     test_string();
+    test_empty_string();
     test_array();
+    test_empty_array();
     test_integer();
     return 0;
 }
