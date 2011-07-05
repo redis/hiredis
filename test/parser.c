@@ -4,6 +4,16 @@
 #include <assert.h>
 #include "parser.h"
 
+#define assert_equal_size_t(a,b) do {            \
+    __typeof__ (a) a_ = (a);                     \
+    __typeof__ (b) b_ = (b);                     \
+    if (a_ != b_) {                              \
+        fprintf(stderr, "%s:%d: %lu != %lu\n",   \
+            __FILE__, __LINE__, a_, b_);         \
+        assert(0);                               \
+    }                                            \
+} while(0)
+
 typedef struct log_entry_s log_entry_t;
 
 struct log_entry_s {
@@ -101,11 +111,11 @@ void test_char_by_char(redis_protocol_t *ref, const char *buf, size_t len) {
         redis_parser_init(p, &callbacks);
 
         /* Slice 1 */
-        assert(i == redis_parser_execute(p, &res, buf, i));
+        assert_equal_size_t(redis_parser_execute(p, &res, buf, i), i);
         assert(NULL == res); /* no result */
 
         /* Slice 2 */
-        assert(len-i == redis_parser_execute(p, &res, buf+i, len-i));
+        assert_equal_size_t(redis_parser_execute(p, &res, buf+i, len-i), len-i);
         assert(NULL != res);
 
         /* Compare result with reference */
@@ -124,7 +134,7 @@ void test_string(void) {
 
     /* Parse and check resulting protocol_t */
     reset_cb_log();
-    assert(redis_parser_execute(p, &res, buf, len) == len);
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
     assert(res->type == REDIS_STRING_T);
     assert(res->poff == 0);
@@ -155,7 +165,7 @@ void test_array(void) {
 
     /* Parse and check resulting protocol_t */
     reset_cb_log();
-    assert(redis_parser_execute(p, &res, buf, len) == len);
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
     assert(res->type == REDIS_ARRAY_T);
     assert(res->poff == 0);
@@ -199,7 +209,7 @@ void test_integer(void) {
 
     /* Parse and check resulting protocol_t */
     reset_cb_log();
-    assert(redis_parser_execute(p, &res, buf, len) == len);
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
     assert(res->type == REDIS_INTEGER_T);
     assert(res->poff == 0);
