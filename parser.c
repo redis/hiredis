@@ -56,8 +56,7 @@ static const char * strstate[] = {
     state = s_##st;                              \
     if (pos >= end) { /* No more data */         \
         goto finalize;                           \
-    }                                            \
-    ch = *pos;
+    }
 
 #define TRANSITION(st) do {                      \
     pos++; nread++;                              \
@@ -131,7 +130,6 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
     unsigned char state;
     struct redis_parser_int64_s i64;
     redis_protocol_t *cur;
-    char ch;
 
     /* Reset destination */
     if (dst) *dst = NULL;
@@ -160,7 +158,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             STATE(type_char) {
                 cur->poff = nread;
 
-                switch (ch) {
+                switch (*pos) {
                 case '$':
                     cur->type = REDIS_STRING_T;
                     TRANSITION(integer_start);
@@ -182,6 +180,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             STATE(integer_start) {
+                char ch = *pos;
                 i64.neg = 0;
                 i64.ui64 = 0;
 
@@ -212,6 +211,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             STATE(integer_19) {
+                char ch = *pos;
+
                 if (ch >= '1' && ch <= '9') {
                     i64.ui64 = ch - '0';
                     TRANSITION(integer_09);
@@ -221,6 +222,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             STATE(integer_09) {
+                char ch = *pos;
+
                 if (ch >= '0' && ch <= '9') {
                     if (i64.ui64 > (UINT64_MAX / 10)) /* Overflow */
                         goto error;
@@ -237,7 +240,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             STATE(integer_cr) {
-                if (ch == '\r') {
+                if (*pos == '\r') {
                     TRANSITION(integer_lf);
                 }
 
@@ -245,7 +248,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             STATE(integer_lf) {
-                if (ch != '\n') {
+                if (*pos != '\n') {
                     goto error;
                 }
 
@@ -322,7 +325,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             STATE(bulk_cr) {
-                if (ch == '\r') {
+                if (*pos == '\r') {
                     TRANSITION(bulk_lf);
                 }
 
@@ -330,7 +333,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             STATE(bulk_lf) {
-                if (ch == '\n') {
+                if (*pos == '\n') {
                     goto done;
                 }
 
