@@ -184,11 +184,12 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             case s_integer_sign:
             l_integer_sign:
             {
-                i64.neg = (ch == '-');
+                i64.neg = 0;
                 i64.ui64 = 0;
 
                 /* Break when char was consumed */
-                if (ch == '-' || ch == '+') {
+                if (ch == '-') {
+                    i64.neg = 1;
                     TRANSITION(integer_start);
                 }
 
