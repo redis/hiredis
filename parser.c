@@ -58,13 +58,17 @@ static const char * strstate[] = {
         goto finalize;                           \
     }
 
-#define TRANSITION(st) do {                      \
-    pos++; nread++;                              \
-    TRANSITION_WITHOUT_POS_INCR(st);             \
+#define ADVANCE(bytes) do {                      \
+    pos += (bytes); nread += (bytes);            \
 } while(0)
 
-#define TRANSITION_WITHOUT_POS_INCR(st) do {     \
+#define MOVE(st) do {                            \
     goto l_##st;                                 \
+} while(0)
+
+#define ADVANCE_AND_MOVE(st) do {                \
+    ADVANCE(1);                                  \
+    MOVE(st);                                    \
 } while(0)
 
 #ifdef DEBUG
@@ -161,13 +165,13 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 switch (*pos) {
                 case '$':
                     cur->type = REDIS_STRING_T;
-                    TRANSITION(integer_start);
+                    ADVANCE_AND_MOVE(integer_start);
                 case '*':
                     cur->type = REDIS_ARRAY_T;
-                    TRANSITION(integer_start);
+                    ADVANCE_AND_MOVE(integer_start);
                 case ':':
                     cur->type = REDIS_INTEGER_T;
-                    TRANSITION(integer_start);
+                    ADVANCE_AND_MOVE(integer_start);
                 case '+':
                     cur->type = REDIS_STATUS_T;
                     assert(NULL);
@@ -187,24 +191,24 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 /* Start with number */
                 if (ch >= '1' && ch <= '9') {
                     i64.ui64 = ch - '0';
-                    TRANSITION(integer_09);
+                    ADVANCE_AND_MOVE(integer_09);
                 }
 
                 /* Start with negative sign */
                 if (ch == '-') {
                     i64.neg = 1;
-                    TRANSITION(integer_19);
+                    ADVANCE_AND_MOVE(integer_19);
                 }
 
                 /* Start with positive sign */
                 if (ch == '+') {
                     i64.neg = 0;
-                    TRANSITION(integer_19);
+                    ADVANCE_AND_MOVE(integer_19);
                 }
 
                 /* Single integer character is a zero */
                 if (ch == '0') {
-                    TRANSITION(integer_cr);
+                    ADVANCE_AND_MOVE(integer_cr);
                 }
 
                 goto error;
@@ -215,7 +219,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 if (ch >= '1' && ch <= '9') {
                     i64.ui64 = ch - '0';
-                    TRANSITION(integer_09);
+                    ADVANCE_AND_MOVE(integer_09);
                 }
 
                 goto error;
@@ -231,9 +235,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     if (i64.ui64 > (UINT64_MAX - (ch - '0'))) /* Overflow */
                         goto error;
                     i64.ui64 += ch - '0';
-                    TRANSITION(integer_09);
+                    ADVANCE_AND_MOVE(integer_09);
                 } else if (ch == '\r') {
-                    TRANSITION(integer_lf);
+                    ADVANCE_AND_MOVE(integer_lf);
                 }
 
                 goto error;
@@ -241,7 +245,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
             STATE(integer_cr) {
                 if (*pos == '\r') {
-                    TRANSITION(integer_lf);
+                    ADVANCE_AND_MOVE(integer_lf);
                 }
 
                 goto error;
@@ -279,7 +283,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                     /* Store remaining bytes for a complete bulk */
                     cur->remaining = (unsigned)i64.i64;
-                    TRANSITION(bulk);
+                    ADVANCE_AND_MOVE(bulk);
                 }
 
                 if (cur->type == REDIS_ARRAY_T) {
@@ -313,8 +317,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 if (remaining <= available) {
                     cur->remaining = 0;
                     CALLBACK(string, pos, remaining);
-                    pos += remaining; nread += remaining;
-                    TRANSITION_WITHOUT_POS_INCR(bulk_cr);
+                    ADVANCE(remaining);
+                    MOVE(bulk_cr);
                 }
 
                 /* Not everything can be read */
@@ -326,7 +330,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
             STATE(bulk_cr) {
                 if (*pos == '\r') {
-                    TRANSITION(bulk_lf);
+                    ADVANCE_AND_MOVE(bulk_lf);
                 }
 
                 goto error;
