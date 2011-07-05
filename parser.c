@@ -316,21 +316,21 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             case s_bulk:
             l_bulk:
             {
-                size_t len = cur->remaining;
+                size_t remaining = cur->remaining;
+                size_t available = (end-pos);
 
                 /* Everything can be read */
-                if (len <= (end-pos)) {
-                    cur->remaining -= len;
-                    CALLBACK(string, pos, len);
-                    pos += len; nread += len;
+                if (remaining <= available) {
+                    cur->remaining = 0;
+                    CALLBACK(string, pos, remaining);
+                    pos += remaining; nread += remaining;
                     TRANSITION_WITHOUT_POS_INCR(bulk_cr);
                 }
 
                 /* Not everything can be read */
-                len = (end-pos);
-                cur->remaining -= len;
-                CALLBACK(string, pos, len);
-                pos += len; nread += len;
+                cur->remaining -= available;
+                CALLBACK(string, pos, available);
+                pos += available; nread += available;
                 goto finalize;
             }
 
