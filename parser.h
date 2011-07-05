@@ -27,16 +27,14 @@ struct redis_parser_cb_s {
 };
 
 struct redis_protocol_s {
+    unsigned char type; /* payload type */
+    const redis_protocol_t* parent; /* when nested, parent object */
+    int64_t remaining; /* remaining bulk bytes/nested objects */
+    void *data; /* user data */
     size_t poff; /* protocol offset */
     size_t plen; /* protocol length */
     size_t coff; /* content offset */
     size_t clen; /* content length */
-
-    unsigned char type; /* payload type */
-    int64_t remaining; /* remaining bulk bytes/nested objects */
-
-    const redis_protocol_t* parent; /* when nested, parent object */
-    void *data; /* user data */
 };
 
 struct redis_parser_s {
