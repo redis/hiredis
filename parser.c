@@ -5,9 +5,11 @@
 #include <assert.h>
 #include "parser.h"
 
-#define CALLBACK(X, args...) do {                                      \
+/* The redis_protocol_t argument to the callback function must be provided by
+ * the caller because "ISO C99 requires rest arguments to be used". */
+#define CALLBACK(X, ...) do {                                          \
     if (callbacks && callbacks->on_##X) {                              \
-        if (callbacks->on_##X(parser, cur , ## args) == 0) {           \
+        if (callbacks->on_##X(parser, __VA_ARGS__) == 0) {             \
             return pos-buf;                                            \
         }                                                              \
     }                                                                  \
@@ -72,9 +74,9 @@ static const char * strstate[] = {
 } while(0)
 
 #ifdef DEBUG
-#define LOG(fmt, args...) do {           \
-    fprintf(stderr, fmt "\n" , ## args); \
-    fflush(stderr);                      \
+#define LOG(fmt, ...) do {                       \
+    fprintf(stderr, fmt "\n", __VA_ARGS__);      \
+    fflush(stderr);                              \
 } while(0)
 
 #include <ctype.h>
@@ -108,7 +110,7 @@ static const char *chrtos(char byte) {
     return buf;
 }
 #else
-#define LOG(fmt, args...) do { ; } while (0)
+#define LOG(fmt, ...) do { ; } while (0)
 #endif
 
 void redis_parser_init(redis_parser_t *parser, const redis_parser_cb_t *callbacks) {
@@ -272,7 +274,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 if (cur->type == REDIS_STRING_T) {
                     if (i64.i64 < 0) { /* nil bulk */
-                        CALLBACK(nil);
+                        CALLBACK(nil, cur);
                         goto done;
                     }
 
@@ -288,13 +290,13 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 if (cur->type == REDIS_ARRAY_T) {
                     if (i64.i64 < 0) { /* nil multi bulk */
-                        CALLBACK(nil);
+                        CALLBACK(nil, cur);
                         goto done;
                     }
 
                     /* Store remaining objects for a complete multi bulk */
                     cur->remaining = (unsigned)i64.i64;
-                    CALLBACK(array, cur->remaining);
+                    CALLBACK(array, cur, cur->remaining);
                     goto done;
                 }
 
@@ -302,7 +304,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     /* Setup content offset and length */
                     cur->coff = cur->poff + 1;
                     cur->clen = nread - cur->coff - 1; /* remove \r */
-                    CALLBACK(integer, i64.i64);
+                    CALLBACK(integer, cur, i64.i64);
                     goto done;
                 }
 
@@ -316,14 +318,14 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 /* Everything can be read */
                 if (remaining <= available) {
                     cur->remaining = 0;
-                    CALLBACK(string, pos, remaining);
+                    CALLBACK(string, cur, pos, remaining);
                     ADVANCE(remaining);
                     MOVE(bulk_cr);
                 }
 
                 /* Not everything can be read */
                 cur->remaining -= available;
-                CALLBACK(string, pos, available);
+                CALLBACK(string, cur, pos, available);
                 pos += available; nread += available;
                 goto finalize;
             }
