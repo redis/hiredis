@@ -346,9 +346,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
     done:
         /* Message is done when root object is done */
-        while (stackidx >= 0) {
+        do {
             /* Move to nested object when we see an incomplete array */
-            cur = &stack[stackidx];
             if (cur->type == REDIS_ARRAY_T && cur->remaining) {
                 RESET_PROTOCOL_T(&stack[++stackidx]);
                 cur->remaining--;
@@ -360,8 +359,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 stack[stackidx-1].plen += cur->plen;
             }
 
-            stackidx--;
-        }
+            cur = &stack[--stackidx];
+        } while (stackidx >= 0);
 
         /* Always move back to start state */
         state = s_type_char;
