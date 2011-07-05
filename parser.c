@@ -225,16 +225,6 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     i64.ui64 += ch - '0';
                     TRANSITION(integer_09);
                 } else if (ch == '\r') {
-                    /* Check if the uint64_t can be safely casted to int64_t */
-                    if (i64.neg) {
-                        if (i64.ui64 > ((uint64_t)(-(INT64_MIN+1))+1)) /* Overflow */
-                            goto error;
-                        i64.i64 = -i64.ui64;
-                    } else {
-                        if (i64.ui64 > INT64_MAX) /* Overflow */
-                            goto error;
-                        i64.i64 = i64.ui64;
-                    }
                     TRANSITION(integer_lf);
                 }
 
@@ -246,6 +236,17 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             {
                 if (ch != '\n') {
                     goto error;
+                }
+
+                /* Check if the uint64_t can be safely casted to int64_t */
+                if (i64.neg) {
+                    if (i64.ui64 > ((uint64_t)(-(INT64_MIN+1))+1)) /* Overflow */
+                        goto error;
+                    i64.i64 = -i64.ui64;
+                } else {
+                    if (i64.ui64 > INT64_MAX) /* Overflow */
+                        goto error;
+                    i64.i64 = i64.ui64;
                 }
 
                 /* Protocol length can be set regardless of type */
