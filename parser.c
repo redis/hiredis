@@ -200,6 +200,12 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     TRANSITION(integer_19);
                 }
 
+                /* Start with positive sign */
+                if (ch == '+') {
+                    i64.neg = 0;
+                    TRANSITION(integer_19);
+                }
+
                 /* Single integer character is a zero */
                 if (ch == '0') {
                     TRANSITION(integer_cr);
