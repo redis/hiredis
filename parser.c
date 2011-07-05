@@ -232,7 +232,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     if (i64.ui64 > (UINT64_MAX / 10)) /* Overflow */
                         goto error;
                     i64.ui64 *= 10;
-                    if (i64.ui64 > (UINT64_MAX - (ch-'0'))) /* Overflow */
+                    if (i64.ui64 > (UINT64_MAX - (ch - '0'))) /* Overflow */
                         goto error;
                     i64.ui64 += ch - '0';
                     TRANSITION(integer_09);
@@ -296,6 +296,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                         goto done;
                     }
 
+                    /* Store remaining objects for a complete multi bulk */
                     cur->remaining = (unsigned)i64.i64;
                     CALLBACK(array, cur->remaining);
                     goto done;
