@@ -188,19 +188,19 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 i64.neg = 0;
                 i64.ui64 = 0;
 
-                /* Break when char was consumed */
-                if (ch == '-') {
-                    i64.neg = 1;
-                    TRANSITION(integer_19);
-                }
-
-                /* First integer character */
+                /* Start with number */
                 if (ch >= '1' && ch <= '9') {
                     i64.ui64 = ch - '0';
                     TRANSITION(integer_09);
                 }
 
-                /* Consume single zero character */
+                /* Start with negative sign */
+                if (ch == '-') {
+                    i64.neg = 1;
+                    TRANSITION(integer_19);
+                }
+
+                /* Single integer character is a zero */
                 if (ch == '0') {
                     TRANSITION(integer_cr);
                 }
