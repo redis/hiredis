@@ -35,7 +35,7 @@ static log_entry_t cb_log[CB_LOG_SIZE];
 static int cb_log_idx = 0;
 
 #define reset_cb_log() do {              \
-    memset(cb_log, 0, sizeof(cb_log));     \
+    memset(cb_log, 0xff, sizeof(cb_log));     \
     cb_log_idx = 0;                      \
 } while(0)
 
