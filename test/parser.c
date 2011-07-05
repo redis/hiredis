@@ -243,7 +243,7 @@ void test_integer(void) {
     /* Start with 0 */
     buf = ":0123\r\n";
     reinitialize(p);
-    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == 1);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == 2);
     assert(res == NULL);
 
     /* Start with non-digit */
@@ -274,7 +274,7 @@ void test_integer(void) {
     /* Signed 64-bit maximum overflow */
     buf = ":9223372036854775808\r\n";
     reinitialize(p);
-    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-2);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-1);
     assert(res == NULL);
 
     /* Signed 64-bit minimum */
@@ -287,7 +287,7 @@ void test_integer(void) {
     /* Signed 64-bit minimum overflow (or underflow...) */
     buf = ":-9223372036854775809\r\n";
     reinitialize(p);
-    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-2);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-1);
     assert(res == NULL);
 
     free_parser(p);
