@@ -358,29 +358,29 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
         /* Transitions should be made from within the switch */
         assert(NULL && "invalid code path");
 
-        done:
-            /* Message is done when root object is done */
-            while (stackidx >= 0) {
-                /* Move to nested object when we see an incomplete array */
-                cur = &stack[stackidx];
-                if (cur->type == REDIS_ARRAY_T && cur->remaining) {
-                    RESET_PROTOCOL_T(&stack[++stackidx]);
-                    cur->remaining--;
-                    break;
-                }
-
-                /* Aggregate plen for nested objects */
-                if (stackidx > 0) {
-                    stack[stackidx-1].plen += cur->plen;
-                }
-
-                stackidx--;
+    done:
+        /* Message is done when root object is done */
+        while (stackidx >= 0) {
+            /* Move to nested object when we see an incomplete array */
+            cur = &stack[stackidx];
+            if (cur->type == REDIS_ARRAY_T && cur->remaining) {
+                RESET_PROTOCOL_T(&stack[++stackidx]);
+                cur->remaining--;
+                break;
             }
 
-            /* Always move back to start state */
-            state = s_type_char;
-            pos++; nread++;
-            continue;
+            /* Aggregate plen for nested objects */
+            if (stackidx > 0) {
+                stack[stackidx-1].plen += cur->plen;
+            }
+
+            stackidx--;
+        }
+
+        /* Always move back to start state */
+        state = s_type_char;
+        pos++; nread++;
+        continue;
     }
 
     /* Set destination pointer when full message was read */
