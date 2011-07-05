@@ -30,6 +30,7 @@
     X(integer_start)                                                   \
     X(integer_19)                                                      \
     X(integer_09)                                                      \
+    X(integer_cr)                                                      \
     X(integer_lf)                                                      \
     X(bulk)                                                            \
     X(bulk_cr)                                                         \
@@ -199,6 +200,11 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     TRANSITION(integer_09);
                 }
 
+                /* Consume single zero character */
+                if (ch == '0') {
+                    TRANSITION(integer_cr);
+                }
+
                 goto error;
             }
 
@@ -225,6 +231,16 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     i64.ui64 += ch - '0';
                     TRANSITION(integer_09);
                 } else if (ch == '\r') {
+                    TRANSITION(integer_lf);
+                }
+
+                goto error;
+            }
+
+            case s_integer_cr:
+            l_integer_cr:
+            {
+                if (ch == '\r') {
                     TRANSITION(integer_lf);
                 }
 
