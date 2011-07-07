@@ -392,7 +392,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
         /* Always move back to start state */
         state = s_type_char;
-        pos++; nread++;
+        ADVANCE(1);
         continue;
     }
 
