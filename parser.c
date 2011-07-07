@@ -48,12 +48,6 @@ enum state {
 };
 #undef _ENUM_GEN
 
-#define _ENUM_GEN(s) #s,
-static const char * strstate[] = {
-    REDIS_PARSER_STATES(_ENUM_GEN)
-};
-#undef _ENUM_GEN
-
 #define STATE(st)                                \
     case s_##st:                                 \
     l_##st:                                      \
@@ -76,6 +70,12 @@ static const char * strstate[] = {
 } while(0)
 
 #ifdef DEBUG
+#define _ENUM_GEN(s) #s,
+static const char *state_str[] = {
+    REDIS_PARSER_STATES(_ENUM_GEN)
+};
+#undef _ENUM_GEN
+
 #define LOG(fmt, ...) do {                       \
     fprintf(stderr, fmt "\n", __VA_ARGS__);      \
     fflush(stderr);                              \
