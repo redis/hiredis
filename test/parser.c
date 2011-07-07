@@ -315,7 +315,7 @@ void test_integer(redis_parser_t *p) {
     /* Signed 64-bit maximum overflow */
     buf = ":9223372036854775808\r\n";
     RESET_PARSER_T(p);
-    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-1);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-3);
     assert(res == NULL);
 
     /* Signed 64-bit minimum */
@@ -328,7 +328,7 @@ void test_integer(redis_parser_t *p) {
     /* Signed 64-bit minimum overflow (or underflow...) */
     buf = ":-9223372036854775809\r\n";
     RESET_PARSER_T(p);
-    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-1);
+    assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf)-3);
     assert(res == NULL);
 }
 
