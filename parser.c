@@ -26,7 +26,7 @@
     __tmp->data = NULL;                                                \
 } while(0)
 
-#define PARSER_STATES(X)                                               \
+#define REDIS_PARSER_STATES(X)                                         \
     X(unused) /* = 0 in enum */                                        \
     X(type_char)                                                       \
     X(integer_start)                                                   \
@@ -44,13 +44,13 @@
 
 #define _ENUM_GEN(name) s_##name,
 enum state {
-    PARSER_STATES(_ENUM_GEN)
+    REDIS_PARSER_STATES(_ENUM_GEN)
 };
 #undef _ENUM_GEN
 
 #define _ENUM_GEN(s) #s,
 static const char * strstate[] = {
-    PARSER_STATES(_ENUM_GEN)
+    REDIS_PARSER_STATES(_ENUM_GEN)
 };
 #undef _ENUM_GEN
 
