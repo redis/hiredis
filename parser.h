@@ -26,6 +26,22 @@ struct redis_parser_cb_s {
     redis_nil_cb on_nil;
 };
 
+#define REDIS_PARSER_ERRORS(_X)                      \
+    _X(OK, NULL) /* = 0 in enum */                   \
+    _X(ERR_UNKNOWN, "unknown")                       \
+    _X(ERR_CALLBACK, "callback failed")              \
+    _X(ERR_INVALID_TYPE, "invalid type character")   \
+    _X(ERR_INVALID_INT, "invalid integer character") \
+    _X(ERR_OVERFLOW, "overflow")                     \
+    _X(ERR_EXPECTED_CR, "expected \\r")              \
+    _X(ERR_EXPECTED_LF, "expected \\n")              \
+
+#define _REDIS_PARSER_ERRNO_ENUM_GEN(code, description) REDIS_PARSER_##code,
+typedef enum redis_parser_errno_e {
+    REDIS_PARSER_ERRORS(_REDIS_PARSER_ERRNO_ENUM_GEN)
+} redis_parser_errno_t;
+#undef _REDIS_PARSER_ERRNO_ENUM_GEN
+
 struct redis_protocol_s {
     unsigned char type; /* payload type */
     const redis_protocol_t* parent; /* when nested, parent object */
@@ -50,6 +66,7 @@ struct redis_parser_s {
 
     /* private: parser state */
     unsigned char state;
+    unsigned char errno;
 
     /* private: temporary integer (integer reply, bulk length) */
     struct redis_parser_int64_s {
@@ -60,5 +77,7 @@ struct redis_parser_s {
 
 void redis_parser_init(redis_parser_t *parser, const redis_parser_cb_t *callbacks);
 size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len);
+redis_parser_errno_t redis_parser_errno(redis_parser_t *parser);
+const char *redis_parser_strerror(redis_parser_errno_t errno);
 
 #endif // __REDIS_PARSER_H
