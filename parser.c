@@ -200,13 +200,11 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 /* Start with negative sign */
                 if (ch == '-') {
-                    i64.neg = 1;
                     ADVANCE_AND_MOVE(integer_neg_19);
                 }
 
                 /* Start with positive sign */
                 if (ch == '+') {
-                    i64.neg = 0;
                     ADVANCE_AND_MOVE(integer_pos_19);
                 }
 
