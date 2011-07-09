@@ -142,16 +142,18 @@ static void test_format_commands(void) {
         len == 4+4+(3+2)+4+(1+2)+4+(1+2));
     free(cmd);
 
+    /* sizeof(long long) is 8 bytes regardless of architecture */
     test("Format command with printf-delegation (long long): ");
-    len = redisFormatCommand(&cmd,"key:%08lld",1234ll);
-    test_cond(strncmp(cmd,"*1\r\n$12\r\nkey:00001234\r\n",len) == 0 &&
-        len == 4+5+(12+2));
+    len = redisFormatCommand(&cmd,"key:%08lld str:%s",1234ll, "hello");
+    test_cond(strncmp(cmd,"*2\r\n$12\r\nkey:00001234\r\n$9\r\nstr:hello\r\n",len) == 0 &&
+        len == 4+5+(12+2)+4+(9+2));
     free(cmd);
 
+    /* sizeof(float) is 4 bytes regardless of architecture */
     test("Format command with printf-delegation (float): ");
-    len = redisFormatCommand(&cmd,"v:%06.1f",12.34f);
-    test_cond(strncmp(cmd,"*1\r\n$8\r\nv:0012.3\r\n",len) == 0 &&
-        len == 4+4+(8+2));
+    len = redisFormatCommand(&cmd,"v:%06.1f str:%s",12.34f,"hello");
+    test_cond(strncmp(cmd,"*2\r\n$8\r\nv:0012.3\r\n$9\r\nstr:hello\r\n",len) == 0 &&
+        len == 4+4+(8+2)+4+(9+2));
     free(cmd);
 
     test("Format command with printf-delegation and extra interpolation: ");
