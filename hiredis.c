@@ -826,10 +826,8 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     }
 
                 fmt_invalid:
-                    /* Consume and discard vararg */
-                    va_arg(ap,void);
                     va_end(_cpy);
-                    break;
+                    goto err;
 
                 fmt_valid:
                     _l = (_p+1)-c;

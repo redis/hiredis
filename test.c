@@ -162,11 +162,9 @@ static void test_format_commands(void) {
         len == 4+4+(8+2)+4+(3+2));
     free(cmd);
 
-    test("Format command with wrong printf format and extra interpolation: ");
+    test("Format command with invalid printf format: ");
     len = redisFormatCommand(&cmd,"key:%08p %b",1234,"foo",3);
-    test_cond(strncmp(cmd,"*2\r\n$6\r\nkey:8p\r\n$3\r\nfoo\r\n",len) == 0 &&
-        len == 4+4+(6+2)+4+(3+2));
-    free(cmd);
+    test_cond(len == -1);
 
     const char *argv[3];
     argv[0] = "SET";
