@@ -32,7 +32,7 @@ struct config {
 /* The following lines make up our testing "framework" :) */
 static int tests = 0, fails = 0;
 #define test(_s) { printf("#%02d ", ++tests); printf(_s); }
-#define test_cond(_c) if(_c) printf("PASSED\n"); else {printf("FAILED\n"); fails++;}
+#define test_cond(_c) if(_c) printf("\033[0;32mPASSED\033[0;0m\n"); else {printf("\033[0;31mFAILED\033[0;0m\n"); fails++;}
 
 static long long usec(void) {
     struct timeval tv;
