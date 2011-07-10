@@ -141,6 +141,9 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
             return REDIS_ERR;
         }
 
+        if (redisCheckSocketError(c, fd) != REDIS_OK)
+            return REDIS_ERR;
+
         return REDIS_OK;
     }
 
