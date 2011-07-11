@@ -190,10 +190,10 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(integer_start);
                 case '+':
                     cur->type = REDIS_STATUS_T;
-                    assert(NULL);
+                    ADVANCE_AND_MOVE(line);
                 case '-':
                     cur->type = REDIS_ERROR_T;
-                    assert(NULL);
+                    ADVANCE_AND_MOVE(line);
                 }
 
                 SET_ERRNO(ERR_INVALID_TYPE);
@@ -389,6 +389,36 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
             STATE(bulk_lf) {
                 if (*pos == '\n') {
+                    goto done;
+                }
+
+                SET_ERRNO(ERR_EXPECTED_LF);
+                goto error;
+            }
+
+            STATE(line) {
+                const char *mark = pos;
+
+                /* Remove tight loop and add function-wide "line mark" once
+                 * limits on line length are added. */
+                while(pos < end) {
+                    if (*pos == '\r') {
+                        cur->coff = cur->poff + 1;
+                        cur->clen = nread - cur->coff;
+                        CALLBACK(string, cur, mark, pos-mark);
+                        ADVANCE_AND_MOVE(line_lf);
+                    }
+
+                    ADVANCE(1);
+                }
+
+                /* No more data */
+                CALLBACK(string, cur, mark, pos-mark);
+            }
+
+            STATE(line_lf) {
+                if (*pos == '\n') {
+                    cur->plen = nread - cur->poff + 1; /* include \n */
                     goto done;
                 }
 

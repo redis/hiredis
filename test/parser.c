@@ -363,6 +363,38 @@ void test_nil(redis_parser_t *p) {
     test_char_by_char(p, res, buf, len);
 }
 
+void test_status(redis_parser_t *p) {
+    const char *buf = "+status\r\n";
+    size_t len = 9;
+    redis_protocol_t *res;
+
+    /* Parse and check resulting protocol_t */
+    RESET_PARSER_T(p);
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
+    assert(res != NULL);
+    assert(res->type == REDIS_STATUS_T);
+    assert(res->poff == 0);
+    assert(res->plen == 9);
+    assert(res->coff == 1);
+    assert(res->clen == 6);
+}
+
+void test_error(redis_parser_t *p) {
+    const char *buf = "-error\r\n";
+    size_t len = 8;
+    redis_protocol_t *res;
+
+    /* Parse and check resulting protocol_t */
+    RESET_PARSER_T(p);
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
+    assert(res != NULL);
+    assert(res->type == REDIS_ERROR_T);
+    assert(res->poff == 0);
+    assert(res->plen == 8);
+    assert(res->coff == 1);
+    assert(res->clen == 5);
+}
+
 int main(int argc, char **argv) {
     redis_parser_t *parser = malloc(sizeof(redis_parser_t));
     redis_parser_init(parser, &callbacks);
@@ -375,6 +407,8 @@ int main(int argc, char **argv) {
     test_array(parser);
     test_empty_array(parser);
     test_integer(parser);
+    test_status(parser);
+    test_error(parser);
 
     free(parser);
     return 0;
