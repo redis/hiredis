@@ -91,9 +91,12 @@ static redis_parser_cb_t callbacks = {
     redis_parser_init((__parser), &callbacks);  \
 } while(0)
 
-void test_char_by_char(redis_parser_t *p, redis_protocol_t *ref, const char *buf, size_t len) {
+void test_char_by_char(redis_protocol_t *ref, const char *buf, size_t len) {
+    redis_parser_t *p;
     redis_protocol_t *res;
     size_t i;
+
+    p = malloc(sizeof(redis_parser_t));
 
     for (i = 1; i < (len-1); i++) {
         RESET_PARSER_T(p);
@@ -109,6 +112,8 @@ void test_char_by_char(redis_parser_t *p, redis_protocol_t *ref, const char *buf
         /* Compare result with reference */
         assert(memcmp(ref, res, sizeof(redis_protocol_t)) == 0);
     }
+
+    free(p);
 }
 
 void test_string(redis_parser_t *p) {
@@ -132,7 +137,7 @@ void test_string(redis_parser_t *p) {
     assert(cb_log[0].string_len == 5);
 
     /* Chunked check */
-    test_char_by_char(p, res, buf, len);
+    test_char_by_char(res, buf, len);
 }
 
 void test_empty_string(redis_parser_t *p) {
@@ -156,7 +161,7 @@ void test_empty_string(redis_parser_t *p) {
     assert(cb_log[0].string_len == 0);
 
     /* Chunked check */
-    test_char_by_char(p, res, buf, len);
+    test_char_by_char(res, buf, len);
 }
 
 void test_array(redis_parser_t *p) {
@@ -199,7 +204,7 @@ void test_array(redis_parser_t *p) {
     assert(cb_log[2].string_len == 5);
 
     /* Chunked check */
-    test_char_by_char(p, res, buf, len);
+    test_char_by_char(res, buf, len);
 }
 
 void test_empty_array(redis_parser_t *p) {
@@ -220,7 +225,7 @@ void test_empty_array(redis_parser_t *p) {
     assert(cb_log[0].array_len == 0);
 
     /* Chunked check */
-    test_char_by_char(p, res, buf, len);
+    test_char_by_char(res, buf, len);
 }
 
 void test_integer(redis_parser_t *p) {
@@ -243,7 +248,7 @@ void test_integer(redis_parser_t *p) {
     assert(cb_log[0].integer_value == 1234);
 
     /* Chunked check */
-    test_char_by_char(p, res, buf, len);
+    test_char_by_char(res, buf, len);
 
     /* Negative sign */
     buf = ":-123\r\n";
@@ -251,7 +256,7 @@ void test_integer(redis_parser_t *p) {
     assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf));
     assert(res != NULL);
     assert(cb_log_idx == 1 && cb_log[0].integer_value == -123);
-    test_char_by_char(p, res, buf, strlen(buf));
+    test_char_by_char(res, buf, strlen(buf));
 
     /* Positive sign */
     buf = ":+123\r\n";
@@ -259,7 +264,7 @@ void test_integer(redis_parser_t *p) {
     assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf));
     assert(res != NULL);
     assert(cb_log_idx == 1 && cb_log[0].integer_value == 123);
-    test_char_by_char(p, res, buf, strlen(buf));
+    test_char_by_char(res, buf, strlen(buf));
 
     /* Zero */
     buf = ":0\r\n";
@@ -267,7 +272,7 @@ void test_integer(redis_parser_t *p) {
     assert(redis_parser_execute(p, &res, buf, strlen(buf)) == strlen(buf));
     assert(res != NULL);
     assert(cb_log_idx == 1 && cb_log[0].integer_value == 0);
-    test_char_by_char(p, res, buf, strlen(buf));
+    test_char_by_char(res, buf, strlen(buf));
 
     /* Signed zero, positive */
     buf = ":+0\r\n";
@@ -360,7 +365,7 @@ void test_nil(redis_parser_t *p) {
     assert(cb_log[0].integer_value == 1234);
 
     /* Chunked check */
-    test_char_by_char(p, res, buf, len);
+    test_char_by_char(res, buf, len);
 }
 
 void test_status(redis_parser_t *p) {
