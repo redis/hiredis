@@ -53,7 +53,8 @@ typedef enum redis_parser_errno_e {
 struct redis_protocol_s {
     unsigned char type; /* payload type */
     const redis_protocol_t* parent; /* when nested, parent object */
-    int64_t remaining; /* remaining bulk bytes/nested objects */
+    int remaining; /* remaining bulk bytes/nested objects */
+    int cursor; /* number of processed bulk bytes/nested objects */
     void *data; /* user data */
     size_t poff; /* protocol offset */
     size_t plen; /* protocol length */

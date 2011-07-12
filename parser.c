@@ -29,6 +29,7 @@
     __tmp->clen = 0;                                                   \
     __tmp->type = 0;                                                   \
     __tmp->remaining = -1;                                             \
+    __tmp->cursor = 0;                                                 \
     __tmp->data = NULL;                                                \
 } while(0)
 
@@ -344,6 +345,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                     /* Store remaining objects for a complete multi bulk */
                     cur->remaining = (unsigned)i64.i64;
+                    cur->cursor = -1; /* Is incremented in "done" */
                     CALLBACK(array, cur, cur->remaining);
                     goto done;
                 }
@@ -375,6 +377,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 cur->remaining -= available;
                 CALLBACK(string, cur, pos, available);
                 pos += available; nread += available;
+
+                /* Add number of processed bytes to cursor */
+                cur->cursor += available;
                 goto finalize;
             }
 
@@ -414,6 +419,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 /* No more data */
                 CALLBACK(string, cur, mark, pos-mark);
+
+                /* Add number of processed bytes to cursor */
+                cur->cursor += pos-mark;
             }
 
             STATE(line_lf) {
@@ -436,6 +444,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             /* Move to nested object when we see an incomplete array */
             if (cur->type == REDIS_ARRAY_T && cur->remaining) {
                 RESET_PROTOCOL_T(&stack[++stackidx]);
+                cur->cursor++;
                 cur->remaining--;
                 break;
             }

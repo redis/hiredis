@@ -18,6 +18,7 @@ typedef struct log_entry_s log_entry_t;
 
 struct log_entry_s {
     redis_protocol_t obj;
+    int parent_cursor;
 
     /* string_t specifics */
     const char *string_buf;
@@ -49,6 +50,10 @@ int on_string(redis_parser_t *parser, redis_protocol_t *obj, const char *buf, si
         .string_buf = buf,
         .string_len = len
     };
+
+    if (obj->parent)
+        tmp.parent_cursor = obj->parent->cursor;
+
     cb_log[cb_log_idx++] = tmp;
     return 0;
 }
@@ -58,6 +63,10 @@ int on_array(redis_parser_t *parser, redis_protocol_t *obj, size_t len) {
         .obj = *obj,
         .array_len = len
     };
+
+    if (obj->parent)
+        tmp.parent_cursor = obj->parent->cursor;
+
     cb_log[cb_log_idx++] = tmp;
     return 0;
 }
@@ -67,6 +76,10 @@ int on_integer(redis_parser_t *parser, redis_protocol_t *obj, int64_t value) {
         .obj = *obj,
         .integer_value = value
     };
+
+    if (obj->parent)
+        tmp.parent_cursor = obj->parent->cursor;
+
     cb_log[cb_log_idx++] = tmp;
     return 0;
 }
@@ -75,6 +88,10 @@ int on_nil(redis_parser_t *parser, redis_protocol_t *obj) {
     log_entry_t tmp = {
         .obj = *obj
     };
+
+    if (obj->parent)
+        tmp.parent_cursor = obj->parent->cursor;
+
     cb_log[cb_log_idx++] = tmp;
     return 0;
 }
@@ -97,7 +114,6 @@ void test_char_by_char(redis_protocol_t *ref, const char *buf, size_t len) {
     size_t i;
 
     p = malloc(sizeof(redis_parser_t));
-
     for (i = 1; i < (len-1); i++) {
         RESET_PARSER_T(p);
 
@@ -110,6 +126,7 @@ void test_char_by_char(redis_protocol_t *ref, const char *buf, size_t len) {
         assert(NULL != res);
 
         /* Compare result with reference */
+        ref->cursor = res->cursor = 0; /* ignore cursor */
         assert(memcmp(ref, res, sizeof(redis_protocol_t)) == 0);
     }
 
@@ -195,6 +212,7 @@ void test_array(redis_parser_t *p) {
     assert(cb_log[1].obj.clen == 5);
     assert(cb_log[1].string_buf == buf+4+4);
     assert(cb_log[1].string_len == 5);
+    assert(cb_log[1].parent_cursor == 0);
 
     assert(cb_log[2].obj.poff == 4+11);
     assert(cb_log[2].obj.plen == 4+5+2);
@@ -202,6 +220,7 @@ void test_array(redis_parser_t *p) {
     assert(cb_log[2].obj.clen == 5);
     assert(cb_log[2].string_buf == buf+4+11+4);
     assert(cb_log[2].string_len == 5);
+    assert(cb_log[2].parent_cursor == 1);
 
     /* Chunked check */
     test_char_by_char(res, buf, len);
