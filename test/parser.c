@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include "parser.h"
+#include "sds.h"
 
 #define assert_equal_size_t(a,b) do {            \
     __typeof__ (a) a_ = (a);                     \
@@ -136,6 +137,17 @@ void test_char_by_char(redis_protocol_t *_unused, const char *buf, size_t len) {
     for (i = 0; i < (len-2); i++) {
         for (j = i+1; j < (len-1); j++) {
             RESET_PARSER_T(p);
+
+#ifdef DEBUG
+            sds debug = sdsempty();
+            debug = sdscatrepr(debug, buf, i);
+            debug = sdscatprintf(debug, "  +  ");
+            debug = sdscatrepr(debug, buf+i, j-i);
+            debug = sdscatprintf(debug, "  +  ");
+            debug = sdscatrepr(debug, buf+j, len-j);
+            fprintf(stderr, "%s\n", debug);
+            sdsfree(debug);
+#endif
 
             /* Slice 1 */
             assert_equal_size_t(redis_parser_execute(p, &res, buf, i), i);
