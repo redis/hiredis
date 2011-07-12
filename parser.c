@@ -14,7 +14,7 @@
  * the caller because "ISO C99 requires rest arguments to be used". */
 #define CALLBACK(X, ...) do {                                          \
     if (callbacks && callbacks->on_##X) {                              \
-        if (callbacks->on_##X(parser, __VA_ARGS__) == 0) {             \
+        if (callbacks->on_##X(parser, __VA_ARGS__) != 0) {             \
             SET_ERRNO(ERR_CALLBACK);                                   \
             goto error;                                                \
         }                                                              \

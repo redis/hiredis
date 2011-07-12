@@ -50,7 +50,7 @@ int on_string(redis_parser_t *parser, redis_protocol_t *obj, const char *buf, si
         .string_len = len
     };
     cb_log[cb_log_idx++] = tmp;
-    return 1;
+    return 0;
 }
 
 int on_array(redis_parser_t *parser, redis_protocol_t *obj, size_t len) {
@@ -59,7 +59,7 @@ int on_array(redis_parser_t *parser, redis_protocol_t *obj, size_t len) {
         .array_len = len
     };
     cb_log[cb_log_idx++] = tmp;
-    return 1;
+    return 0;
 }
 
 int on_integer(redis_parser_t *parser, redis_protocol_t *obj, int64_t value) {
@@ -68,7 +68,7 @@ int on_integer(redis_parser_t *parser, redis_protocol_t *obj, int64_t value) {
         .integer_value = value
     };
     cb_log[cb_log_idx++] = tmp;
-    return 1;
+    return 0;
 }
 
 int on_nil(redis_parser_t *parser, redis_protocol_t *obj) {
@@ -76,7 +76,7 @@ int on_nil(redis_parser_t *parser, redis_protocol_t *obj) {
         .obj = *obj
     };
     cb_log[cb_log_idx++] = tmp;
-    return 1;
+    return 0;
 }
 
 static redis_parser_callbacks_t callbacks = {
