@@ -376,7 +376,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 /* Not everything can be read */
                 cur->remaining -= available;
                 CALLBACK(string, cur, pos, available);
-                pos += available; nread += available;
+                ADVANCE(available);
 
                 /* Add number of processed bytes to cursor */
                 cur->cursor += available;
