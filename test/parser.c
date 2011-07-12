@@ -79,7 +79,7 @@ int on_nil(redis_parser_t *parser, redis_protocol_t *obj) {
     return 1;
 }
 
-static redis_parser_cb_t callbacks = {
+static redis_parser_callbacks_t callbacks = {
     &on_string,
     &on_array,
     &on_integer,

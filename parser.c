@@ -127,7 +127,7 @@ static const char *chrtos(char byte) {
 #define LOG(fmt, ...) do { ; } while (0)
 #endif
 
-void redis_parser_init(redis_parser_t *parser, const redis_parser_cb_t *callbacks) {
+void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *callbacks) {
     parser->stackidx = -1;
     parser->callbacks = callbacks;
 }
@@ -142,7 +142,7 @@ void redis_parser_init(redis_parser_t *parser, const redis_parser_cb_t *callback
  * re-initialized before parsing more data. */
 size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len) {
     redis_protocol_t *stack = parser->stack;
-    const redis_parser_cb_t *callbacks = parser->callbacks;
+    const redis_parser_callbacks_t *callbacks = parser->callbacks;
     const char *pos;
     const char *end;
     size_t nread;

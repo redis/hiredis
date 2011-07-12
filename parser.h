@@ -10,7 +10,7 @@
 #define REDIS_STATUS_T 5
 #define REDIS_ERROR_T 6
 
-typedef struct redis_parser_cb_s redis_parser_cb_t;
+typedef struct redis_parser_callbacks_s redis_parser_callbacks_t;
 typedef struct redis_protocol_s redis_protocol_t;
 typedef struct redis_parser_s redis_parser_t;
 
@@ -19,7 +19,7 @@ typedef int (*redis_array_cb)(redis_parser_t *, redis_protocol_t *, size_t);
 typedef int (*redis_integer_cb)(redis_parser_t *, redis_protocol_t *, int64_t);
 typedef int (*redis_nil_cb)(redis_parser_t *, redis_protocol_t *);
 
-struct redis_parser_cb_s {
+struct redis_parser_callbacks_s {
     redis_string_cb on_string;
     redis_array_cb on_array;
     redis_integer_cb on_integer;
@@ -55,7 +55,7 @@ struct redis_protocol_s {
 
 struct redis_parser_s {
     /* private: callbacks */
-    const redis_parser_cb_t *callbacks;
+    const redis_parser_callbacks_t *callbacks;
 
     /* private: number of consumed bytes for a single message */
     size_t nread;
@@ -75,7 +75,7 @@ struct redis_parser_s {
     } i64;
 };
 
-void redis_parser_init(redis_parser_t *parser, const redis_parser_cb_t *callbacks);
+void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *callbacks);
 size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len);
 redis_parser_errno_t redis_parser_errno(redis_parser_t *parser);
 const char *redis_parser_strerror(redis_parser_errno_t errno);
