@@ -3,12 +3,20 @@
 
 #include <stdint.h>
 
-#define REDIS_STRING_T 1
-#define REDIS_ARRAY_T 2
-#define REDIS_INTEGER_T 3
-#define REDIS_NIL_T 4
-#define REDIS_STATUS_T 5
-#define REDIS_ERROR_T 6
+/* Compat */
+#define REDIS_REPLY_STRING 1
+#define REDIS_REPLY_ARRAY 2
+#define REDIS_REPLY_INTEGER 3
+#define REDIS_REPLY_NIL 4
+#define REDIS_REPLY_STATUS 5
+#define REDIS_REPLY_ERROR 6
+
+#define REDIS_STRING_T REDIS_REPLY_STRING
+#define REDIS_ARRAY_T REDIS_REPLY_ARRAY
+#define REDIS_INTEGER_T REDIS_REPLY_INTEGER
+#define REDIS_NIL_T REDIS_REPLY_NIL
+#define REDIS_STATUS_T REDIS_REPLY_STATUS
+#define REDIS_ERROR_T REDIS_REPLY_ERROR
 
 typedef struct redis_parser_callbacks_s redis_parser_callbacks_t;
 typedef struct redis_protocol_s redis_protocol_t;
