@@ -128,31 +128,37 @@ void test_char_by_char(redis_protocol_t *_unused, const char *buf, size_t len) {
     log_entry_t *ref;
     redis_parser_t *p;
     redis_protocol_t *res;
-    size_t i, j;
+    size_t i, j, k;
 
     ref = dup_cb_log();
     p = malloc(sizeof(redis_parser_t));
 
-    for (i = 1; i < (len-1); i++) {
-        RESET_PARSER_T(p);
+    for (i = 0; i < (len-2); i++) {
+        for (j = i+1; j < (len-1); j++) {
+            RESET_PARSER_T(p);
 
-        /* Slice 1 */
-        assert_equal_size_t(redis_parser_execute(p, &res, buf, i), i);
-        assert(NULL == res); /* no result */
+            /* Slice 1 */
+            assert_equal_size_t(redis_parser_execute(p, &res, buf, i), i);
+            assert(NULL == res); /* no result */
 
-        /* Slice 2 */
-        assert_equal_size_t(redis_parser_execute(p, &res, buf+i, len-i), len-i);
-        assert(NULL != res);
+            /* Slice 2 */
+            assert_equal_size_t(redis_parser_execute(p, &res, buf+i, j-i), j-i);
+            assert(NULL == res); /* no result */
 
-        /* Compare callback log with reference */
-        for (j = 0; j < CB_LOG_SIZE; j++) {
-            log_entry_t expect = ref[j];
-            log_entry_t actual = cb_log[j];
+            /* Slice 3 */
+            assert_equal_size_t(redis_parser_execute(p, &res, buf+j, len-j), len-j);
+            assert(NULL != res);
 
-            /* Not interested in the redis_protocol_t data */
-            memset(&expect.obj, 0, sizeof(expect.obj));
-            memset(&actual.obj, 0, sizeof(actual.obj));
-            assert(memcmp(&expect, &actual, sizeof(expect)) == 0);
+            /* Compare callback log with reference */
+            for (k = 0; k < CB_LOG_SIZE; k++) {
+                log_entry_t expect = ref[k];
+                log_entry_t actual = cb_log[k];
+
+                /* Not interested in the redis_protocol_t data */
+                memset(&expect.obj, 0, sizeof(expect.obj));
+                memset(&actual.obj, 0, sizeof(actual.obj));
+                assert(memcmp(&expect, &actual, sizeof(expect)) == 0);
+            }
         }
     }
 
