@@ -18,11 +18,10 @@ typedef struct log_entry_s log_entry_t;
 
 struct log_entry_s {
     redis_protocol_t obj;
-    int parent_cursor;
+    int type;
 
     /* string_t specifics */
-    const char *string_buf;
-    size_t string_len;
+    char string_buf[1024];
 
     /* array_t specifics */
     size_t array_len;
@@ -35,64 +34,81 @@ struct log_entry_s {
 static log_entry_t cb_log[CB_LOG_SIZE];
 static int cb_log_idx = 0;
 
-#define reset_cb_log() do {              \
-    memset(cb_log, 0xff, sizeof(cb_log));     \
-    cb_log_idx = 0;                      \
-} while(0)
+static void reset_cb_log(void) {
+    memset(cb_log, 0xff, sizeof(cb_log));
+    cb_log_idx = 0;
+}
 
-#define copy_cb_log(dst) do {            \
-    memcpy(dst, cb_log, sizeof(cb_log));   \
-} while(0)
+static log_entry_t *dup_cb_log(void) {
+    log_entry_t *log = malloc(sizeof(cb_log));
+    memcpy(log, cb_log, sizeof(cb_log));
+    return log;
+}
 
-int on_string(redis_parser_t *parser, redis_protocol_t *obj, const char *buf, size_t len) {
-    log_entry_t tmp = {
-        .obj = *obj,
-        .string_buf = buf,
-        .string_len = len
-    };
+int on_string(redis_parser_t *parser, redis_protocol_t *p, const char *buf, size_t len) {
+    log_entry_t *log = (log_entry_t*)p->data;
 
-    if (obj->parent)
-        tmp.parent_cursor = obj->parent->cursor;
+    /* Use new entry when this is the first call */
+    if (log == NULL) {
+        log = p->data = &cb_log[cb_log_idx++];
+        log->obj = *p;
+        log->type = p->type;
+        log->string_buf[0] = '\0';
+    }
 
-    cb_log[cb_log_idx++] = tmp;
+    /* Type should never change when called multiple times */
+    assert(log->type == p->type);
+
+    /* Cursor should equal current string length */
+    assert(p->cursor == strlen(log->string_buf));
+
+    /* Append string data */
+    strncat(log->string_buf, buf, len);
+
     return 0;
 }
 
-int on_array(redis_parser_t *parser, redis_protocol_t *obj, size_t len) {
-    log_entry_t tmp = {
-        .obj = *obj,
-        .array_len = len
-    };
+int on_array(redis_parser_t *parser, redis_protocol_t *p, size_t len) {
+    log_entry_t *log = (log_entry_t*)p->data;
 
-    if (obj->parent)
-        tmp.parent_cursor = obj->parent->cursor;
+    /* Should only be called once */
+    assert(log == NULL);
 
-    cb_log[cb_log_idx++] = tmp;
+    /* Use new entry */
+    log = p->data = &cb_log[cb_log_idx++];
+    log->obj = *p;
+    log->type = p->type;
+    log->array_len = len;
+
     return 0;
 }
 
-int on_integer(redis_parser_t *parser, redis_protocol_t *obj, int64_t value) {
-    log_entry_t tmp = {
-        .obj = *obj,
-        .integer_value = value
-    };
+int on_integer(redis_parser_t *parser, redis_protocol_t *p, int64_t value) {
+    log_entry_t *log = (log_entry_t*)p->data;
 
-    if (obj->parent)
-        tmp.parent_cursor = obj->parent->cursor;
+    /* Should only be called once */
+    assert(log == NULL);
 
-    cb_log[cb_log_idx++] = tmp;
+    /* Use new entry */
+    log = p->data = &cb_log[cb_log_idx++];
+    log->obj = *p;
+    log->type = p->type;
+    log->integer_value = value;
+
     return 0;
 }
 
-int on_nil(redis_parser_t *parser, redis_protocol_t *obj) {
-    log_entry_t tmp = {
-        .obj = *obj
-    };
+int on_nil(redis_parser_t *parser, redis_protocol_t *p) {
+    log_entry_t *log = (log_entry_t*)p->data;
 
-    if (obj->parent)
-        tmp.parent_cursor = obj->parent->cursor;
+    /* Should only be called once */
+    assert(log == NULL);
 
-    cb_log[cb_log_idx++] = tmp;
+    /* Use new entry */
+    log = p->data = &cb_log[cb_log_idx++];
+    log->obj = *p;
+    log->type = p->type;
+
     return 0;
 }
 
@@ -108,12 +124,15 @@ static redis_parser_callbacks_t callbacks = {
     redis_parser_init((__parser), &callbacks);  \
 } while(0)
 
-void test_char_by_char(redis_protocol_t *ref, const char *buf, size_t len) {
+void test_char_by_char(redis_protocol_t *_unused, const char *buf, size_t len) {
+    log_entry_t *ref;
     redis_parser_t *p;
     redis_protocol_t *res;
-    size_t i;
+    size_t i, j;
 
+    ref = dup_cb_log();
     p = malloc(sizeof(redis_parser_t));
+
     for (i = 1; i < (len-1); i++) {
         RESET_PARSER_T(p);
 
@@ -125,12 +144,20 @@ void test_char_by_char(redis_protocol_t *ref, const char *buf, size_t len) {
         assert_equal_size_t(redis_parser_execute(p, &res, buf+i, len-i), len-i);
         assert(NULL != res);
 
-        /* Compare result with reference */
-        ref->cursor = res->cursor = 0; /* ignore cursor */
-        assert(memcmp(ref, res, sizeof(redis_protocol_t)) == 0);
+        /* Compare callback log with reference */
+        for (j = 0; j < CB_LOG_SIZE; j++) {
+            log_entry_t expect = ref[j];
+            log_entry_t actual = cb_log[j];
+
+            /* Not interested in the redis_protocol_t data */
+            memset(&expect.obj, 0, sizeof(expect.obj));
+            memset(&actual.obj, 0, sizeof(actual.obj));
+            assert(memcmp(&expect, &actual, sizeof(expect)) == 0);
+        }
     }
 
     free(p);
+    free(ref);
 }
 
 void test_string(redis_parser_t *p) {
@@ -150,8 +177,7 @@ void test_string(redis_parser_t *p) {
 
     /* Check callbacks */
     assert(cb_log_idx == 1);
-    assert(cb_log[0].string_buf == buf+4);
-    assert(cb_log[0].string_len == 5);
+    assert(!strncmp(cb_log[0].string_buf, buf+4, 5));
 
     /* Chunked check */
     test_char_by_char(res, buf, len);
@@ -174,8 +200,7 @@ void test_empty_string(redis_parser_t *p) {
 
     /* Check callbacks */
     assert(cb_log_idx == 1);
-    assert(cb_log[0].string_buf == buf+4);
-    assert(cb_log[0].string_len == 0);
+    assert(!strncmp(cb_log[0].string_buf, buf+4, 0));
 
     /* Chunked check */
     test_char_by_char(res, buf, len);
@@ -210,17 +235,13 @@ void test_array(redis_parser_t *p) {
     assert(cb_log[1].obj.plen == 4+5+2);
     assert(cb_log[1].obj.coff == 4+4);
     assert(cb_log[1].obj.clen == 5);
-    assert(cb_log[1].string_buf == buf+4+4);
-    assert(cb_log[1].string_len == 5);
-    assert(cb_log[1].parent_cursor == 0);
+    assert(!strncmp(cb_log[1].string_buf, buf+4+4, 5));
 
     assert(cb_log[2].obj.poff == 4+11);
     assert(cb_log[2].obj.plen == 4+5+2);
     assert(cb_log[2].obj.coff == 4+11+4);
     assert(cb_log[2].obj.clen == 5);
-    assert(cb_log[2].string_buf == buf+4+11+4);
-    assert(cb_log[2].string_len == 5);
-    assert(cb_log[2].parent_cursor == 1);
+    assert(!strncmp(cb_log[2].string_buf, buf+4+11+4, 5));
 
     /* Chunked check */
     test_char_by_char(res, buf, len);
