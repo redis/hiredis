@@ -422,6 +422,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 /* Add number of processed bytes to cursor */
                 cur->cursor += pos-mark;
+                goto finalize;
             }
 
             STATE(line_lf) {
