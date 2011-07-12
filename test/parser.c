@@ -442,6 +442,10 @@ void test_status(redis_parser_t *p) {
     assert(res->plen == 9);
     assert(res->coff == 1);
     assert(res->clen == 6);
+    assert(!strncmp(cb_log[0].string_buf, buf+1, 6));
+
+    /* Chunked check */
+    test_char_by_char(res, buf, len);
 }
 
 void test_error(redis_parser_t *p) {
@@ -458,6 +462,10 @@ void test_error(redis_parser_t *p) {
     assert(res->plen == 8);
     assert(res->coff == 1);
     assert(res->clen == 5);
+    assert(!strncmp(cb_log[0].string_buf, buf+1, 5));
+
+    /* Chunked check */
+    test_char_by_char(res, buf, len);
 }
 
 int main(int argc, char **argv) {
