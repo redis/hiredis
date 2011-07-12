@@ -134,8 +134,8 @@ void test_char_by_char(redis_protocol_t *_unused, const char *buf, size_t len) {
     ref = dup_cb_log();
     p = malloc(sizeof(redis_parser_t));
 
-    for (i = 0; i < (len-2); i++) {
-        for (j = i+1; j < (len-1); j++) {
+    for (i = 0; i < (len-1); i++) {
+        for (j = i+1; j < len; j++) {
             RESET_PARSER_T(p);
 
 #ifdef DEBUG
