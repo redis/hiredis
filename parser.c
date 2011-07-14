@@ -6,8 +6,8 @@
 #include "parser.h"
 
 #define ERRNO(code) REDIS_PARSER_##code
-#define SET_ERRNO(code) do {                                         \
-    parser->errno = ERRNO(code);                                     \
+#define SET_ERRNO(code) do {                                           \
+    parser->errno = ERRNO(code);                                       \
 } while(0)
 
 /* The redis_protocol_t argument to the callback function must be provided by
@@ -61,25 +61,25 @@ static const char *errno_str[] = {
 };
 #undef _GEN
 
-#define STATE(st)                                \
-    case s_##st:                                 \
-    l_##st:                                      \
-    state = s_##st;                              \
-    if (pos >= end) { /* No more data */         \
-        goto finalize;                           \
+#define STATE(st)                                                      \
+    case s_##st:                                                       \
+    l_##st:                                                            \
+    state = s_##st;                                                    \
+    if (pos >= end) { /* No more data */                               \
+        goto finalize;                                                 \
     }
 
-#define ADVANCE(bytes) do {                      \
-    pos += (bytes); nread += (bytes);            \
+#define ADVANCE(bytes) do {                                            \
+    pos += (bytes); nread += (bytes);                                  \
 } while(0)
 
-#define MOVE(st) do {                            \
-    goto l_##st;                                 \
+#define MOVE(st) do {                                                  \
+    goto l_##st;                                                       \
 } while(0)
 
-#define ADVANCE_AND_MOVE(st) do {                \
-    ADVANCE(1);                                  \
-    MOVE(st);                                    \
+#define ADVANCE_AND_MOVE(st) do {                                      \
+    ADVANCE(1);                                                        \
+    MOVE(st);                                                          \
 } while(0)
 
 #ifdef DEBUG
@@ -89,9 +89,9 @@ static const char *state_str[] = {
 };
 #undef _ENUM_GEN
 
-#define LOG(fmt, ...) do {                       \
-    fprintf(stderr, fmt "\n", __VA_ARGS__);      \
-    fflush(stderr);                              \
+#define LOG(fmt, ...) do {                                             \
+    fprintf(stderr, fmt "\n", __VA_ARGS__);                            \
+    fflush(stderr);                                                    \
 } while(0)
 
 #include <ctype.h>
