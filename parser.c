@@ -493,6 +493,10 @@ error:
     return pos-buf;
 }
 
+redis_protocol_t *redis_parser_root(redis_parser_t *parser) {
+    return &parser->stack[0];
+}
+
 redis_parser_err_t redis_parser_err(redis_parser_t *parser) {
     return parser->err;
 }
