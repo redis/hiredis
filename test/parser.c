@@ -491,6 +491,25 @@ void test_error(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
+void test_abort_after_error(redis_parser_t *p) {
+    redis_protocol_t *res;
+    redis_parser_errno_t errno;
+
+    assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r", 4), 4);
+    assert(res == NULL);
+    assert_equal_size_t(redis_parser_execute(p, &res, "\r", 1), 0);
+    assert(res == NULL);
+
+    /* Test if the error matches what we expect */
+    errno = redis_parser_errno(p);
+    assert(errno == REDIS_PARSER_ERR_EXPECTED_LF);
+    assert(strcmp("expected \\n", redis_parser_strerror(errno)) == 0);
+
+    /* Test that the parser doesn't continue after an error */
+    assert_equal_size_t(redis_parser_execute(p, &res, "\n", 1), 0);
+    assert(res == NULL);
+}
+
 int main(int argc, char **argv) {
     redis_parser_t *parser = malloc(sizeof(redis_parser_t));
     redis_parser_init(parser, &callbacks);
@@ -505,6 +524,7 @@ int main(int argc, char **argv) {
     test_integer(parser);
     test_status(parser);
     test_error(parser);
+    test_abort_after_error(parser);
 
     free(parser);
     return 0;

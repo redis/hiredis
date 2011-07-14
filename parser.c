@@ -131,6 +131,7 @@ static const char *chrtos(char byte) {
 void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *callbacks) {
     parser->stackidx = -1;
     parser->callbacks = callbacks;
+    parser->errno = 0;
 }
 
 /* Execute the parser against len bytes in buf. When a full message was read,
@@ -151,6 +152,12 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
     unsigned char state;
     struct redis_parser_int64_s i64;
     redis_protocol_t *cur;
+
+    /* Abort immediately if the parser is in an error state. It should be
+     * re-initialized before attempting to execute it with new data. */
+    if (parser->errno) {
+        return 0;
+    }
 
     /* Reset destination */
     if (dst) *dst = NULL;
