@@ -7,7 +7,7 @@
 
 #define ERRNO(code) REDIS_PARSER_##code
 #define SET_ERRNO(code) do {                                           \
-    parser->errno = ERRNO(code);                                       \
+    parser->err = ERRNO(code);                                         \
 } while(0)
 
 /* The redis_protocol_t argument to the callback function must be provided by
@@ -56,7 +56,7 @@ enum state {
 #undef _GEN
 
 #define _GEN(code, description) description,
-static const char *errno_str[] = {
+static const char *strerror_map[] = {
     REDIS_PARSER_ERRORS(_GEN)
 };
 #undef _GEN
@@ -131,7 +131,7 @@ static const char *chrtos(char byte) {
 void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *callbacks) {
     parser->stackidx = -1;
     parser->callbacks = callbacks;
-    parser->errno = 0;
+    parser->err = 0;
 }
 
 /* Execute the parser against len bytes in buf. When a full message was read,
@@ -155,7 +155,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
     /* Abort immediately if the parser is in an error state. It should be
      * re-initialized before attempting to execute it with new data. */
-    if (parser->errno) {
+    if (parser->err) {
         return 0;
     }
 
@@ -486,19 +486,19 @@ finalize:
 
 error:
 
-    if (parser->errno == ERRNO(OK)) {
+    if (parser->err == ERRNO(OK)) {
         SET_ERRNO(ERR_UNKNOWN);
     }
 
     return pos-buf;
 }
 
-redis_parser_errno_t redis_parser_errno(redis_parser_t *parser) {
-    return parser->errno;
+redis_parser_err_t redis_parser_err(redis_parser_t *parser) {
+    return parser->err;
 }
 
-const char *redis_parser_strerror(redis_parser_errno_t errno) {
-    if (errno < (sizeof(errno_str)/sizeof(errno_str[0])))
-        return errno_str[errno];
+const char *redis_parser_strerror(redis_parser_err_t err) {
+    if (err < (sizeof(strerror_map)/sizeof(strerror_map[0])))
+        return strerror_map[err];
     return NULL;
 }

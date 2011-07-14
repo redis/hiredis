@@ -45,9 +45,9 @@ struct redis_parser_callbacks_s {
     _X(ERR_EXPECTED_LF, "expected \\n")              \
 
 #define _REDIS_PARSER_ERRNO_ENUM_GEN(code, description) REDIS_PARSER_##code,
-typedef enum redis_parser_errno_e {
+typedef enum redis_parser_err_e {
     REDIS_PARSER_ERRORS(_REDIS_PARSER_ERRNO_ENUM_GEN)
-} redis_parser_errno_t;
+} redis_parser_err_t;
 #undef _REDIS_PARSER_ERRNO_ENUM_GEN
 
 struct redis_protocol_s {
@@ -75,7 +75,7 @@ struct redis_parser_s {
 
     /* private: parser state */
     unsigned char state;
-    unsigned char errno;
+    redis_parser_err_t err;
 
     /* private: temporary integer (integer reply, bulk length) */
     struct redis_parser_int64_s {
@@ -86,7 +86,7 @@ struct redis_parser_s {
 
 void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *callbacks);
 size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len);
-redis_parser_errno_t redis_parser_errno(redis_parser_t *parser);
-const char *redis_parser_strerror(redis_parser_errno_t errno);
+redis_parser_err_t redis_parser_err(redis_parser_t *parser);
+const char *redis_parser_strerror(redis_parser_err_t err);
 
 #endif // __REDIS_PARSER_H
