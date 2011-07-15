@@ -330,6 +330,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 if (cur->type == REDIS_STRING_T) {
                     if (i64.i64 < 0) { /* nil bulk */
+                        cur->type = REDIS_NIL_T;
                         CALLBACK(nil, cur);
                         goto done;
                     }
@@ -346,6 +347,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 if (cur->type == REDIS_ARRAY_T) {
                     if (i64.i64 < 0) { /* nil multi bulk */
+                        cur->type = REDIS_NIL_T;
                         CALLBACK(nil, cur);
                         goto done;
                     }

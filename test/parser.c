@@ -242,6 +242,25 @@ void test_empty_string(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
+void test_nil_string(redis_parser_t *p) {
+    const char *buf = "$-1\r\n";
+    size_t len = 5;
+    redis_protocol_t *res;
+
+    /* Parse and check resulting protocol_t */
+    RESET_PARSER_T(p);
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
+    assert(res != NULL);
+    assert_equal_size_t(res->type, REDIS_NIL_T);
+    assert_equal_size_t(res->poff, 0);
+    assert_equal_size_t(res->plen, 5);
+    assert_equal_size_t(res->coff, 0);
+    assert_equal_size_t(res->clen, 0);
+
+    /* Chunked check */
+    test_char_by_char(res, buf, len);
+}
+
 void test_array(redis_parser_t *p) {
     const char *buf =
         "*2\r\n"
@@ -299,6 +318,23 @@ void test_empty_array(redis_parser_t *p) {
     /* Check callbacks */
     assert_equal_size_t(cb_log_idx, 1);
     assert_equal_size_t(cb_log[0].array_len, 0);
+
+    /* Chunked check */
+    test_char_by_char(res, buf, len);
+}
+
+void test_nil_array(redis_parser_t *p) {
+    const char *buf = "*-1\r\n";
+    size_t len = 5;
+    redis_protocol_t *res;
+
+    /* Parse and check resulting protocol_t */
+    RESET_PARSER_T(p);
+    assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
+    assert(res != NULL);
+    assert_equal_size_t(res->type, REDIS_NIL_T);
+    assert_equal_size_t(res->poff, 0);
+    assert_equal_size_t(res->plen, 5);
 
     /* Chunked check */
     test_char_by_char(res, buf, len);
