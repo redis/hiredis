@@ -1,5 +1,5 @@
-#ifndef __REDIS_PARSER_H
-#define __REDIS_PARSER_H
+#ifndef _REDIS_PARSER_H
+#define _REDIS_PARSER_H 1
 
 #include <stdint.h>
 
@@ -90,4 +90,4 @@ redis_protocol_t *redis_parser_root(redis_parser_t *parser);
 redis_parser_err_t redis_parser_err(redis_parser_t *parser);
 const char *redis_parser_strerror(redis_parser_err_t err);
 
-#endif // __REDIS_PARSER_H
+#endif // _REDIS_PARSER_H
