@@ -135,13 +135,14 @@ void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *c
 }
 
 /* Execute the parser against len bytes in buf. When a full message was read,
- * the "dst" pointer is populated with the address of the root object (this
- * address is a static offset in the redis_parser_t struct, but may change in
- * the future). This pointer is set to NULL when no full message could be
- * parsed. This function returns the number of bytes that could be parsed. When
- * no full message was parsed and the return value is smaller than the number
- * of bytes that were available, an error occured and the parser should be
- * re-initialized before parsing more data. */
+ * the "dst" pointer is populated with the address of the root payload object.
+ * This pointer is set to NULL when no full message could be parsed.
+ *
+ * This function returns the number of bytes that could be parsed. When no full
+ * message was parsed and the return value is smaller than the number of bytes
+ * that were available, an error occured and the parser should be
+ * re-initialized before parsing more data.
+ */
 size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len) {
     redis_protocol_t *stack = parser->stack;
     const redis_parser_callbacks_t *callbacks = parser->callbacks;
