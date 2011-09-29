@@ -94,6 +94,12 @@ check: hiredis-test
 			( kill `cat /tmp/hiredis-test-redis.pid` && false )
 	kill `cat /tmp/hiredis-test-redis.pid`
 
+test/test-%.o: test/test-%.c
+	$(CC) -std=c99 -pedantic -o $@ -c $(REAL_CFLAGS) $<
+
+test/test-parser: test/test-parser.o parser.o sds.o
+	$(CC) -o $@ $(REAL_LDFLAGS) $^
+
 .c.o:
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
