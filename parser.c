@@ -28,8 +28,8 @@
     __tmp->coff = 0;                                                   \
     __tmp->clen = 0;                                                   \
     __tmp->type = 0;                                                   \
-    __tmp->remaining = -1;                                             \
-    __tmp->cursor = 0;                                                 \
+    __tmp->size = -1;                                                  \
+    __tmp->cursor = -1;                                                \
     __tmp->data = NULL;                                                \
 } while(0)
 
@@ -199,9 +199,11 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(integer_start);
                 case '+':
                     cur->type = REDIS_STATUS_T;
+                    cur->cursor = 0;
                     ADVANCE_AND_MOVE(line);
                 case '-':
                     cur->type = REDIS_ERROR_T;
+                    cur->cursor = 0;
                     ADVANCE_AND_MOVE(line);
                 }
 
@@ -341,8 +343,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     cur->clen = (unsigned)i64.i64;
                     cur->plen += cur->clen + 2; /* include \r\n */
 
-                    /* Store remaining bytes for a complete bulk */
-                    cur->remaining = (unsigned)i64.i64;
+                    /* Store size of complete bulk */
+                    cur->size = (unsigned)i64.i64;
+                    cur->cursor = 0;
                     ADVANCE_AND_MOVE(bulk);
                 }
 
@@ -353,10 +356,10 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                         goto done;
                     }
 
-                    /* Store remaining objects for a complete multi bulk */
-                    cur->remaining = (unsigned)i64.i64;
-                    cur->cursor = -1; /* Is incremented in "done" */
-                    CALLBACK(array, cur, cur->remaining);
+                    /* Store size of complete multi bulk */
+                    cur->size = (unsigned)i64.i64;
+                    cur->cursor = 0;
+                    CALLBACK(array, cur, cur->size);
                     goto done;
                 }
 
@@ -372,19 +375,17 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
             }
 
             STATE(bulk) {
-                size_t remaining = cur->remaining;
+                size_t remaining = cur->size - cur->cursor;
                 size_t available = (end-pos);
 
                 /* Everything can be read */
                 if (remaining <= available) {
-                    cur->remaining = 0;
                     CALLBACK(string, cur, pos, remaining);
                     ADVANCE(remaining);
                     MOVE(bulk_cr);
                 }
 
                 /* Not everything can be read */
-                cur->remaining -= available;
                 CALLBACK(string, cur, pos, available);
                 ADVANCE(available);
 
@@ -453,10 +454,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
         /* Message is done when root object is done */
         do {
             /* Move to nested object when we see an incomplete array */
-            if (cur->type == REDIS_ARRAY_T && cur->remaining) {
+            if (cur->type == REDIS_ARRAY_T && (cur->cursor < cur->size)) {
                 RESET_PROTOCOL_T(&stack[++stackidx]);
                 cur->cursor++;
-                cur->remaining--;
                 break;
             }
 

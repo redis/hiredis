@@ -47,6 +47,7 @@ struct log_entry_s {
 
     /* string_t specifics */
     char string_buf[1024];
+    int string_size;
 
     /* array_t specifics */
     size_t array_len;
@@ -79,6 +80,7 @@ int on_string(redis_parser_t *parser, redis_protocol_t *p, const char *buf, size
         log->obj = *p;
         log->type = p->type;
         log->string_buf[0] = '\0';
+        log->string_size = p->size;
     }
 
     /* Type should never change when called multiple times */
@@ -219,6 +221,7 @@ void test_string(redis_parser_t *p) {
 
     /* Check callbacks */
     assert(cb_log_idx == 1);
+    assert_equal_int(cb_log[0].string_size, 5);
     assert(!strncmp(cb_log[0].string_buf, buf+4, 5));
 
     /* Chunked check */
@@ -242,6 +245,7 @@ void test_empty_string(redis_parser_t *p) {
 
     /* Check callbacks */
     assert(cb_log_idx == 1);
+    assert_equal_int(cb_log[0].string_size, 0);
     assert(!strncmp(cb_log[0].string_buf, buf+4, 0));
 
     /* Chunked check */
@@ -296,12 +300,14 @@ void test_array(redis_parser_t *p) {
     assert_equal_size_t(cb_log[1].obj.plen, 4+5+2);
     assert_equal_size_t(cb_log[1].obj.coff, 4+4);
     assert_equal_size_t(cb_log[1].obj.clen, 5);
+    assert_equal_int(cb_log[1].string_size, 5);
     assert(!strncmp(cb_log[1].string_buf, buf+4+4, 5));
 
     assert_equal_size_t(cb_log[2].obj.poff, 4+11);
     assert_equal_size_t(cb_log[2].obj.plen, 4+5+2);
     assert_equal_size_t(cb_log[2].obj.coff, 4+11+4);
     assert_equal_size_t(cb_log[2].obj.clen, 5);
+    assert_equal_int(cb_log[2].string_size, 5);
     assert(!strncmp(cb_log[2].string_buf, buf+4+11+4, 5));
 
     /* Chunked check */
