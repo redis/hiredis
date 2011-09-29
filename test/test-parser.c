@@ -400,42 +400,42 @@ void test_integer(redis_parser_t *p) {
     RESET_PARSER_T(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 2);
     assert(res == NULL);
-    assert(redis_parser_err(p) == REDIS_PARSER_ERR_INVALID_INT);
+    assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Signed zero, negative */
     buf = ":-0\r\n";
     RESET_PARSER_T(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 2);
     assert(res == NULL);
-    assert(redis_parser_err(p) == REDIS_PARSER_ERR_INVALID_INT);
+    assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Start with 0 */
     buf = ":0123\r\n";
     RESET_PARSER_T(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 2);
     assert(res == NULL);
-    assert(redis_parser_err(p) == REDIS_PARSER_ERR_EXPECTED_CR);
+    assert(redis_parser_err(p) == RPE_EXPECTED_CR);
 
     /* Start with non-digit */
     buf = ":x123\r\n";
     RESET_PARSER_T(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 1);
     assert(res == NULL);
-    assert(redis_parser_err(p) == REDIS_PARSER_ERR_INVALID_INT);
+    assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Non-digit in the middle */
     buf = ":12x3\r\n";
     RESET_PARSER_T(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 3);
     assert(res == NULL);
-    assert(redis_parser_err(p) == REDIS_PARSER_ERR_INVALID_INT);
+    assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Non-digit at the end */
     buf = ":123x\r\n";
     RESET_PARSER_T(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 4);
     assert(res == NULL);
-    assert(redis_parser_err(p) == REDIS_PARSER_ERR_INVALID_INT);
+    assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Signed 64-bit maximum */
     buf = ":9223372036854775807\r\n";
@@ -451,7 +451,7 @@ void test_integer(redis_parser_t *p) {
     RESET_PARSER_T(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf)-3);
     assert(res == NULL);
-    assert(redis_parser_err(p) == REDIS_PARSER_ERR_OVERFLOW);
+    assert(redis_parser_err(p) == RPE_OVERFLOW);
 
     /* Signed 64-bit minimum */
     buf = ":-9223372036854775808\r\n";
@@ -467,7 +467,7 @@ void test_integer(redis_parser_t *p) {
     RESET_PARSER_T(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf)-3);
     assert(res == NULL);
-    assert(redis_parser_err(p) == REDIS_PARSER_ERR_OVERFLOW);
+    assert(redis_parser_err(p) == RPE_OVERFLOW);
 }
 
 void test_nil(redis_parser_t *p) {
@@ -535,7 +535,7 @@ void test_error(redis_parser_t *p) {
 
 void test_abort_after_error(redis_parser_t *p) {
     redis_protocol_t *res;
-    redis_parser_err_t err;
+    enum redis_parser_errno err;
 
     assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r", 4), 4);
     assert(res == NULL);
@@ -544,7 +544,7 @@ void test_abort_after_error(redis_parser_t *p) {
 
     /* Test if the error matches what we expect */
     err = redis_parser_err(p);
-    assert(err == REDIS_PARSER_ERR_EXPECTED_LF);
+    assert(err == RPE_EXPECTED_LF);
     assert(strcmp("expected \\n", redis_parser_strerror(err)) == 0);
 
     /* Test that the parser doesn't continue after an error */

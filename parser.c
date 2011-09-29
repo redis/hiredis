@@ -5,7 +5,7 @@
 #include <assert.h>
 #include "parser.h"
 
-#define ERRNO(code) REDIS_PARSER_##code
+#define ERRNO(code) RPE_##code
 #define SET_ERRNO(code) do {                                           \
     parser->err = ERRNO(code);                                         \
 } while(0)
@@ -15,7 +15,7 @@
 #define CALLBACK(X, ...) do {                                          \
     if (callbacks && callbacks->on_##X) {                              \
         if (callbacks->on_##X(parser, __VA_ARGS__) != 0) {             \
-            SET_ERRNO(ERR_CALLBACK);                                   \
+            SET_ERRNO(CALLBACK);                                   \
             goto error;                                                \
         }                                                              \
     }                                                                  \
@@ -57,7 +57,7 @@ enum state {
 
 #define _GEN(code, description) description,
 static const char *strerror_map[] = {
-    REDIS_PARSER_ERRORS(_GEN)
+    REDIS_PARSER_ERRNO_MAP(_GEN)
 };
 #undef _GEN
 
@@ -205,7 +205,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(line);
                 }
 
-                SET_ERRNO(ERR_INVALID_TYPE);
+                SET_ERRNO(INVALID_TYPE);
                 goto error;
             }
 
@@ -235,7 +235,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(integer_cr);
                 }
 
-                SET_ERRNO(ERR_INVALID_INT);
+                SET_ERRNO(INVALID_INT);
                 goto error;
             }
 
@@ -247,7 +247,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(integer_pos_09);
                 }
 
-                SET_ERRNO(ERR_INVALID_INT);
+                SET_ERRNO(INVALID_INT);
                 goto error;
             }
 
@@ -256,12 +256,12 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 if (ch >= '0' && ch <= '9') {
                     if (i64.ui64 > ((uint64_t)INT64_MAX / 10)) { /* Overflow */
-                        SET_ERRNO(ERR_OVERFLOW);
+                        SET_ERRNO(OVERFLOW);
                         goto error;
                     }
                     i64.ui64 *= 10;
                     if (i64.ui64 > ((uint64_t)INT64_MAX - (ch - '0'))) { /* Overflow */
-                        SET_ERRNO(ERR_OVERFLOW);
+                        SET_ERRNO(OVERFLOW);
                         goto error;
                     }
                     i64.ui64 += ch - '0';
@@ -271,7 +271,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(integer_lf);
                 }
 
-                SET_ERRNO(ERR_INVALID_INT);
+                SET_ERRNO(INVALID_INT);
                 goto error;
             }
 
@@ -283,7 +283,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(integer_neg_09);
                 }
 
-                SET_ERRNO(ERR_INVALID_INT);
+                SET_ERRNO(INVALID_INT);
                 goto error;
             }
 
@@ -292,12 +292,12 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 if (ch >= '0' && ch <= '9') {
                     if (i64.ui64 > (((uint64_t)-(INT64_MIN+1)+1) / 10)) { /* Overflow */
-                        SET_ERRNO(ERR_OVERFLOW);
+                        SET_ERRNO(OVERFLOW);
                         goto error;
                     }
                     i64.ui64 *= 10;
                     if (i64.ui64 > (((uint64_t)-(INT64_MIN+1)+1) - (ch - '0'))) { /* Overflow */
-                        SET_ERRNO(ERR_OVERFLOW);
+                        SET_ERRNO(OVERFLOW);
                         goto error;
                     }
                     i64.ui64 += ch - '0';
@@ -307,7 +307,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(integer_lf);
                 }
 
-                SET_ERRNO(ERR_INVALID_INT);
+                SET_ERRNO(INVALID_INT);
                 goto error;
             }
 
@@ -316,13 +316,13 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(integer_lf);
                 }
 
-                SET_ERRNO(ERR_EXPECTED_CR);
+                SET_ERRNO(EXPECTED_CR);
                 goto error;
             }
 
             STATE(integer_lf) {
                 if (*pos != '\n') {
-                    SET_ERRNO(ERR_EXPECTED_LF);
+                    SET_ERRNO(EXPECTED_LF);
                     goto error;
                 }
 
@@ -398,7 +398,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(bulk_lf);
                 }
 
-                SET_ERRNO(ERR_EXPECTED_CR);
+                SET_ERRNO(EXPECTED_CR);
                 goto error;
             }
 
@@ -407,7 +407,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     goto done;
                 }
 
-                SET_ERRNO(ERR_EXPECTED_LF);
+                SET_ERRNO(EXPECTED_LF);
                 goto error;
             }
 
@@ -441,7 +441,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     goto done;
                 }
 
-                SET_ERRNO(ERR_EXPECTED_LF);
+                SET_ERRNO(EXPECTED_LF);
                 goto error;
             }
         }
@@ -490,7 +490,7 @@ finalize:
 error:
 
     if (parser->err == ERRNO(OK)) {
-        SET_ERRNO(ERR_UNKNOWN);
+        SET_ERRNO(UNKNOWN);
     }
 
     return pos-buf;
@@ -500,11 +500,11 @@ redis_protocol_t *redis_parser_root(redis_parser_t *parser) {
     return &parser->stack[0];
 }
 
-redis_parser_err_t redis_parser_err(redis_parser_t *parser) {
+enum redis_parser_errno redis_parser_err(redis_parser_t *parser) {
     return parser->err;
 }
 
-const char *redis_parser_strerror(redis_parser_err_t err) {
+const char *redis_parser_strerror(enum redis_parser_errno err) {
     if (err < (sizeof(strerror_map)/sizeof(strerror_map[0])))
         return strerror_map[err];
     return NULL;
