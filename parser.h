@@ -26,7 +26,7 @@ typedef int (*redis_parser_string_cb)(redis_parser *, redis_protocol *, const ch
 typedef int (*redis_parser_array_cb)(redis_parser *, redis_protocol *, size_t);
 typedef int (*redis_parser_integer_cb)(redis_parser *, redis_protocol *, int64_t);
 typedef int (*redis_parser_nil_cb)(redis_parser *, redis_protocol *);
-typedef int (*redis_parser_destroy_cb)(redis_parser *, redis_protocol *);
+typedef void (*redis_parser_destroy_cb)(redis_parser *, redis_protocol *);
 
 struct redis_parser_callbacks_s {
     redis_parser_string_cb on_string;
