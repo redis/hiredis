@@ -44,6 +44,8 @@ static log_entry_t *dup_cb_log(void) {
 }
 
 int on_string(redis_parser *parser, redis_protocol *p, const char *buf, size_t len) {
+    ((void)parser);
+
     log_entry_t *log = (log_entry_t*)p->data;
 
     /* Use new entry when this is the first call */
@@ -59,7 +61,7 @@ int on_string(redis_parser *parser, redis_protocol *p, const char *buf, size_t l
     assert(log->type == p->type);
 
     /* Cursor should equal current string length */
-    assert(p->cursor == strlen(log->string_buf));
+    assert(p->cursor == (signed)strlen(log->string_buf));
 
     /* Append string data */
     strncat(log->string_buf, buf, len);
@@ -68,6 +70,8 @@ int on_string(redis_parser *parser, redis_protocol *p, const char *buf, size_t l
 }
 
 int on_array(redis_parser *parser, redis_protocol *p, size_t len) {
+    ((void)parser);
+
     log_entry_t *log = (log_entry_t*)p->data;
 
     /* Should only be called once */
@@ -83,6 +87,8 @@ int on_array(redis_parser *parser, redis_protocol *p, size_t len) {
 }
 
 int on_integer(redis_parser *parser, redis_protocol *p, int64_t value) {
+    ((void)parser);
+
     log_entry_t *log = (log_entry_t*)p->data;
 
     /* Should only be called once */
@@ -98,6 +104,8 @@ int on_integer(redis_parser *parser, redis_protocol *p, int64_t value) {
 }
 
 int on_nil(redis_parser *parser, redis_protocol *p) {
+    ((void)parser);
+
     log_entry_t *log = (log_entry_t*)p->data;
 
     /* Should only be called once */
@@ -133,7 +141,7 @@ static redis_parser_callbacks callbacks = {
     redis_parser_init((__parser), &callbacks);  \
 } while(0)
 
-void test_char_by_char(redis_protocol *_unused, const char *buf, size_t len) {
+void test_char_by_char(const char *buf, size_t len) {
     log_entry_t *ref;
     redis_parser *p;
     redis_protocol *res;
@@ -207,7 +215,7 @@ void test_string(redis_parser *p) {
     assert(!strncmp(cb_log[0].string_buf, buf+4, 5));
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_empty_string(redis_parser *p) {
@@ -231,7 +239,7 @@ void test_empty_string(redis_parser *p) {
     assert(!strncmp(cb_log[0].string_buf, buf+4, 0));
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_nil_string(redis_parser *p) {
@@ -250,7 +258,7 @@ void test_nil_string(redis_parser *p) {
     assert_equal_size_t(res->clen, 0);
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_array(redis_parser *p) {
@@ -293,7 +301,7 @@ void test_array(redis_parser *p) {
     assert(!strncmp(cb_log[2].string_buf, buf+4+11+4, 5));
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_empty_array(redis_parser *p) {
@@ -314,7 +322,7 @@ void test_empty_array(redis_parser *p) {
     assert_equal_size_t(cb_log[0].array_len, 0);
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_nil_array(redis_parser *p) {
@@ -331,7 +339,7 @@ void test_nil_array(redis_parser *p) {
     assert_equal_size_t(res->plen, 5);
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_integer(redis_parser *p) {
@@ -354,7 +362,7 @@ void test_integer(redis_parser *p) {
     assert_equal_size_t(cb_log[0].integer_value, 1234);
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 
     /* Negative sign */
     buf = ":-123\r\n";
@@ -363,7 +371,7 @@ void test_integer(redis_parser *p) {
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
     assert_equal_int64_t(cb_log[0].integer_value, -123);
-    test_char_by_char(res, buf, strlen(buf));
+    test_char_by_char(buf, strlen(buf));
 
     /* Positive sign */
     buf = ":+123\r\n";
@@ -372,7 +380,7 @@ void test_integer(redis_parser *p) {
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
     assert_equal_int64_t(cb_log[0].integer_value, 123);
-    test_char_by_char(res, buf, strlen(buf));
+    test_char_by_char(buf, strlen(buf));
 
     /* Zero */
     buf = ":0\r\n";
@@ -381,7 +389,7 @@ void test_integer(redis_parser *p) {
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
     assert_equal_int64_t(cb_log[0].integer_value, 0);
-    test_char_by_char(res, buf, strlen(buf));
+    test_char_by_char(buf, strlen(buf));
 
     /* Signed zero, positive */
     buf = ":+0\r\n";
@@ -432,7 +440,7 @@ void test_integer(redis_parser *p) {
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
     assert_equal_int64_t(cb_log[0].integer_value, INT64_MAX);
-    test_char_by_char(res, buf, strlen(buf));
+    test_char_by_char(buf, strlen(buf));
 
     /* Signed 64-bit maximum overflow */
     buf = ":9223372036854775808\r\n";
@@ -448,7 +456,7 @@ void test_integer(redis_parser *p) {
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
     assert_equal_int64_t(cb_log[0].integer_value, INT64_MIN);
-    test_char_by_char(res, buf, strlen(buf));
+    test_char_by_char(buf, strlen(buf));
 
     /* Signed 64-bit minimum overflow (or underflow...) */
     buf = ":-9223372036854775809\r\n";
@@ -478,7 +486,7 @@ void test_nil(redis_parser *p) {
     assert_equal_size_t(cb_log[0].integer_value, 1234);
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_status(redis_parser *p) {
@@ -498,7 +506,7 @@ void test_status(redis_parser *p) {
     assert(!strncmp(cb_log[0].string_buf, buf+1, 6));
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_error(redis_parser *p) {
@@ -518,7 +526,7 @@ void test_error(redis_parser *p) {
     assert(!strncmp(cb_log[0].string_buf, buf+1, 5));
 
     /* Chunked check */
-    test_char_by_char(res, buf, len);
+    test_char_by_char(buf, len);
 }
 
 void test_abort_after_error(redis_parser *p) {
@@ -542,7 +550,6 @@ void test_abort_after_error(redis_parser *p) {
 
 void test_destroy_callback_after_success(redis_parser *p) {
     redis_protocol *res;
-    enum redis_parser_errno err;
 
     RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r\n", 5), 5);
@@ -557,7 +564,6 @@ void test_destroy_callback_after_success(redis_parser *p) {
 
 void test_destroy_callback_after_error(redis_parser *p) {
     redis_protocol *res;
-    enum redis_parser_errno err;
 
     RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r\r", 5), 4);
@@ -571,7 +577,6 @@ void test_destroy_callback_after_error(redis_parser *p) {
 
 void test_destroy_callback_in_flight(redis_parser *p) {
     redis_protocol *res;
-    enum redis_parser_errno err;
 
     RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r", 4), 4);
@@ -584,6 +589,9 @@ void test_destroy_callback_in_flight(redis_parser *p) {
 }
 
 int main(int argc, char **argv) {
+    ((void)argc);
+    ((void)argv);
+
     redis_parser *parser = malloc(sizeof(redis_parser));
     redis_parser_init(parser, &callbacks);
 
