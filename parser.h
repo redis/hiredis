@@ -1,5 +1,5 @@
-#ifndef _REDIS_PARSER_H
-#define _REDIS_PARSER_H 1
+#ifndef _HIREDIS_PARSER_H
+#define _HIREDIS_PARSER_H 1
 
 #include <stdint.h>
 
@@ -11,21 +11,21 @@
 #define REDIS_REPLY_STATUS 5
 #define REDIS_REPLY_ERROR 6
 
-#define REDIS_STRING_T REDIS_REPLY_STRING
-#define REDIS_ARRAY_T REDIS_REPLY_ARRAY
-#define REDIS_INTEGER_T REDIS_REPLY_INTEGER
-#define REDIS_NIL_T REDIS_REPLY_NIL
-#define REDIS_STATUS_T REDIS_REPLY_STATUS
-#define REDIS_ERROR_T REDIS_REPLY_ERROR
+#define REDIS_STRING REDIS_REPLY_STRING
+#define REDIS_ARRAY REDIS_REPLY_ARRAY
+#define REDIS_INTEGER REDIS_REPLY_INTEGER
+#define REDIS_NIL REDIS_REPLY_NIL
+#define REDIS_STATUS REDIS_REPLY_STATUS
+#define REDIS_ERROR REDIS_REPLY_ERROR
 
-typedef struct redis_parser_callbacks_s redis_parser_callbacks_t;
-typedef struct redis_protocol_s redis_protocol_t;
-typedef struct redis_parser_s redis_parser_t;
+typedef struct redis_parser_callbacks_s redis_parser_callbacks;
+typedef struct redis_protocol_s redis_protocol;
+typedef struct redis_parser_s redis_parser;
 
-typedef int (*redis_string_cb)(redis_parser_t *, redis_protocol_t *, const char *, size_t);
-typedef int (*redis_array_cb)(redis_parser_t *, redis_protocol_t *, size_t);
-typedef int (*redis_integer_cb)(redis_parser_t *, redis_protocol_t *, int64_t);
-typedef int (*redis_nil_cb)(redis_parser_t *, redis_protocol_t *);
+typedef int (*redis_string_cb)(redis_parser *, redis_protocol *, const char *, size_t);
+typedef int (*redis_array_cb)(redis_parser *, redis_protocol *, size_t);
+typedef int (*redis_integer_cb)(redis_parser *, redis_protocol *, int64_t);
+typedef int (*redis_nil_cb)(redis_parser *, redis_protocol *);
 
 struct redis_parser_callbacks_s {
     redis_string_cb on_string;
@@ -53,7 +53,7 @@ enum redis_parser_errno {
 struct redis_protocol_s {
     unsigned char type; /* payload type */
     void *data; /* payload data (to be populated by the callback functions) */
-    const redis_protocol_t* parent; /* when nested, parent object */
+    const redis_protocol* parent; /* when nested, parent object */
     int size; /* size of complete bulk (bytes)/multi bulk (nested objects) */
     int cursor; /* number of processed bytes/nested objects */
     size_t poff; /* protocol offset */
@@ -64,13 +64,13 @@ struct redis_protocol_s {
 
 struct redis_parser_s {
     /* private: callbacks */
-    const redis_parser_callbacks_t *callbacks;
+    const redis_parser_callbacks *callbacks;
 
     /* private: number of consumed bytes for a single message */
     size_t nread;
 
     /* private: protocol_t stack (multi-bulk, nested multi-bulk) */
-    redis_protocol_t stack[3];
+    redis_protocol stack[3];
     int stackidx;
 
     /* private: parser state */
@@ -84,10 +84,10 @@ struct redis_parser_s {
     } i64;
 };
 
-void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *callbacks);
-size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len);
-redis_protocol_t *redis_parser_root(redis_parser_t *parser);
-enum redis_parser_errno redis_parser_err(redis_parser_t *parser);
+void redis_parser_init(redis_parser *parser, const redis_parser_callbacks *callbacks);
+size_t redis_parser_execute(redis_parser *parser, redis_protocol **dst, const char *buf, size_t len);
+redis_protocol *redis_parser_root(redis_parser *parser);
+enum redis_parser_errno redis_parser_err(redis_parser *parser);
 const char *redis_parser_strerror(enum redis_parser_errno err);
 
 #endif // _REDIS_PARSER_H

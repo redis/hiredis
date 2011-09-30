@@ -42,7 +42,7 @@
 typedef struct log_entry_s log_entry_t;
 
 struct log_entry_s {
-    redis_protocol_t obj;
+    redis_protocol obj;
     int type;
 
     /* string_t specifics */
@@ -71,7 +71,7 @@ static log_entry_t *dup_cb_log(void) {
     return log;
 }
 
-int on_string(redis_parser_t *parser, redis_protocol_t *p, const char *buf, size_t len) {
+int on_string(redis_parser *parser, redis_protocol *p, const char *buf, size_t len) {
     log_entry_t *log = (log_entry_t*)p->data;
 
     /* Use new entry when this is the first call */
@@ -95,7 +95,7 @@ int on_string(redis_parser_t *parser, redis_protocol_t *p, const char *buf, size
     return 0;
 }
 
-int on_array(redis_parser_t *parser, redis_protocol_t *p, size_t len) {
+int on_array(redis_parser *parser, redis_protocol *p, size_t len) {
     log_entry_t *log = (log_entry_t*)p->data;
 
     /* Should only be called once */
@@ -110,7 +110,7 @@ int on_array(redis_parser_t *parser, redis_protocol_t *p, size_t len) {
     return 0;
 }
 
-int on_integer(redis_parser_t *parser, redis_protocol_t *p, int64_t value) {
+int on_integer(redis_parser *parser, redis_protocol *p, int64_t value) {
     log_entry_t *log = (log_entry_t*)p->data;
 
     /* Should only be called once */
@@ -125,7 +125,7 @@ int on_integer(redis_parser_t *parser, redis_protocol_t *p, int64_t value) {
     return 0;
 }
 
-int on_nil(redis_parser_t *parser, redis_protocol_t *p) {
+int on_nil(redis_parser *parser, redis_protocol *p) {
     log_entry_t *log = (log_entry_t*)p->data;
 
     /* Should only be called once */
@@ -139,30 +139,30 @@ int on_nil(redis_parser_t *parser, redis_protocol_t *p) {
     return 0;
 }
 
-static redis_parser_callbacks_t callbacks = {
+static redis_parser_callbacks callbacks = {
     &on_string,
     &on_array,
     &on_integer,
     &on_nil
 };
 
-#define RESET_PARSER_T(__parser) do {           \
+#define RESET_PARSER(__parser) do {           \
     reset_cb_log();                             \
     redis_parser_init((__parser), &callbacks);  \
 } while(0)
 
-void test_char_by_char(redis_protocol_t *_unused, const char *buf, size_t len) {
+void test_char_by_char(redis_protocol *_unused, const char *buf, size_t len) {
     log_entry_t *ref;
-    redis_parser_t *p;
-    redis_protocol_t *res;
+    redis_parser *p;
+    redis_protocol *res;
     size_t i, j, k;
 
     ref = dup_cb_log();
-    p = malloc(sizeof(redis_parser_t));
+    p = malloc(sizeof(redis_parser));
 
     for (i = 0; i < (len-1); i++) {
         for (j = i+1; j < len; j++) {
-            RESET_PARSER_T(p);
+            RESET_PARSER(p);
 
 #ifdef DEBUG
             sds debug = sdsempty();
@@ -192,7 +192,7 @@ void test_char_by_char(redis_protocol_t *_unused, const char *buf, size_t len) {
                 log_entry_t expect = ref[k];
                 log_entry_t actual = cb_log[k];
 
-                /* Not interested in the redis_protocol_t data */
+                /* Not interested in the redis_protocol data */
                 memset(&expect.obj, 0, sizeof(expect.obj));
                 memset(&actual.obj, 0, sizeof(actual.obj));
                 assert(memcmp(&expect, &actual, sizeof(expect)) == 0);
@@ -204,16 +204,16 @@ void test_char_by_char(redis_protocol_t *_unused, const char *buf, size_t len) {
     free(ref);
 }
 
-void test_string(redis_parser_t *p) {
+void test_string(redis_parser *p) {
     const char *buf = "$5\r\nhello\r\n";
     size_t len = 11;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_STRING_T);
+    assert_equal_size_t(res->type, REDIS_STRING);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 11);
     assert_equal_size_t(res->coff, 4);
@@ -228,16 +228,16 @@ void test_string(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_empty_string(redis_parser_t *p) {
+void test_empty_string(redis_parser *p) {
     const char *buf = "$0\r\n\r\n";
     size_t len = 6;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_STRING_T);
+    assert_equal_size_t(res->type, REDIS_STRING);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 6);
     assert_equal_size_t(res->coff, 4);
@@ -252,16 +252,16 @@ void test_empty_string(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_nil_string(redis_parser_t *p) {
+void test_nil_string(redis_parser *p) {
     const char *buf = "$-1\r\n";
     size_t len = 5;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_NIL_T);
+    assert_equal_size_t(res->type, REDIS_NIL);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 5);
     assert_equal_size_t(res->coff, 0);
@@ -271,19 +271,19 @@ void test_nil_string(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_array(redis_parser_t *p) {
+void test_array(redis_parser *p) {
     const char *buf =
         "*2\r\n"
         "$5\r\nhello\r\n"
         "$5\r\nworld\r\n";
     size_t len = 26;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_ARRAY_T);
+    assert_equal_size_t(res->type, REDIS_ARRAY);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 26);
     assert_equal_size_t(res->coff, 0);
@@ -314,16 +314,16 @@ void test_array(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_empty_array(redis_parser_t *p) {
+void test_empty_array(redis_parser *p) {
     const char *buf = "*0\r\n";
     size_t len = 4;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_ARRAY_T);
+    assert_equal_size_t(res->type, REDIS_ARRAY);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 4);
 
@@ -335,16 +335,16 @@ void test_empty_array(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_nil_array(redis_parser_t *p) {
+void test_nil_array(redis_parser *p) {
     const char *buf = "*-1\r\n";
     size_t len = 5;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_NIL_T);
+    assert_equal_size_t(res->type, REDIS_NIL);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 5);
 
@@ -352,16 +352,16 @@ void test_nil_array(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_integer(redis_parser_t *p) {
+void test_integer(redis_parser *p) {
     const char *buf = ":1234\r\n";
     size_t len = 7;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_INTEGER_T);
+    assert_equal_size_t(res->type, REDIS_INTEGER);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 7);
     assert_equal_size_t(res->coff, 1);
@@ -376,7 +376,7 @@ void test_integer(redis_parser_t *p) {
 
     /* Negative sign */
     buf = ":-123\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf));
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
@@ -385,7 +385,7 @@ void test_integer(redis_parser_t *p) {
 
     /* Positive sign */
     buf = ":+123\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf));
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
@@ -394,7 +394,7 @@ void test_integer(redis_parser_t *p) {
 
     /* Zero */
     buf = ":0\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf));
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
@@ -403,49 +403,49 @@ void test_integer(redis_parser_t *p) {
 
     /* Signed zero, positive */
     buf = ":+0\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 2);
     assert(res == NULL);
     assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Signed zero, negative */
     buf = ":-0\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 2);
     assert(res == NULL);
     assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Start with 0 */
     buf = ":0123\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 2);
     assert(res == NULL);
     assert(redis_parser_err(p) == RPE_EXPECTED_CR);
 
     /* Start with non-digit */
     buf = ":x123\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 1);
     assert(res == NULL);
     assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Non-digit in the middle */
     buf = ":12x3\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 3);
     assert(res == NULL);
     assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Non-digit at the end */
     buf = ":123x\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), 4);
     assert(res == NULL);
     assert(redis_parser_err(p) == RPE_INVALID_INT);
 
     /* Signed 64-bit maximum */
     buf = ":9223372036854775807\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf));
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
@@ -454,14 +454,14 @@ void test_integer(redis_parser_t *p) {
 
     /* Signed 64-bit maximum overflow */
     buf = ":9223372036854775808\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf)-3);
     assert(res == NULL);
     assert(redis_parser_err(p) == RPE_OVERFLOW);
 
     /* Signed 64-bit minimum */
     buf = ":-9223372036854775808\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf));
     assert(res != NULL);
     assert_equal_size_t(cb_log_idx, 1);
@@ -470,22 +470,22 @@ void test_integer(redis_parser_t *p) {
 
     /* Signed 64-bit minimum overflow (or underflow...) */
     buf = ":-9223372036854775809\r\n";
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, strlen(buf)), strlen(buf)-3);
     assert(res == NULL);
     assert(redis_parser_err(p) == RPE_OVERFLOW);
 }
 
-void test_nil(redis_parser_t *p) {
+void test_nil(redis_parser *p) {
     const char *buf = "$-1\r\n";
     size_t len = 7;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_INTEGER_T);
+    assert_equal_size_t(res->type, REDIS_INTEGER);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 7);
     assert_equal_size_t(res->coff, 1);
@@ -499,16 +499,16 @@ void test_nil(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_status(redis_parser_t *p) {
+void test_status(redis_parser *p) {
     const char *buf = "+status\r\n";
     size_t len = 9;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_STATUS_T);
+    assert_equal_size_t(res->type, REDIS_STATUS);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 9);
     assert_equal_size_t(res->coff, 1);
@@ -519,16 +519,16 @@ void test_status(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_error(redis_parser_t *p) {
+void test_error(redis_parser *p) {
     const char *buf = "-error\r\n";
     size_t len = 8;
-    redis_protocol_t *res;
+    redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
-    RESET_PARSER_T(p);
+    RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_ERROR_T);
+    assert_equal_size_t(res->type, REDIS_ERROR);
     assert_equal_size_t(res->poff, 0);
     assert_equal_size_t(res->plen, 8);
     assert_equal_size_t(res->coff, 1);
@@ -539,8 +539,8 @@ void test_error(redis_parser_t *p) {
     test_char_by_char(res, buf, len);
 }
 
-void test_abort_after_error(redis_parser_t *p) {
-    redis_protocol_t *res;
+void test_abort_after_error(redis_parser *p) {
+    redis_protocol *res;
     enum redis_parser_errno err;
 
     assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r", 4), 4);
@@ -559,11 +559,11 @@ void test_abort_after_error(redis_parser_t *p) {
 }
 
 int main(int argc, char **argv) {
-    redis_parser_t *parser = malloc(sizeof(redis_parser_t));
+    redis_parser *parser = malloc(sizeof(redis_parser));
     redis_parser_init(parser, &callbacks);
 
-    printf("redis_protocol_t: %lu bytes\n", sizeof(redis_protocol_t));
-    printf("redis_parser_t: %lu bytes\n", sizeof(redis_parser_t));
+    printf("redis_protocol: %lu bytes\n", sizeof(redis_protocol));
+    printf("redis_parser: %lu bytes\n", sizeof(redis_parser));
 
     test_string(parser);
     test_empty_string(parser);

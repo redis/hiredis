@@ -10,7 +10,7 @@
     parser->err = ERRNO(code);                                         \
 } while(0)
 
-/* The redis_protocol_t argument to the callback function must be provided by
+/* The redis_protocol argument to the callback function must be provided by
  * the caller because "ISO C99 requires rest arguments to be used". */
 #define CALLBACK(X, ...) do {                                          \
     if (callbacks && callbacks->on_##X) {                              \
@@ -21,8 +21,8 @@
     }                                                                  \
 } while(0)
 
-#define RESET_PROTOCOL_T(ptr) do {                                     \
-    redis_protocol_t *__tmp = (ptr);                                   \
+#define RESET_PROTOCOL(ptr) do {                                       \
+    redis_protocol *__tmp = (ptr);                                     \
     __tmp->poff = 0;                                                   \
     __tmp->plen = 0;                                                   \
     __tmp->coff = 0;                                                   \
@@ -128,7 +128,7 @@ static const char *chrtos(char byte) {
 #define LOG(fmt, ...) do { ; } while (0)
 #endif
 
-void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *callbacks) {
+void redis_parser_init(redis_parser *parser, const redis_parser_callbacks *callbacks) {
     parser->stackidx = -1;
     parser->callbacks = callbacks;
     parser->err = 0;
@@ -143,16 +143,16 @@ void redis_parser_init(redis_parser_t *parser, const redis_parser_callbacks_t *c
  * that were available, an error occured and the parser should be
  * re-initialized before parsing more data.
  */
-size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, const char *buf, size_t len) {
-    redis_protocol_t *stack = parser->stack;
-    const redis_parser_callbacks_t *callbacks = parser->callbacks;
+size_t redis_parser_execute(redis_parser *parser, redis_protocol **dst, const char *buf, size_t len) {
+    redis_protocol *stack = parser->stack;
+    const redis_parser_callbacks *callbacks = parser->callbacks;
     const char *pos;
     const char *end;
     size_t nread;
     int stackidx;
     unsigned char state;
     struct redis_parser_int64_s i64;
-    redis_protocol_t *cur;
+    redis_protocol *cur;
 
     /* Abort immediately if the parser is in an error state. It should be
      * re-initialized before attempting to execute it with new data. */
@@ -165,7 +165,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
     /* Reset root protocol object for new messages */
     if (parser->stackidx == -1) {
-        RESET_PROTOCOL_T(&stack[0]);
+        RESET_PROTOCOL(&stack[0]);
         parser->nread = 0;
         parser->stackidx = 0;
         parser->state = s_type_char;
@@ -189,20 +189,20 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
 
                 switch (*pos) {
                 case '$':
-                    cur->type = REDIS_STRING_T;
+                    cur->type = REDIS_STRING;
                     ADVANCE_AND_MOVE(integer_start);
                 case '*':
-                    cur->type = REDIS_ARRAY_T;
+                    cur->type = REDIS_ARRAY;
                     ADVANCE_AND_MOVE(integer_start);
                 case ':':
-                    cur->type = REDIS_INTEGER_T;
+                    cur->type = REDIS_INTEGER;
                     ADVANCE_AND_MOVE(integer_start);
                 case '+':
-                    cur->type = REDIS_STATUS_T;
+                    cur->type = REDIS_STATUS;
                     cur->cursor = 0;
                     ADVANCE_AND_MOVE(line);
                 case '-':
-                    cur->type = REDIS_ERROR_T;
+                    cur->type = REDIS_ERROR;
                     cur->cursor = 0;
                     ADVANCE_AND_MOVE(line);
                 }
@@ -331,9 +331,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                 /* Protocol length can be set regardless of type */
                 cur->plen = nread - cur->poff + 1; /* include \n */
 
-                if (cur->type == REDIS_STRING_T) {
+                if (cur->type == REDIS_STRING) {
                     if (i64.i64 < 0) { /* nil bulk */
-                        cur->type = REDIS_NIL_T;
+                        cur->type = REDIS_NIL;
                         CALLBACK(nil, cur);
                         goto done;
                     }
@@ -349,9 +349,9 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     ADVANCE_AND_MOVE(bulk);
                 }
 
-                if (cur->type == REDIS_ARRAY_T) {
+                if (cur->type == REDIS_ARRAY) {
                     if (i64.i64 < 0) { /* nil multi bulk */
-                        cur->type = REDIS_NIL_T;
+                        cur->type = REDIS_NIL;
                         CALLBACK(nil, cur);
                         goto done;
                     }
@@ -363,7 +363,7 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
                     goto done;
                 }
 
-                if (cur->type == REDIS_INTEGER_T) {
+                if (cur->type == REDIS_INTEGER) {
                     /* Setup content offset and length */
                     cur->coff = cur->poff + 1;
                     cur->clen = nread - cur->coff - 1; /* remove \r */
@@ -454,8 +454,8 @@ size_t redis_parser_execute(redis_parser_t *parser, redis_protocol_t **dst, cons
         /* Message is done when root object is done */
         do {
             /* Move to nested object when we see an incomplete array */
-            if (cur->type == REDIS_ARRAY_T && (cur->cursor < cur->size)) {
-                RESET_PROTOCOL_T(&stack[++stackidx]);
+            if (cur->type == REDIS_ARRAY && (cur->cursor < cur->size)) {
+                RESET_PROTOCOL(&stack[++stackidx]);
                 cur->cursor++;
                 break;
             }
@@ -496,11 +496,11 @@ error:
     return pos-buf;
 }
 
-redis_protocol_t *redis_parser_root(redis_parser_t *parser) {
+redis_protocol *redis_parser_root(redis_parser *parser) {
     return &parser->stack[0];
 }
 
-enum redis_parser_errno redis_parser_err(redis_parser_t *parser) {
+enum redis_parser_errno redis_parser_err(redis_parser *parser) {
     return parser->err;
 }
 
