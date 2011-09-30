@@ -126,6 +126,95 @@ void test_empty_array(redis_parser *parser) {
     redis_object_free(&obj);
 }
 
+void test_integer(redis_parser *parser) {
+    const char *buf = ":37\r\n";
+    redis_protocol *res;
+    redis_object *obj;
+
+    redis_parser_init(parser, &redis_object_parser_callbacks);
+    assert(redis_parser_execute(parser, &res, buf, 5) == 5);
+
+    obj = (redis_object*)res->data;
+    assert(obj != NULL);
+
+    assert_equal_int(obj->type, REDIS_INTEGER);
+    assert_equal_int(obj->integer, 37);
+
+    redis_object_free(&obj);
+}
+
+void test_status(redis_parser *parser) {
+    const char *buf = "+foo\r\n";
+    redis_protocol *res;
+    redis_object *obj;
+
+    redis_parser_init(parser, &redis_object_parser_callbacks);
+    assert(redis_parser_execute(parser, &res, buf, strlen(buf)) == strlen(buf));
+
+    obj = (redis_object*)res->data;
+    assert(obj != NULL);
+
+    assert_equal_int(obj->type, REDIS_STATUS);
+    assert_equal_string(obj->str, "foo");
+    assert_equal_int(obj->len, 3);
+
+    redis_object_free(&obj);
+}
+
+void test_empty_status(redis_parser *parser) {
+    const char *buf = "+\r\n";
+    redis_protocol *res;
+    redis_object *obj;
+
+    redis_parser_init(parser, &redis_object_parser_callbacks);
+    assert(redis_parser_execute(parser, &res, buf, strlen(buf)) == strlen(buf));
+
+    obj = (redis_object*)res->data;
+    assert(obj != NULL);
+
+    assert_equal_int(obj->type, REDIS_STATUS);
+    assert_equal_string(obj->str, "");
+    assert_equal_int(obj->len, 0);
+
+    redis_object_free(&obj);
+}
+
+void test_error(redis_parser *parser) {
+    const char *buf = "-err\r\n";
+    redis_protocol *res;
+    redis_object *obj;
+
+    redis_parser_init(parser, &redis_object_parser_callbacks);
+    assert(redis_parser_execute(parser, &res, buf, strlen(buf)) == strlen(buf));
+
+    obj = (redis_object*)res->data;
+    assert(obj != NULL);
+
+    assert_equal_int(obj->type, REDIS_ERROR);
+    assert_equal_string(obj->str, "err");
+    assert_equal_int(obj->len, 3);
+
+    redis_object_free(&obj);
+}
+
+void test_empty_error(redis_parser *parser) {
+    const char *buf = "-\r\n";
+    redis_protocol *res;
+    redis_object *obj;
+
+    redis_parser_init(parser, &redis_object_parser_callbacks);
+    assert(redis_parser_execute(parser, &res, buf, strlen(buf)) == strlen(buf));
+
+    obj = (redis_object*)res->data;
+    assert(obj != NULL);
+
+    assert_equal_int(obj->type, REDIS_ERROR);
+    assert_equal_string(obj->str, "");
+    assert_equal_int(obj->len, 0);
+
+    redis_object_free(&obj);
+}
+
 int main(int argc, char **argv) {
     redis_parser *parser = malloc(sizeof(redis_parser));
 
@@ -134,14 +223,19 @@ int main(int argc, char **argv) {
     test_string(parser);
     test_chunked_string(parser);
     test_empty_string(parser);
+
     test_nil(parser);
+
     test_array(parser);
     test_empty_array(parser);
 
-    //test_integer(parser);
-    //test_status(parser);
-    //test_error(parser);
-    //test_abort_after_error(parser);
+    test_integer(parser);
+
+    test_status(parser);
+    test_empty_status(parser);
+
+    test_error(parser);
+    test_empty_error(parser);
 
     free(parser);
     return 0;
