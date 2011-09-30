@@ -232,6 +232,9 @@ void test_destroy_callback(redis_parser *parser) {
 }
 
 int main(int argc, char **argv) {
+    ((void)argc);
+    ((void)argv);
+
     redis_parser *parser = malloc(sizeof(redis_parser));
 
     printf("redis_object: %lu bytes\n", sizeof(redis_object));
