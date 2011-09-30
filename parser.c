@@ -497,6 +497,17 @@ error:
     return pos-buf;
 }
 
+void redis_parser_destroy(redis_parser *parser) {
+    /* Only trigger destroy callback when the parser has unfinished
+     * redis_protocol instances. */
+    if (parser->stackidx >= 0 &&
+        parser->callbacks &&
+        parser->callbacks->destroy)
+    {
+        parser->callbacks->destroy(parser, redis_parser_root(parser));
+    }
+}
+
 redis_protocol *redis_parser_root(redis_parser *parser) {
     return &parser->stack[0];
 }

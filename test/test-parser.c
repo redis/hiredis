@@ -111,11 +111,21 @@ int on_nil(redis_parser *parser, redis_protocol *p) {
     return 0;
 }
 
+static int destroy_called = 0;
+
+void destroy(redis_parser *parser, redis_protocol *p) {
+    ((void)parser);
+    ((void)p);
+
+    destroy_called++;
+}
+
 static redis_parser_callbacks callbacks = {
     &on_string,
     &on_array,
     &on_integer,
-    &on_nil
+    &on_nil,
+    &destroy
 };
 
 #define RESET_PARSER(__parser) do {           \
@@ -528,6 +538,49 @@ void test_abort_after_error(redis_parser *p) {
     /* Test that the parser doesn't continue after an error */
     assert_equal_size_t(redis_parser_execute(p, &res, "\n", 1), 0);
     assert(res == NULL);
+}
+
+void test_destroy_callback_after_success(redis_parser *p) {
+    redis_protocol *res;
+    enum redis_parser_errno err;
+
+    RESET_PARSER(p);
+    assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r\n", 5), 5);
+    assert(res != NULL);
+    assert(redis_parser_err(p) == RPE_OK);
+
+    /* Test that the destroy callback is NOT called when there are
+     * no errors or the parser is in-flight */
+    redis_parser_destroy(p);
+    assert_equal_int(destroy_called, 0);
+}
+
+void test_destroy_callback_after_error(redis_parser *p) {
+    redis_protocol *res;
+    enum redis_parser_errno err;
+
+    RESET_PARSER(p);
+    assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r\r", 5), 4);
+    assert(res == NULL);
+    assert(redis_parser_err(p) != RPE_OK);
+
+    /* Test that the destroy callback is called after an error */
+    redis_parser_destroy(p);
+    assert_equal_int(destroy_called, 1);
+}
+
+void test_destroy_callback_in_flight(redis_parser *p) {
+    redis_protocol *res;
+    enum redis_parser_errno err;
+
+    RESET_PARSER(p);
+    assert_equal_size_t(redis_parser_execute(p, &res, "+ok\r", 4), 4);
+    assert(res == NULL);
+    assert(redis_parser_err(p) == RPE_OK);
+
+    /* Test that the destroy callback is called when the parser is in-flight */
+    redis_parser_destroy(p);
+    assert_equal_int(destroy_called, 1);
 }
 
 int main(int argc, char **argv) {

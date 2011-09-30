@@ -88,6 +88,7 @@ struct redis_parser_s {
 
 void redis_parser_init(redis_parser *parser, const redis_parser_callbacks *callbacks);
 size_t redis_parser_execute(redis_parser *parser, redis_protocol **dst, const char *buf, size_t len);
+void redis_parser_destroy(redis_parser *parser);
 redis_protocol *redis_parser_root(redis_parser *parser);
 enum redis_parser_errno redis_parser_err(redis_parser *parser);
 const char *redis_parser_strerror(enum redis_parser_errno err);
