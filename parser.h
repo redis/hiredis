@@ -22,18 +22,18 @@ typedef struct redis_parser_callbacks_s redis_parser_callbacks;
 typedef struct redis_protocol_s redis_protocol;
 typedef struct redis_parser_s redis_parser;
 
-typedef int (*redis_string_cb)(redis_parser *, redis_protocol *, const char *, size_t);
-typedef int (*redis_array_cb)(redis_parser *, redis_protocol *, size_t);
-typedef int (*redis_integer_cb)(redis_parser *, redis_protocol *, int64_t);
-typedef int (*redis_nil_cb)(redis_parser *, redis_protocol *);
-typedef int (*redis_destroy_cb)(redis_parser *, redis_protocol *);
+typedef int (*redis_parser_string_cb)(redis_parser *, redis_protocol *, const char *, size_t);
+typedef int (*redis_parser_array_cb)(redis_parser *, redis_protocol *, size_t);
+typedef int (*redis_parser_integer_cb)(redis_parser *, redis_protocol *, int64_t);
+typedef int (*redis_parser_nil_cb)(redis_parser *, redis_protocol *);
+typedef int (*redis_parser_destroy_cb)(redis_parser *, redis_protocol *);
 
 struct redis_parser_callbacks_s {
-    redis_string_cb on_string;
-    redis_array_cb on_array;
-    redis_integer_cb on_integer;
-    redis_nil_cb on_nil;
-    redis_destroy_cb destroy;
+    redis_parser_string_cb on_string;
+    redis_parser_array_cb on_array;
+    redis_parser_integer_cb on_integer;
+    redis_parser_nil_cb on_nil;
+    redis_parser_destroy_cb destroy;
 };
 
 #define REDIS_PARSER_ERRNO_MAP(_X)                   \
