@@ -13,7 +13,7 @@ HIREDIS_MINOR=10
 # Fallback to gcc when $CC is not in $PATH.
 CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
 OPTIMIZATION?=-O3
-WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings
+WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings -Wno-unused-label
 DEBUG?= -g -ggdb
 REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(DEBUG)
 REAL_LDFLAGS=$(LDFLAGS)
