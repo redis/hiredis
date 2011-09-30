@@ -456,13 +456,14 @@ size_t redis_parser_execute(redis_parser *parser, redis_protocol **dst, const ch
             /* Move to nested object when we see an incomplete array */
             if (cur->type == REDIS_ARRAY && (cur->cursor < cur->size)) {
                 RESET_PROTOCOL(&stack[++stackidx]);
-                cur->cursor++;
                 break;
             }
 
             /* Aggregate plen for nested objects */
             if (stackidx > 0) {
+                assert(stack[stackidx-1].type == REDIS_ARRAY);
                 stack[stackidx-1].plen += cur->plen;
+                stack[stackidx-1].cursor++;
             }
 
             cur = &stack[--stackidx];
