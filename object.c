@@ -159,7 +159,12 @@ static int _object_nil_cb(redis_parser *parser, redis_protocol *p) {
 }
 
 static void _object_destroy_cb(redis_parser *parser, redis_protocol *p) {
-    assert(NULL);
+    redis_object *self;
+
+    ((void)parser);
+
+    self = p->data;
+    redis_object_free(&self);
 }
 
 /* Set of callbacks that can be passed to the parser. */

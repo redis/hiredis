@@ -215,6 +215,22 @@ void test_empty_error(redis_parser *parser) {
     redis_object_free(&obj);
 }
 
+void test_destroy_callback(redis_parser *parser) {
+    const char *buf = "+ok\r";
+    redis_protocol *res;
+
+    redis_parser_init(parser, &redis_object_parser_callbacks);
+    assert(redis_parser_execute(parser, &res, buf, strlen(buf)) == strlen(buf));
+    assert(res == NULL);
+    assert(redis_parser_err(parser) == RPE_OK);
+
+    /* Go ahead and let the parser clean up */
+    redis_parser_destroy(parser);
+
+    /* No way to check if the temporary object gets properly free'd.
+     * Let's hope that Valgrind starts complaining when this is buggy. */
+}
+
 int main(int argc, char **argv) {
     redis_parser *parser = malloc(sizeof(redis_parser));
 
@@ -236,6 +252,8 @@ int main(int argc, char **argv) {
 
     test_error(parser);
     test_empty_error(parser);
+
+    test_destroy_callback(parser);
 
     free(parser);
     return 0;
