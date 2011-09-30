@@ -2,6 +2,7 @@
 #define _TEST_HELPER_H 1
 
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 
 #define assert_equal(a, b, type, fmt) do {       \
@@ -30,6 +31,15 @@
 
 #define assert_equal_double(a,b) do {            \
     assert_equal(a, b, double, "%f");            \
+} while(0)
+
+#define assert_equal_string(a,b) do {            \
+    if (strcmp(a, b)) {                          \
+        fprintf(stderr,                          \
+            "%s:%d: %s != %s\n",                 \
+            __FILE__, __LINE__, a, b);           \
+        assert(0);                               \
+    }                                            \
 } while(0)
 
 #endif
