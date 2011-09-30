@@ -3,7 +3,7 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ=net.o hiredis.o sds.o async.o
+OBJ=net.o hiredis.o sds.o async.o parser.o object.o
 BINS=hiredis-example hiredis-test
 LIBNAME=libhiredis
 
@@ -94,17 +94,17 @@ check: hiredis-test
 			( kill `cat /tmp/hiredis-test-redis.pid` && false )
 	kill `cat /tmp/hiredis-test-redis.pid`
 
-test/test-%.o: test/test-%.c
+test/test-%.o: test/test-%.c $(STLIBNAME)
 	$(CC) -std=c99 -pedantic -o $@ -c $(REAL_CFLAGS) $<
 
-test/test-parser: test/test-parser.o parser.o sds.o
+test/test-%: test/test-%.o $(STLIBNAME)
 	$(CC) -o $@ $(REAL_LDFLAGS) $^
 
 .c.o:
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
 clean:
-	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
+	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov test/*.o
 
 dep:
 	$(CC) -MM *.c
