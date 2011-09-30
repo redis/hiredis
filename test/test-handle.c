@@ -130,10 +130,28 @@ int test_connect_gai_unknown_host(void) {
     return 0;
 }
 
+int test_connect_gai_success(void) {
+    redis_handle h;
+    int rv;
+
+    rv = redis_handle_init(&h);
+    assert(rv == REDIS_OK);
+
+    rv = redis_handle_connect_gai(&h, AF_INET, "localhost", redis_port());
+    assert_equal_int(rv, REDIS_OK);
+
+    rv = redis_handle_wait_connected(&h);
+    assert_equal_int(rv, REDIS_OK);
+
+    redis_handle_destroy(&h);
+    return 0;
+}
+
 int main(void) {
     test_connect_in_refused();
     test_connect_in6_refused();
     test_connect_un_noent();
     test_connect_timeout();
     test_connect_gai_unknown_host();
+    test_connect_gai_success();
 }
