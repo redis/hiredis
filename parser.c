@@ -15,7 +15,7 @@
 #define CALLBACK(X, ...) do {                                          \
     if (callbacks && callbacks->on_##X) {                              \
         if (callbacks->on_##X(parser, __VA_ARGS__) != 0) {             \
-            SET_ERRNO(CALLBACK);                                   \
+            SET_ERRNO(CALLBACK);                                       \
             goto error;                                                \
         }                                                              \
     }                                                                  \
