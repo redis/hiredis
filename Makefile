@@ -3,7 +3,7 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ=net.o hiredis.o sds.o async.o parser.o object.o
+OBJ=net.o hiredis.o sds.o async.o parser.o object.o handle.o
 BINS=hiredis-example hiredis-test
 LIBNAME=libhiredis
 

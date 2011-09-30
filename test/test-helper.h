@@ -3,7 +3,13 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <sys/time.h>
 #include <assert.h>
+
+/******************************************************************************/
+/* ASSERTS ********************************************************************/
+/******************************************************************************/
 
 #define assert_equal(a, b, type, fmt) do {       \
     type a_ = (a);                               \
@@ -41,5 +47,37 @@
         assert(0);                               \
     }                                            \
 } while(0)
+
+/******************************************************************************/
+/* TIMING *********************************************************************/
+/******************************************************************************/
+
+static long long usec(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (long long)tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
+/******************************************************************************/
+/* MISC ***********************************************************************/
+/******************************************************************************/
+
+#define REDIS_DEFAULT_PORT 6379
+
+static int redis_port(void) {
+    char *env, *eptr;
+    long port = REDIS_DEFAULT_PORT;
+
+    env = getenv("REDIS_PORT");
+    if (env != NULL) {
+        port = strtol(env, &eptr, 10);
+
+        /* Reset to default when the var contains garbage. */
+        if (*eptr != '\0') {
+            port = REDIS_DEFAULT_PORT;
+        }
+    }
+    return port;
+}
 
 #endif
