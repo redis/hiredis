@@ -15,6 +15,7 @@
 #define REDIS_ESYS -1
 #define REDIS_EGAI -2
 #define REDIS_EPARSER -3
+#define REDIS_EEOF -4
 
 typedef struct redis_handle_s redis_handle;
 
@@ -22,6 +23,8 @@ struct redis_handle_s {
     int fd;
     struct timeval timeout;
     redis_parser parser;
+    char *wbuf;
+    char *rbuf;
 };
 
 int redis_handle_init(redis_handle *h);
@@ -37,5 +40,11 @@ int redis_handle_connect_gai(redis_handle *h, int family, const char *addr, int 
 int redis_handle_wait_connected(redis_handle *);
 int redis_handle_wait_readable(redis_handle *);
 int redis_handle_wait_writable(redis_handle *);
+
+int redis_handle_write_from_buffer(redis_handle *, int *drained);
+int redis_handle_write_to_buffer(redis_handle *, const char *buf, size_t len);
+
+int redis_handle_read_to_buffer(redis_handle *);
+int redis_handle_read_from_buffer(redis_handle *, redis_protocol **p);
 
 #endif

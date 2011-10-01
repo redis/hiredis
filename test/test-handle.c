@@ -147,6 +147,100 @@ int test_connect_gai_success(void) {
     return 0;
 }
 
+redis_handle *setup(void) {
+    redis_handle *h = malloc(sizeof(*h));
+    int rv;
+
+    rv = redis_handle_init(h);
+    assert(rv == REDIS_OK);
+    rv = redis_handle_set_timeout(h, 10000);
+    assert_equal_int(rv, REDIS_OK);
+    rv = redis_handle_connect_gai(h, AF_INET, "localhost", redis_port());
+    assert_equal_int(rv, REDIS_OK);
+    rv = redis_handle_wait_connected(h);
+    assert_equal_int(rv, REDIS_OK);
+
+    return h;
+}
+
+void teardown(redis_handle *h) {
+    redis_handle_destroy(h);
+    free(h);
+}
+
+void test_eof_after_quit(void) {
+    redis_handle *h = setup();
+    int rv, drained;
+
+    rv = redis_handle_write_to_buffer(h, "quit\r\n", 6);
+    assert(rv == REDIS_OK);
+    rv = redis_handle_write_from_buffer(h, &drained);
+    assert(rv == REDIS_OK && drained);
+    rv = redis_handle_wait_readable(h);
+    assert(rv == REDIS_OK);
+    rv = redis_handle_read_to_buffer(h);
+    assert(rv == REDIS_OK);
+
+    redis_protocol *p;
+    rv = redis_handle_read_from_buffer(h, &p);
+    assert(rv == REDIS_OK);
+    assert_equal_int(p->type, REDIS_STATUS);
+    assert_equal_int(p->plen, 5); /* +ok\r\n */
+
+    /* wait_readable should return REDIS_OK because EOF is readable */
+    rv = redis_handle_wait_readable(h);
+    assert_equal_int(rv, REDIS_OK);
+
+    /* 1: read EOF */
+    rv = redis_handle_read_to_buffer(h);
+    assert_equal_int(rv, REDIS_EEOF);
+
+    /* 2: reading EOF should be idempotent (user is responsible for closing the handle) */
+    rv = redis_handle_read_to_buffer(h);
+    assert_equal_int(rv, REDIS_EEOF);
+
+    teardown(h);
+}
+
+void test_read_timeout(void) {
+    redis_handle *h = setup();
+    int rv;
+
+    rv = redis_handle_wait_readable(h);
+    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_int(errno, ETIMEDOUT);
+
+    teardown(h);
+}
+
+void test_einval_against_closed_handle(void) {
+    redis_handle *h = setup();
+    int rv;
+
+    rv = redis_handle_close(h);
+    assert_equal_int(rv, REDIS_OK);
+
+    rv = redis_handle_write_to_buffer(h, "ping\r\n", 6);
+    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_int(errno, EINVAL);
+
+    int drained;
+    rv = redis_handle_write_from_buffer(h, &drained);
+    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_int(errno, EINVAL);
+
+    rv = redis_handle_read_to_buffer(h);
+    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_int(errno, EINVAL);
+
+    redis_protocol *p;
+    rv = redis_handle_read_from_buffer(h, &p);
+    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_int(errno, EINVAL);
+
+    teardown(h);
+}
+
 int main(void) {
     test_connect_in_refused();
     test_connect_in6_refused();
@@ -154,4 +248,8 @@ int main(void) {
     test_connect_timeout();
     test_connect_gai_unknown_host();
     test_connect_gai_success();
+
+    test_eof_after_quit();
+    test_read_timeout();
+    test_einval_against_closed_handle();
 }

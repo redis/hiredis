@@ -29,6 +29,7 @@
 
 /* local */
 #include "handle.h"
+#include "sds.h"
 
 #define REDIS__READABLE 1
 #define REDIS__WRITABLE 2
@@ -38,6 +39,8 @@ int redis_handle_init(redis_handle *h) {
     h->timeout.tv_sec = 5;
     h->timeout.tv_usec = 0;
     redis_parser_init(&h->parser, NULL);
+    h->wbuf = NULL;
+    h->rbuf = NULL;
     return REDIS_OK;
 }
 
@@ -54,6 +57,16 @@ int redis_handle_close(redis_handle *h) {
     if (h->fd >= 0) {
         close(h->fd);
         h->fd = -1;
+    }
+
+    if (h->wbuf) {
+        sdsfree(h->wbuf);
+        h->wbuf = NULL;
+    }
+
+    if (h->rbuf) {
+        sdsfree(h->rbuf);
+        h->rbuf = NULL;
     }
 
     return REDIS_OK;
@@ -149,6 +162,8 @@ int redis_handle_connect_in(redis_handle *h, struct sockaddr_in addr) {
     }
 
     h->fd = fd;
+    h->wbuf = sdsempty();
+    h->rbuf = sdsempty();
     return REDIS_OK;
 }
 
@@ -167,6 +182,8 @@ int redis_handle_connect_in6(redis_handle *h, struct sockaddr_in6 addr) {
     }
 
     h->fd = fd;
+    h->wbuf = sdsempty();
+    h->rbuf = sdsempty();
     return REDIS_OK;
 }
 
@@ -185,6 +202,8 @@ int redis_handle_connect_un(redis_handle *h, struct sockaddr_un addr) {
     }
 
     h->fd = fd;
+    h->wbuf = sdsempty();
+    h->rbuf = sdsempty();
     return REDIS_OK;
 }
 
@@ -223,6 +242,8 @@ int redis_handle_connect_gai(redis_handle *h,
 
         freeaddrinfo(servinfo);
         h->fd = fd;
+        h->wbuf = sdsempty();
+        h->rbuf = sdsempty();
         return REDIS_OK;
     }
 
@@ -302,4 +323,88 @@ int redis_handle_wait_readable(redis_handle *h) {
 
 int redis_handle_wait_writable(redis_handle *h) {
     return redis__wait(h, REDIS__WRITABLE);
+}
+
+int redis_handle_write_from_buffer(redis_handle *h, int *drained) {
+    int nwritten;
+
+    if (h->fd < 0) {
+        errno = EINVAL;
+        return REDIS_ESYS;
+    }
+
+    if (sdslen(h->wbuf)) {
+        nwritten = write(h->fd, h->wbuf, sdslen(h->wbuf));
+        if (nwritten == -1) {
+            /* Let all errors bubble, including EAGAIN */
+            return REDIS_ESYS;
+        } else if (nwritten > 0) {
+            h->wbuf = sdsrange(h->wbuf, nwritten, -1);
+        }
+    }
+
+    if (drained) {
+        *drained = (sdslen(h->wbuf) == 0);
+    }
+
+    return REDIS_OK;
+}
+
+int redis_handle_write_to_buffer(redis_handle *h, const char *buf, size_t len) {
+    if (h->fd < 0) {
+        errno = EINVAL;
+        return REDIS_ESYS;
+    }
+
+    h->wbuf = sdscatlen(h->wbuf, buf, len);
+    return REDIS_OK;
+}
+
+int redis_handle_read_to_buffer(redis_handle *h) {
+    char buf[2048];
+    int nread;
+
+    if (h->fd < 0) {
+        errno = EINVAL;
+        return REDIS_ESYS;
+    }
+
+    nread = read(h->fd, buf, sizeof(buf));
+    if (nread == -1) {
+        /* Let all errors bubble, including EAGAIN */
+        return REDIS_ESYS;
+    } else if (nread == 0) {
+        return REDIS_EEOF;
+    }
+
+    h->rbuf = sdscatlen(h->rbuf, buf, nread);
+    return 0;
+}
+
+int redis_handle_read_from_buffer(redis_handle *h, redis_protocol **p) {
+    size_t navail, nparsed;
+
+    if (h->fd < 0) {
+        errno = EINVAL;
+        return REDIS_ESYS;
+    }
+
+    assert(p != NULL);
+    *p = NULL;
+
+    navail = sdslen(h->rbuf);
+    if (navail) {
+        nparsed = redis_parser_execute(&h->parser, p, h->rbuf, navail);
+
+        /* Trim read buffer */
+        h->rbuf = sdsrange(h->rbuf, nparsed, -1);
+
+        /* Test for parse error */
+        if (nparsed < navail && *p == NULL) {
+            errno = redis_parser_err(&h->parser);
+            return REDIS_EPARSER;
+        }
+    }
+
+    return REDIS_OK;
 }
