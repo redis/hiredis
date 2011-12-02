@@ -225,8 +225,9 @@ static void test_reply_reader(void) {
               strcasecmp(reader->errstr,"Protocol error, got \"@\" as reply type byte") == 0);
     redisReaderFree(reader);
 
-    test("Set error on nested multi bulks with depth > 1: ");
+    test("Set error on nested multi bulks with depth > 2: ");
     reader = redisReaderCreate();
+    redisReaderFeed(reader,(char*)"*1\r\n",4);
     redisReaderFeed(reader,(char*)"*1\r\n",4);
     redisReaderFeed(reader,(char*)"*1\r\n",4);
     redisReaderFeed(reader,(char*)"*1\r\n",4);
