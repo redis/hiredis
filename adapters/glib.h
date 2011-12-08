@@ -5,150 +5,123 @@
 #include "../async.h"
 
 typedef struct redisGlibEvents {
+    GSource source;
+    GPollFD poll_fd;
+    gboolean removed;
 
     redisAsyncContext *context;
-
-    GMainContext *main_context;
-    GIOChannel *channel;
-
-    guint err_source_id;
-    guint read_source_id;
-    guint write_source_id;
-
 } redisGlibEvents;
 
-/* g_io_add_watch_to_context is, essentially the same as g_io_add_watch
- * but with the ability to specify a context to attach the IO watch to.
- * Calling g_io_add_watch_to_context with context equal to NULL is equivalent
- * to calling g_io_add_watch.
- */
-static guint g_io_add_watch_to_context(GIOChannel *channel,
-                                       GIOCondition condition,
-                                       GIOFunc func,
-                                       gpointer user_data,
-                                       GMainContext *context)
-{
-    GSource *source;
-    guint id;
-
-    g_return_val_if_fail(channel != NULL, 0);
-
-    source = g_io_create_watch(channel, condition);
-    g_source_set_callback(source, (GSourceFunc)func, user_data, NULL);
-
-    id = g_source_attach(source, context);
-    g_source_unref(source);
-
-    return id;
+/* Stop polling the events file descriptor source */
+static void redisGlibSourceRemove(redisGlibEvents *e) {
+    e->removed = TRUE;
+    g_source_remove_poll((GSource*)e, &e->poll_fd);
 }
 
-static gboolean redisGlibIOCallback(GIOChannel *source,
-                                    GIOCondition condition,
-                                    gpointer privdata)
-{
-    redisGlibEvents *e = (redisGlibEvents*)privdata;
+static gboolean redisGlibSourcePrepare(GSource *source, gint *timeout) {
+    ((void)source);
+    /* Need to wait for poll() to be called before we known if any events
+     * need to be processed. It doesn't matter how long poll() blocks for.
+     */
+    *timeout = -1;
+    return FALSE;
+}
+
+static gboolean redisGlibSourceCheck(GSource *source) {
+    redisGlibEvents *e = (redisGlibEvents*)source;
+    /* The source is checked regardless of the result of the polling.
+     * Only signal that the source is ready if poll() indicated so.
+     */
+    return (e->poll_fd.events & e->poll_fd.revents);
+}
+
+static gboolean redisGlibSourceDispatch(GSource *source,
+                                        GSourceFunc callback,
+                                        gpointer user_data) {
+    ((void)callback);
+    ((void)user_data);
+    redisGlibEvents *e = (redisGlibEvents*)source;
+    ushort revents = e->poll_fd.revents;
     gboolean ret = TRUE;
 
-    if(condition & (G_IO_NVAL|G_IO_HUP|G_IO_ERR)) {
-        // An error condition occured. Propagate this
-        // inforation to read/write async handlers.
-        condition |= G_IO_IN|G_IO_OUT;
+    if(revents & (G_IO_NVAL|G_IO_HUP|G_IO_ERR)) {
+        /* G_IO_NVAL may happen if the file descriptor is closed while
+         * the GLib source is active. This and other error conditions
+         * need to be propagated to hiredis async handlers.
+         */
+        redisGlibSourceRemove(e);
         ret = FALSE;
     }
 
-    if(e->read_source_id && (condition & G_IO_IN))
+    if(!ret || (revents & G_IO_IN))
         redisAsyncHandleRead(e->context);
 
-    if(e->write_source_id && (condition & G_IO_OUT))
+    if(!ret || (revents & G_IO_OUT))
         redisAsyncHandleWrite(e->context);
-
-    if(ret == FALSE) {
-        // In case of errors, event sources are destroyed.
-        e->err_source_id = 0;
-        e->read_source_id = 0;
-        e->write_source_id = 0;
-    }
 
     return ret;
 }
 
-static void redisGlibAddRead(void *privdata) {
-    redisGlibEvents *e = (redisGlibEvents*)privdata;
+static GSourceFuncs redisGlibSourceFuncs = {
+    redisGlibSourcePrepare,
+    redisGlibSourceCheck,
+    redisGlibSourceDispatch,
+    NULL,
+    (GSourceFunc)NULL,
+    (GSourceDummyMarshal)NULL
+};
 
-    if(e->read_source_id)
+/* Add an IO condition to source file descriptor poll. */ 
+static void redisGlibAddPoll(GSource *source,
+                             GPollFD *pollfd,
+                             GIOCondition cond) {
+    /* Only update poll conditions when they are different */
+    if(pollfd->events & cond)
         return;
 
-    e->read_source_id = g_io_add_watch_to_context(e->channel,
-                                                  G_IO_IN,
-                                                  redisGlibIOCallback,
-                                                  e,
-                                                  e->main_context);
+    g_source_remove_poll(source, pollfd);
+    pollfd->events |= cond;
+    g_source_add_poll(source, pollfd);
+}
+
+/* Remove an IO condition from source file descriptor poll. */ 
+static void redisGlibRemovePoll(GSource *source,
+                                GPollFD *pollfd,
+                                GIOCondition cond) {
+    /* Only update poll conditions when they are different */
+    if(!(pollfd->events & cond))
+        return;
+
+    g_source_remove_poll(source, pollfd);
+    pollfd->events &= ~cond;
+    g_source_add_poll(source, pollfd);
+}
+
+static void redisGlibAddRead(void *privdata) {
+    redisGlibEvents *e = (redisGlibEvents*)privdata;
+    redisGlibAddPoll((GSource*)e, &e->poll_fd, G_IO_IN);
 }
 
 static void redisGlibDelRead(void *privdata) {
     redisGlibEvents *e = (redisGlibEvents*)privdata;
-    GSource *source;
-
-    if(!e->read_source_id)
-        return;
-
-    source = g_main_context_find_source_by_id(e->main_context,
-                                              e->read_source_id);
-    g_source_destroy(source);
-    e->read_source_id = 0;
+    redisGlibRemovePoll((GSource*)e, &e->poll_fd, G_IO_IN);
 }
 
 static void redisGlibAddWrite(void *privdata) {
     redisGlibEvents *e = (redisGlibEvents*)privdata;
-
-    if(e->write_source_id)
-        return;
-
-    e->write_source_id = g_io_add_watch_to_context(e->channel,
-                                                   G_IO_OUT,
-                                                   redisGlibIOCallback,
-                                                   e,
-                                                   e->main_context);
+    redisGlibAddPoll((GSource*)e, &e->poll_fd, G_IO_OUT);
 }
 
 static void redisGlibDelWrite(void *privdata) {
     redisGlibEvents *e = (redisGlibEvents*)privdata;
-    GSource *source;
-
-    if(!e->write_source_id)
-        return;
-
-    source = g_main_context_find_source_by_id(e->main_context,
-                                              e->write_source_id);
-    g_source_destroy(source);
-    e->write_source_id = 0;
+    redisGlibRemovePoll((GSource*)e, &e->poll_fd, G_IO_OUT);
 }
 
 static void redisGlibCleanup(void *privdata) {
     redisGlibEvents *e = (redisGlibEvents*)privdata;
-    GSource *source;
 
-    if(e->err_source_id) {
-        source = g_main_context_find_source_by_id(e->main_context,
-                                                  e->err_source_id);
-        g_source_destroy(source);
-    }
-
-    if(e->read_source_id) {
-        source = g_main_context_find_source_by_id(e->main_context,
-                                                  e->read_source_id);
-        g_source_destroy(source);
-    }
-
-    if(e->write_source_id) {
-        source = g_main_context_find_source_by_id(e->main_context,
-                                                  e->write_source_id);
-        g_source_destroy(source);
-    }
-
-    g_io_channel_unref(e->channel);
-
-    free(e);
+    redisGlibSourceRemove(e);
+    g_source_unref((GSource*)e);
 }
 
 static int redisGlibAttach(GMainContext *ctx, redisAsyncContext *ac) {
@@ -160,18 +133,14 @@ static int redisGlibAttach(GMainContext *ctx, redisAsyncContext *ac) {
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisGlibEvents*)malloc(sizeof(*e));
+    e = (redisGlibEvents*)g_source_new(&redisGlibSourceFuncs,
+                                       sizeof(redisGlibEvents));
     e->context = ac;
-    e->main_context = ctx;
 
-    e->channel = g_io_channel_unix_new(c->fd);
-    g_io_channel_set_close_on_unref(e->channel, FALSE);
+    e->poll_fd.fd = c->fd;
+    e->poll_fd.events = G_IO_NVAL|G_IO_HUP|G_IO_ERR;
 
-    e->err_source_id = g_io_add_watch_to_context(e->channel,
-                                                 G_IO_NVAL|G_IO_HUP|G_IO_ERR,
-                                                 redisGlibIOCallback,
-                                                 e,
-                                                 e->main_context);
+    g_source_attach((GSource*)e, ctx);
 
     /* Register functions to start/stop listening for events */
     ac->ev.addRead = redisGlibAddRead;
@@ -183,6 +152,5 @@ static int redisGlibAttach(GMainContext *ctx, redisAsyncContext *ac) {
 
     return REDIS_OK;
 }
-
 
 #endif
