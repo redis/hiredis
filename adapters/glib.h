@@ -12,12 +12,6 @@ typedef struct redisGlibEvents {
     redisAsyncContext *context;
 } redisGlibEvents;
 
-/* Stop polling the events file descriptor source */
-static void redisGlibSourceRemove(redisGlibEvents *e) {
-    e->removed = TRUE;
-    g_source_remove_poll((GSource*)e, &e->poll_fd);
-}
-
 static gboolean redisGlibSourcePrepare(GSource *source, gint *timeout) {
     ((void)source);
     /* Need to wait for poll() to be called before we known if any events
@@ -49,7 +43,7 @@ static gboolean redisGlibSourceDispatch(GSource *source,
          * the GLib source is active. This and other error conditions
          * need to be propagated to hiredis async handlers.
          */
-        redisGlibSourceRemove(e);
+        g_source_remove_poll(source, &e->poll_fd);
         ret = FALSE;
     }
 
@@ -119,9 +113,10 @@ static void redisGlibDelWrite(void *privdata) {
 
 static void redisGlibCleanup(void *privdata) {
     redisGlibEvents *e = (redisGlibEvents*)privdata;
+    GSource *source = (GSource*)e;
 
-    redisGlibSourceRemove(e);
-    g_source_unref((GSource*)e);
+    g_source_remove_poll(source, &e->poll_fd);
+    g_source_unref(source);
 }
 
 static int redisGlibAttach(GMainContext *ctx, redisAsyncContext *ac) {
