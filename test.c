@@ -177,7 +177,7 @@ static void test_format_commands(void) {
     FLOAT_WIDTH_TEST(double);
 
     test("Format command with invalid printf format: ");
-    len = redisFormatCommand(&cmd,"key:%08p %b",1234,"foo",3);
+    len = redisFormatCommand(&cmd,"key:%08p %b",(void*)1234,"foo",3);
     test_cond(len == -1);
 
     const char *argv[3];
@@ -283,7 +283,8 @@ static void test_blocking_connection_errors(void) {
     test("Returns error when host cannot be resolved: ");
     c = redisConnect((char*)"idontexist.local", 6379);
     test_cond(c->err == REDIS_ERR_OTHER &&
-        strcmp(c->errstr,"Can't resolve: idontexist.local") == 0);
+        (strcmp(c->errstr,"Name or service not known") == 0 ||
+         strcmp(c->errstr,"Can't resolve: idontexist.local") == 0));
     redisFree(c);
 
     test("Returns error when the port is not open: ");
