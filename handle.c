@@ -158,7 +158,7 @@ static int redis__finish_connect(redis_handle *h, int fd) {
     return REDIS_OK;
 }
 
-int redis_handle_connect_in(redis_handle *h, struct sockaddr_in addr) {
+int redis_handle_connect_address(redis_handle *h, const redis_address *addr) {
     int fd;
 
     if (h->fd >= 0) {
@@ -166,8 +166,7 @@ int redis_handle_connect_in(redis_handle *h, struct sockaddr_in addr) {
         return REDIS_ESYS;
     }
 
-    assert(addr.sin_family == AF_INET);
-    fd = redis__handle_connect(AF_INET, (struct sockaddr*)&addr, sizeof(addr));
+    fd = redis__handle_connect(addr->sa_family, &addr->sa_addr.addr, addr->sa_addrlen);
     if (fd == -1) {
         return REDIS_ESYS;
     }
@@ -175,44 +174,38 @@ int redis_handle_connect_in(redis_handle *h, struct sockaddr_in addr) {
     return redis__finish_connect(h, fd);
 }
 
-int redis_handle_connect_in6(redis_handle *h, struct sockaddr_in6 addr) {
-    int fd;
+int redis_handle_connect_in(redis_handle *h, struct sockaddr_in sa) {
+    redis_address address;
 
-    if (h->fd >= 0) {
-        errno = EALREADY;
-        return REDIS_ESYS;
-    }
-
-    assert(addr.sin6_family == AF_INET6);
-    fd = redis__handle_connect(AF_INET6, (struct sockaddr*)&addr, sizeof(addr));
-    if (fd == -1) {
-        return REDIS_ESYS;
-    }
-
-    return redis__finish_connect(h, fd);
+    address.sa_family = AF_INET;
+    address.sa_addr.in = sa;
+    address.sa_addrlen = sizeof(sa);
+    return redis_handle_connect_address(h, &address);
 }
 
-int redis_handle_connect_un(redis_handle *h, struct sockaddr_un addr) {
-    int fd;
+int redis_handle_connect_in6(redis_handle *h, struct sockaddr_in6 sa) {
+    redis_address address;
 
-    if (h->fd >= 0) {
-        errno = EALREADY;
-        return REDIS_ESYS;
-    }
+    address.sa_family = AF_INET6;
+    address.sa_addr.in6 = sa;
+    address.sa_addrlen = sizeof(sa);
+    return redis_handle_connect_address(h, &address);
+}
 
-    assert(addr.sun_family == AF_LOCAL);
-    fd = redis__handle_connect(AF_LOCAL, (struct sockaddr*)&addr, sizeof(addr));
-    if (fd == -1) {
-        return REDIS_ESYS;
-    }
+int redis_handle_connect_un(redis_handle *h, struct sockaddr_un sa) {
+    redis_address address;
 
-    return redis__finish_connect(h, fd);
+    address.sa_family = AF_LOCAL;
+    address.sa_addr.un = sa;
+    address.sa_addrlen = sizeof(sa);
+    return redis_handle_connect_address(h, &address);
 }
 
 int redis_handle_connect_gai(redis_handle *h,
                              int family,
                              const char *addr,
-                             int port) {
+                             int port,
+                             redis_address *_addr) {
     char _port[6];  /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *p;
     int rv, fd;
@@ -240,6 +233,14 @@ int redis_handle_connect_gai(redis_handle *h,
             }
 
             goto error;
+        }
+
+        /* Pass address we connect to back to caller */
+        if (_addr != NULL) {
+            memset(_addr, 0, sizeof(*_addr));
+            memcpy(&_addr->sa_addr, p->ai_addr, p->ai_addrlen);
+            _addr->sa_family = p->ai_family;
+            _addr->sa_addrlen = p->ai_addrlen;
         }
 
         freeaddrinfo(servinfo);

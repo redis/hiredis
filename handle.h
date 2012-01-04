@@ -18,6 +18,7 @@
 #define REDIS_EEOF -4
 
 typedef struct redis_handle_s redis_handle;
+typedef struct redis_address_s redis_address;
 
 struct redis_handle_s {
     int fd;
@@ -27,16 +28,28 @@ struct redis_handle_s {
     char *rbuf;
 };
 
+struct redis_address_s {
+    int sa_family;
+    socklen_t sa_addrlen;
+    union {
+        struct sockaddr addr;
+        struct sockaddr_in in;
+        struct sockaddr_in6 in6;
+        struct sockaddr_un un;
+    } sa_addr;
+};
+
 int redis_handle_init(redis_handle *h);
 int redis_handle_close(redis_handle *);
 int redis_handle_destroy(redis_handle *);
 int redis_handle_set_timeout(redis_handle *, unsigned long us);
 unsigned long redis_handle_get_timeout(redis_handle *h);
 
+int redis_handle_connect_address(redis_handle *, const redis_address *);
 int redis_handle_connect_in(redis_handle *, struct sockaddr_in addr);
 int redis_handle_connect_in6(redis_handle *, struct sockaddr_in6 addr);
 int redis_handle_connect_un(redis_handle *, struct sockaddr_un addr);
-int redis_handle_connect_gai(redis_handle *h, int family, const char *addr, int port);
+int redis_handle_connect_gai(redis_handle *h, int family, const char *host, int port, redis_address *addr);
 
 int redis_handle_wait_connected(redis_handle *);
 int redis_handle_wait_readable(redis_handle *);

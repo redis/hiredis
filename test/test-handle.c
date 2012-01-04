@@ -118,7 +118,7 @@ TEST(connect_gai_unknown_host) {
     rv = redis_handle_init(&h);
     assert(rv == REDIS_OK);
 
-    rv = redis_handle_connect_gai(&h, AF_INET, "idontexist.foo", redis_port());
+    rv = redis_handle_connect_gai(&h, AF_INET, "idontexist.foo", redis_port(), NULL);
     assert_equal_int(rv, REDIS_EGAI);
     /* Don't care about the specific error for now. */
 
@@ -132,11 +132,35 @@ TEST(connect_gai_success) {
     rv = redis_handle_init(&h);
     assert(rv == REDIS_OK);
 
-    rv = redis_handle_connect_gai(&h, AF_INET, "localhost", redis_port());
+    rv = redis_handle_connect_gai(&h, AF_INET, "localhost", redis_port(), NULL);
     assert_equal_int(rv, REDIS_OK);
 
     rv = redis_handle_wait_connected(&h);
     assert_equal_int(rv, REDIS_OK);
+
+    redis_handle_destroy(&h);
+}
+
+TEST(connect_gai_redis_address) {
+    redis_handle h;
+    redis_address address;
+    int rv;
+
+    rv = redis_handle_init(&h);
+    assert(rv == REDIS_OK);
+
+    rv = redis_handle_connect_gai(&h, AF_INET, "localhost", redis_port(), &address);
+    assert_equal_int(rv, REDIS_OK);
+
+    /* Match common fields */
+    assert(address.sa_family == AF_INET);
+    assert(address.sa_addrlen == sizeof(struct sockaddr_in));
+
+    /* Match sockaddr specific fields */
+    assert(address.sa_addr.in.sin_len == sizeof(struct sockaddr_in));
+    assert(address.sa_addr.in.sin_family == AF_INET);
+    assert(ntohs(address.sa_addr.in.sin_port) == redis_port());
+    assert(strcmp(inet_ntoa(address.sa_addr.in.sin_addr), "127.0.0.1") == 0);
 
     redis_handle_destroy(&h);
 }
@@ -149,7 +173,7 @@ redis_handle *setup(void) {
     assert(rv == REDIS_OK);
     rv = redis_handle_set_timeout(h, 10000);
     assert_equal_int(rv, REDIS_OK);
-    rv = redis_handle_connect_gai(h, AF_INET, "localhost", redis_port());
+    rv = redis_handle_connect_gai(h, AF_INET, "localhost", redis_port(), NULL);
     assert_equal_int(rv, REDIS_OK);
     rv = redis_handle_wait_connected(h);
     assert_equal_int(rv, REDIS_OK);
@@ -242,6 +266,7 @@ int main(void) {
     test_connect_timeout();
     test_connect_gai_unknown_host();
     test_connect_gai_success();
+    test_connect_gai_redis_address();
 
     test_eof_after_quit();
     test_read_timeout();
