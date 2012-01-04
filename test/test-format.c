@@ -10,9 +10,12 @@
 #include "../format.h"
 #include "test-helper.h"
 
-void test_format_without_interpolation(void) {
-    char *cmd;
+#define SETUP()                                                                \
+    char *cmd;                                                                 \
     int len;
+
+TEST(format_without_interpolation) {
+    SETUP();
 
     len = redis_format_command(&cmd, "SET foo bar");
     assert(strncmp(cmd, "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n", len) == 0 &&
@@ -20,9 +23,8 @@ void test_format_without_interpolation(void) {
     free(cmd);
 }
 
-void test_format_with_string_interpolation(void) {
-    char *cmd;
-    int len;
+TEST(format_with_string_interpolation) {
+    SETUP();
 
     /* Regular */
     len = redis_format_command(&cmd, "SET %s %s", "foo", "bar");
@@ -43,9 +45,8 @@ void test_format_with_string_interpolation(void) {
     free(cmd);
 }
 
-void test_format_with_binary_interpolation(void) {
-    char *cmd;
-    int len;
+TEST(format_with_binary_interpolation) {
+    SETUP();
 
     /* Regular */
     len = redis_format_command(&cmd, "SET %b %b", "f\0o", 3, "b\0r", 3);
@@ -66,9 +67,8 @@ void test_format_with_binary_interpolation(void) {
     free(cmd);
 }
 
-void test_format_with_literal_percent(void) {
-    char *cmd;
-    int len;
+TEST(format_with_literal_percent) {
+    SETUP();
 
     len = redis_format_command(&cmd,"SET %% %%");
     assert(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$1\r\n%\r\n$1\r\n%\r\n",len) == 0 &&
@@ -76,9 +76,8 @@ void test_format_with_literal_percent(void) {
     free(cmd);
 }
 
-void test_format_with_printf_format(void) {
-    char *cmd;
-    int len;
+TEST(format_with_printf_format) {
+    SETUP();
 
     /* Vararg width depends on the type. These tests make sure that the
      * width is correctly determined using the format and subsequent varargs
@@ -111,20 +110,18 @@ void test_format_with_printf_format(void) {
     INTEGER_WIDTH_TEST("llu", unsigned long long);
     FLOAT_WIDTH_TEST(float);
     FLOAT_WIDTH_TEST(double);
-
 }
 
-void test_format_with_invalid_printf_format(void) {
-    char *cmd;
-    int len;
+TEST(format_with_invalid_printf_format) {
+    SETUP();
 
     len = redis_format_command(&cmd,"key:%08p %b",1234,"foo",3);
     assert(len == -1);
 }
 
-void test_format_argv(void) {
-    char *cmd;
-    int len;
+TEST(format_argv) {
+    SETUP();
+
     int argc = 3;
     const char *argv[3] = { "SET", "foo\0xxx", "bar" };
     size_t lens[3] = { 3, 7, 3 };
