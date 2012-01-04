@@ -59,6 +59,7 @@ static void test__##name(void);                                                \
 static void test_##name(void) {                                                \
     current_test = #name;                                                      \
     test__##name();                                                            \
+    printf("%s: PASSED\n", current_test);                                      \
 }                                                                              \
 static void test__##name(void)
 
