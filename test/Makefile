@@ -4,8 +4,11 @@ TESTS=test-format test-parser test-object test-handle
 
 all: $(TESTS)
 
-test-%: test-%.o
-	$(CC) -o $@ $(REAL_LDFLAGS) $< ../$(STLIBNAME)
+../$(STLIBNAME):
+	cd .. && $(MAKE) $(STLIBNAME)
+
+test-%: test-%.o ../$(STLIBNAME)
+	$(CC) -o $@ $(REAL_LDFLAGS) $^
 
 .c.o:
 	$(CC) -std=c99 -pedantic -c -O0 $(REAL_CFLAGS) $<
