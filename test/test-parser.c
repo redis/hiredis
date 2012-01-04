@@ -136,9 +136,10 @@ static redis_parser_callbacks callbacks = {
     &destroy
 };
 
-#define RESET_PARSER(__parser) do {           \
-    reset_cb_log();                             \
-    redis_parser_init((__parser), &callbacks);  \
+#define RESET_PARSER(__parser) do {                                            \
+    reset_cb_log();                                                            \
+    redis_parser_init((__parser), &callbacks);                                 \
+    destroy_called = 0;                                                        \
 } while(0)
 
 void test_char_by_char(const char *buf, size_t len) {
@@ -194,7 +195,19 @@ void test_char_by_char(const char *buf, size_t len) {
     free(ref);
 }
 
-void test_string(redis_parser *p) {
+#define SETUP(var)                                                             \
+    redis_parser _parser, *(var) = &_parser;                                   \
+    redis_parser_init((var), &callbacks);
+
+/* Not a real test, just print sizeof's */
+TEST(struct_size) {
+    printf("redis_protocol: %lu bytes\n", sizeof(redis_protocol));
+    printf("redis_parser: %lu bytes\n", sizeof(redis_parser));
+}
+
+TEST(string) {
+    SETUP(p);
+
     const char *buf = "$5\r\nhello\r\n";
     size_t len = 11;
     redis_protocol *res;
@@ -218,7 +231,9 @@ void test_string(redis_parser *p) {
     test_char_by_char(buf, len);
 }
 
-void test_empty_string(redis_parser *p) {
+TEST(empty_string) {
+    SETUP(p);
+
     const char *buf = "$0\r\n\r\n";
     size_t len = 6;
     redis_protocol *res;
@@ -242,7 +257,9 @@ void test_empty_string(redis_parser *p) {
     test_char_by_char(buf, len);
 }
 
-void test_nil_string(redis_parser *p) {
+TEST(nil_string) {
+    SETUP(p);
+
     const char *buf = "$-1\r\n";
     size_t len = 5;
     redis_protocol *res;
@@ -261,7 +278,9 @@ void test_nil_string(redis_parser *p) {
     test_char_by_char(buf, len);
 }
 
-void test_array(redis_parser *p) {
+TEST(array) {
+    SETUP(p);
+
     const char *buf =
         "*2\r\n"
         "$5\r\nhello\r\n"
@@ -304,7 +323,9 @@ void test_array(redis_parser *p) {
     test_char_by_char(buf, len);
 }
 
-void test_empty_array(redis_parser *p) {
+TEST(empty_array) {
+    SETUP(p);
+
     const char *buf = "*0\r\n";
     size_t len = 4;
     redis_protocol *res;
@@ -325,7 +346,9 @@ void test_empty_array(redis_parser *p) {
     test_char_by_char(buf, len);
 }
 
-void test_nil_array(redis_parser *p) {
+TEST(nil_array) {
+    SETUP(p);
+
     const char *buf = "*-1\r\n";
     size_t len = 5;
     redis_protocol *res;
@@ -342,7 +365,9 @@ void test_nil_array(redis_parser *p) {
     test_char_by_char(buf, len);
 }
 
-void test_integer(redis_parser *p) {
+TEST(integer) {
+    SETUP(p);
+
     const char *buf = ":1234\r\n";
     size_t len = 7;
     redis_protocol *res;
@@ -466,30 +491,33 @@ void test_integer(redis_parser *p) {
     assert(redis_parser_err(p) == RPE_OVERFLOW);
 }
 
-void test_nil(redis_parser *p) {
+TEST(nil) {
+    SETUP(p);
+
     const char *buf = "$-1\r\n";
-    size_t len = 7;
+    size_t len = 5;
     redis_protocol *res;
 
     /* Parse and check resulting protocol_t */
     RESET_PARSER(p);
     assert_equal_size_t(redis_parser_execute(p, &res, buf, len), len);
     assert(res != NULL);
-    assert_equal_size_t(res->type, REDIS_INTEGER);
+    assert_equal_size_t(res->type, REDIS_NIL);
     assert_equal_size_t(res->poff, 0);
-    assert_equal_size_t(res->plen, 7);
-    assert_equal_size_t(res->coff, 1);
-    assert_equal_size_t(res->clen, 4);
+    assert_equal_size_t(res->plen, 5);
+    assert_equal_size_t(res->coff, 0);
+    assert_equal_size_t(res->clen, 0);
 
     /* Check callbacks */
     assert_equal_size_t(cb_log_idx, 1);
-    assert_equal_size_t(cb_log[0].integer_value, 1234);
 
     /* Chunked check */
     test_char_by_char(buf, len);
 }
 
-void test_status(redis_parser *p) {
+TEST(status) {
+    SETUP(p);
+
     const char *buf = "+status\r\n";
     size_t len = 9;
     redis_protocol *res;
@@ -509,7 +537,9 @@ void test_status(redis_parser *p) {
     test_char_by_char(buf, len);
 }
 
-void test_error(redis_parser *p) {
+TEST(error) {
+    SETUP(p);
+
     const char *buf = "-error\r\n";
     size_t len = 8;
     redis_protocol *res;
@@ -529,7 +559,9 @@ void test_error(redis_parser *p) {
     test_char_by_char(buf, len);
 }
 
-void test_abort_after_error(redis_parser *p) {
+TEST(abort_after_error) {
+    SETUP(p);
+
     redis_protocol *res;
     enum redis_parser_errno err;
 
@@ -548,7 +580,9 @@ void test_abort_after_error(redis_parser *p) {
     assert(res == NULL);
 }
 
-void test_destroy_callback_after_success(redis_parser *p) {
+TEST(destroy_callback_after_success) {
+    SETUP(p);
+
     redis_protocol *res;
 
     RESET_PARSER(p);
@@ -562,7 +596,9 @@ void test_destroy_callback_after_success(redis_parser *p) {
     assert_equal_int(destroy_called, 0);
 }
 
-void test_destroy_callback_after_error(redis_parser *p) {
+TEST(destroy_callback_after_error) {
+    SETUP(p);
+
     redis_protocol *res;
 
     RESET_PARSER(p);
@@ -575,7 +611,9 @@ void test_destroy_callback_after_error(redis_parser *p) {
     assert_equal_int(destroy_called, 1);
 }
 
-void test_destroy_callback_in_flight(redis_parser *p) {
+TEST(destroy_callback_in_flight) {
+    SETUP(p);
+
     redis_protocol *res;
 
     RESET_PARSER(p);
@@ -592,21 +630,25 @@ int main(int argc, char **argv) {
     ((void)argc);
     ((void)argv);
 
-    redis_parser *parser = malloc(sizeof(redis_parser));
-    redis_parser_init(parser, &callbacks);
+    test_struct_size();
 
-    printf("redis_protocol: %lu bytes\n", sizeof(redis_protocol));
-    printf("redis_parser: %lu bytes\n", sizeof(redis_parser));
+    test_string();
+    test_empty_string();
+    test_nil_string();
 
-    test_string(parser);
-    test_empty_string(parser);
-    test_array(parser);
-    test_empty_array(parser);
-    test_integer(parser);
-    test_status(parser);
-    test_error(parser);
-    test_abort_after_error(parser);
+    test_array();
+    test_empty_array();
+    test_nil_array();
 
-    free(parser);
+    test_integer();
+    test_nil();
+    test_status();
+    test_error();
+
+    test_abort_after_error();
+    test_destroy_callback_after_success();
+    test_destroy_callback_after_error();
+    test_destroy_callback_in_flight();
+
     return 0;
 }

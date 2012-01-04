@@ -19,7 +19,7 @@
 #include "../handle.h"
 #include "test-helper.h"
 
-int test_connect_in_refused(void) {
+TEST(connect_in_refused) {
     redis_handle h;
     int rv;
 
@@ -39,10 +39,9 @@ int test_connect_in_refused(void) {
     assert_equal_int(errno, ECONNREFUSED);
 
     redis_handle_destroy(&h);
-    return 0;
 }
 
-int test_connect_in6_refused(void) {
+TEST(connect_in6_refused) {
     redis_handle h;
     int rv;
 
@@ -62,10 +61,9 @@ int test_connect_in6_refused(void) {
     assert_equal_int(errno, ECONNREFUSED);
 
     redis_handle_destroy(&h);
-    return 0;
 }
 
-int test_connect_un_noent(void) {
+TEST(connect_un_noent) {
     redis_handle h;
     int rv;
 
@@ -81,10 +79,9 @@ int test_connect_un_noent(void) {
     assert_equal_int(errno, ENOENT);
 
     redis_handle_destroy(&h);
-    return 0;
 }
 
-int test_connect_timeout(void) {
+TEST(connect_timeout) {
     redis_handle h;
     long long t1, t2;
     int rv;
@@ -112,10 +109,9 @@ int test_connect_timeout(void) {
     assert((t2 - t1) < 15000); /* 5ms of slack should be enough */
 
     redis_handle_destroy(&h);
-    return 0;
 }
 
-int test_connect_gai_unknown_host(void) {
+TEST(connect_gai_unknown_host) {
     redis_handle h;
     int rv;
 
@@ -127,10 +123,9 @@ int test_connect_gai_unknown_host(void) {
     /* Don't care about the specific error for now. */
 
     redis_handle_destroy(&h);
-    return 0;
 }
 
-int test_connect_gai_success(void) {
+TEST(connect_gai_success) {
     redis_handle h;
     int rv;
 
@@ -144,7 +139,6 @@ int test_connect_gai_success(void) {
     assert_equal_int(rv, REDIS_OK);
 
     redis_handle_destroy(&h);
-    return 0;
 }
 
 redis_handle *setup(void) {
@@ -168,7 +162,7 @@ void teardown(redis_handle *h) {
     free(h);
 }
 
-void test_eof_after_quit(void) {
+TEST(eof_after_quit) {
     redis_handle *h = setup();
     int rv, drained;
 
@@ -202,7 +196,7 @@ void test_eof_after_quit(void) {
     teardown(h);
 }
 
-void test_read_timeout(void) {
+TEST(read_timeout) {
     redis_handle *h = setup();
     int rv;
 
@@ -213,7 +207,7 @@ void test_read_timeout(void) {
     teardown(h);
 }
 
-void test_einval_against_closed_handle(void) {
+TEST(einval_against_closed_handle) {
     redis_handle *h = setup();
     int rv;
 
