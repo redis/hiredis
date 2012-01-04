@@ -36,15 +36,15 @@ struct redis_parser_callbacks_s {
     redis_parser_destroy_cb destroy;
 };
 
-#define REDIS_PARSER_ERRNO_MAP(_X)                   \
-    _X(OK, NULL) /* = 0 in enum */                   \
-    _X(UNKNOWN, "unknown")                       \
-    _X(CALLBACK, "callback failed")              \
-    _X(INVALID_TYPE, "invalid type character")   \
-    _X(INVALID_INT, "invalid integer character") \
-    _X(OVERFLOW, "overflow")                     \
-    _X(EXPECTED_CR, "expected \\r")              \
-    _X(EXPECTED_LF, "expected \\n")              \
+#define REDIS_PARSER_ERRNO_MAP(_X)                                             \
+    _X(OK, NULL) /* = 0 in enum */                                             \
+    _X(UNKNOWN, "unknown")                                                     \
+    _X(CALLBACK, "callback failed")                                            \
+    _X(INVALID_TYPE, "invalid type character")                                 \
+    _X(INVALID_INT, "invalid integer character")                               \
+    _X(OVERFLOW, "overflow")                                                   \
+    _X(EXPECTED_CR, "expected \\r")                                            \
+    _X(EXPECTED_LF, "expected \\n")
 
 #define _REDIS_PARSER_ERRNO_GEN(code, description) RPE_##code,
 enum redis_parser_errno {
