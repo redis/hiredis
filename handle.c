@@ -109,7 +109,7 @@ static int redis__so_error(int fd) {
     return err;
 }
 
-static int redis__handle_connect(int family, struct sockaddr *addr, socklen_t addrlen) {
+static int redis__handle_connect(int family, const struct sockaddr *addr, socklen_t addrlen) {
     int fd;
     int on = 1;
 
