@@ -8,7 +8,7 @@ test-%: test-%.o
 	$(CC) -o $@ $(REAL_LDFLAGS) $< ../$(STLIBNAME)
 
 .c.o:
-	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) -O0 $<
+	$(CC) -std=c99 -pedantic -c -O0 $(REAL_CFLAGS) $<
 
 clean:
 	rm -f *.o $(TESTS)
