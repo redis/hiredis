@@ -1,6 +1,6 @@
 include ../Makefile.common
 
-TESTS=test-format test-parser test-object test-handle
+TESTS=test-format test-parser test-object test-handle test-context
 
 all: $(TESTS)
 
