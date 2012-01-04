@@ -147,6 +147,13 @@ static int redis__handle_connect(int family, struct sockaddr *addr, socklen_t ad
     return fd;
 }
 
+static int redis__finish_connect(redis_handle *h, int fd) {
+    h->fd = fd;
+    h->wbuf = sdsempty();
+    h->rbuf = sdsempty();
+    return REDIS_OK;
+}
+
 int redis_handle_connect_in(redis_handle *h, struct sockaddr_in addr) {
     int fd;
 
@@ -161,10 +168,7 @@ int redis_handle_connect_in(redis_handle *h, struct sockaddr_in addr) {
         return REDIS_ESYS;
     }
 
-    h->fd = fd;
-    h->wbuf = sdsempty();
-    h->rbuf = sdsempty();
-    return REDIS_OK;
+    return redis__finish_connect(h, fd);
 }
 
 int redis_handle_connect_in6(redis_handle *h, struct sockaddr_in6 addr) {
@@ -181,10 +185,7 @@ int redis_handle_connect_in6(redis_handle *h, struct sockaddr_in6 addr) {
         return REDIS_ESYS;
     }
 
-    h->fd = fd;
-    h->wbuf = sdsempty();
-    h->rbuf = sdsempty();
-    return REDIS_OK;
+    return redis__finish_connect(h, fd);
 }
 
 int redis_handle_connect_un(redis_handle *h, struct sockaddr_un addr) {
@@ -201,10 +202,7 @@ int redis_handle_connect_un(redis_handle *h, struct sockaddr_un addr) {
         return REDIS_ESYS;
     }
 
-    h->fd = fd;
-    h->wbuf = sdsempty();
-    h->rbuf = sdsempty();
-    return REDIS_OK;
+    return redis__finish_connect(h, fd);
 }
 
 int redis_handle_connect_gai(redis_handle *h,
@@ -241,10 +239,7 @@ int redis_handle_connect_gai(redis_handle *h,
         }
 
         freeaddrinfo(servinfo);
-        h->fd = fd;
-        h->wbuf = sdsempty();
-        h->rbuf = sdsempty();
-        return REDIS_OK;
+        return redis__finish_connect(h, fd);
     }
 
 error:
