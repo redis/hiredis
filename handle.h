@@ -31,6 +31,7 @@ int redis_handle_init(redis_handle *h);
 int redis_handle_close(redis_handle *);
 int redis_handle_destroy(redis_handle *);
 int redis_handle_set_timeout(redis_handle *, unsigned long us);
+unsigned long redis_handle_get_timeout(redis_handle *h);
 
 int redis_handle_connect_in(redis_handle *, struct sockaddr_in addr);
 int redis_handle_connect_in6(redis_handle *, struct sockaddr_in6 addr);

@@ -53,6 +53,10 @@ int redis_handle_set_timeout(redis_handle *h, unsigned long us) {
     return REDIS_OK;
 }
 
+unsigned long redis_handle_get_timeout(redis_handle *h) {
+    return h->timeout.tv_sec * 1000000 + h->timeout.tv_usec;
+}
+
 int redis_handle_close(redis_handle *h) {
     if (h->fd >= 0) {
         close(h->fd);
