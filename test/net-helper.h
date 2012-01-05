@@ -3,12 +3,16 @@
 
 #include "../handle.h"
 
-typedef struct accept_and_ignore_args_s accept_and_ignore_args;
+typedef struct run_server_args_s run_server_args;
 
-struct accept_and_ignore_args_s {
+struct run_server_args_s {
     redis_address address;
+    struct {
+        void (*ptr)(int fd, void *data);
+        void *data;
+    } fn;
 };
 
-void accept_and_ignore(void *ptr);
+void run_server(void *ptr);
 
 #endif

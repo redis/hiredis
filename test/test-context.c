@@ -15,6 +15,9 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+/* close */
+#include <unistd.h>
+
 /* local */
 #include "../context.h"
 #include "../object.h"
@@ -257,10 +260,10 @@ TEST(flush_against_full_kernel_buffer) {
 
     redis_address addr = redis_address_in("127.0.0.1", redis_port() + 1);
 
-    accept_and_ignore_args args;
+    run_server_args args;
     args.address = addr;
 
-    spawn(accept_and_ignore, &args);
+    spawn(run_server, &args);
 
     rv = redis_context_connect_in(&c, addr.sa_addr.in);
     assert_equal_return(rv, REDIS_OK);
@@ -282,6 +285,37 @@ TEST(flush_against_full_kernel_buffer) {
     assert_equal_int(errno, ETIMEDOUT);
 }
 
+void close_after_accept(int fd, void *data) {
+    close(fd);
+}
+
+TEST(read_against_closed_connection) {
+    SETUP_CONNECT();
+
+    redis_address addr = redis_address_in("127.0.0.1", redis_port() + 1);
+
+    run_server_args args;
+    args.address = addr;
+    args.fn.ptr = close_after_accept;
+
+    spawn(run_server, &args);
+
+    rv = redis_context_connect_in(&c, addr.sa_addr.in);
+    assert_equal_return(rv, REDIS_OK);
+
+    redis_protocol *reply = NULL;
+
+    /* Read should immediately EOF */
+    rv = redis_context_read(&c, &reply);
+    assert_equal_return(rv, REDIS_EEOF);
+
+    /* ... and should be idempotent... */
+    rv = redis_context_read(&c, &reply);
+    assert_equal_return(rv, REDIS_EEOF);
+
+    redis_context_destroy(&c);
+}
+
 int main(void) {
     test_connect_in_refused();
     test_connect_in6_refused();
@@ -297,4 +331,5 @@ int main(void) {
     test_call_command();
     test_call_command_argv();
     test_flush_against_full_kernel_buffer();
+    test_read_against_closed_connection();
 }

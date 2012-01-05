@@ -7,14 +7,24 @@
 #include <netinet/tcp.h>
 #include "net-helper.h"
 
-void accept_and_ignore(void *ptr) {
-    accept_and_ignore_args *args = ptr;
-    int fd, rv;
+void run_server(void *ptr) {
+    run_server_args *args = ptr;
+    int family = args->address.sa_family;
+    int fd;
+    int rv;
 
-    fd = socket(args->address.sa_family, SOCK_STREAM, 0);
+    fd = socket(family, SOCK_STREAM, 0);
     if (fd == -1) {
         fprintf(stderr, "socket: %s\n", strerror(errno));
         exit(1);
+    }
+
+    if (family == AF_INET || family == AF_INET6) {
+        int on = 1;
+        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
+            fprintf(stderr, "setsockopt: %s\n", strerror(errno));
+            exit(1);
+        }
     }
 
     rv = bind(fd, &args->address.sa_addr.addr, args->address.sa_addrlen);
@@ -40,6 +50,9 @@ void accept_and_ignore(void *ptr) {
             exit(1);
         }
 
-        /* Ignore the new connection */
+        /* Execute specified function, if given */
+        if (args->fn.ptr != NULL) {
+            args->fn.ptr(rv, args->fn.data);
+        }
     }
 }
