@@ -158,7 +158,7 @@ static int redis__finish_connect(redis_handle *h, int fd) {
     return REDIS_OK;
 }
 
-int redis_handle_connect_address(redis_handle *h, const redis_address *addr) {
+int redis_handle_connect_address(redis_handle *h, const redis_address addr) {
     int fd;
 
     if (h->fd >= 0) {
@@ -166,7 +166,7 @@ int redis_handle_connect_address(redis_handle *h, const redis_address *addr) {
         return REDIS_ESYS;
     }
 
-    fd = redis__handle_connect(addr->sa_family, &addr->sa_addr.addr, addr->sa_addrlen);
+    fd = redis__handle_connect(addr.sa_family, &addr.sa_addr.addr, addr.sa_addrlen);
     if (fd == -1) {
         return REDIS_ESYS;
     }
@@ -175,30 +175,15 @@ int redis_handle_connect_address(redis_handle *h, const redis_address *addr) {
 }
 
 int redis_handle_connect_in(redis_handle *h, struct sockaddr_in sa) {
-    redis_address address;
-
-    address.sa_family = AF_INET;
-    address.sa_addr.in = sa;
-    address.sa_addrlen = sizeof(sa);
-    return redis_handle_connect_address(h, &address);
+    return redis_handle_connect_address(h, redis_address_from_in(sa));
 }
 
 int redis_handle_connect_in6(redis_handle *h, struct sockaddr_in6 sa) {
-    redis_address address;
-
-    address.sa_family = AF_INET6;
-    address.sa_addr.in6 = sa;
-    address.sa_addrlen = sizeof(sa);
-    return redis_handle_connect_address(h, &address);
+    return redis_handle_connect_address(h, redis_address_from_in6(sa));
 }
 
 int redis_handle_connect_un(redis_handle *h, struct sockaddr_un sa) {
-    redis_address address;
-
-    address.sa_family = AF_LOCAL;
-    address.sa_addr.un = sa;
-    address.sa_addrlen = sizeof(sa);
-    return redis_handle_connect_address(h, &address);
+    return redis_handle_connect_address(h, redis_address_from_un(sa));
 }
 
 int redis_handle_connect_gai(redis_handle *h,

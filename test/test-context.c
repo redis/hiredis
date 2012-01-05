@@ -32,13 +32,8 @@
 TEST(connect_in_refused) {
     SETUP_CONNECT();
 
-    struct sockaddr_in sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(redis_port() + 1);
-    assert(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr) == 1);
-
-    rv = redis_context_connect_in(&c, sa);
+    redis_address addr = redis_address_in("127.0.0.1", redis_port() + 1);
+    rv = redis_context_connect_in(&c, addr.sa_addr.in);
     assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ECONNREFUSED);
 
@@ -51,13 +46,8 @@ TEST(connect_in_refused) {
 TEST(connect_in6_refused) {
     SETUP_CONNECT();
 
-    struct sockaddr_in6 sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sin6_family = AF_INET6;
-    sa.sin6_port = htons(redis_port() + 1);
-    assert(inet_pton(AF_INET6, "::1", &sa.sin6_addr) == 1);
-
-    rv = redis_context_connect_in6(&c, sa);
+    redis_address addr = redis_address_in6("::1", redis_port() + 1);
+    rv = redis_context_connect_in6(&c, addr.sa_addr.in6);
     assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ECONNREFUSED);
 
@@ -70,12 +60,8 @@ TEST(connect_in6_refused) {
 TEST(connect_un_noent) {
     SETUP_CONNECT();
 
-    struct sockaddr_un sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sun_family = AF_LOCAL;
-    strcpy((char*)&sa.sun_path, "/tmp/idontexist.sock");
-
-    rv = redis_context_connect_un(&c, sa);
+    redis_address addr = redis_address_un("/tmp/idontexist.sock");
+    rv = redis_context_connect_un(&c, addr.sa_addr.un);
     assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ENOENT);
 
@@ -88,15 +74,11 @@ TEST(connect_un_noent) {
 TEST(connect_timeout) {
     SETUP_CONNECT();
 
-    struct sockaddr_in sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(redis_port());
-    assert(inet_pton(AF_INET, "10.255.255.254", &sa.sin_addr) == 1);
+    redis_address addr = redis_address_in("10.255.255.254", redis_port());
 
     long long t1, t2;
     t1 = usec();
-    rv = redis_context_connect_in(&c, sa);
+    rv = redis_context_connect_in(&c, addr.sa_addr.in);
     t2 = usec();
 
     assert_equal_return(rv, REDIS_ESYS);
@@ -112,13 +94,8 @@ TEST(connect_timeout) {
 TEST(connect_success) {
     SETUP_CONNECT();
 
-    struct sockaddr_in sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(redis_port());
-    assert(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr) == 1);
-
-    rv = redis_context_connect_in(&c, sa);
+    redis_address addr = redis_address_in("127.0.0.1", redis_port());
+    rv = redis_context_connect_in(&c, addr.sa_addr.in);
     assert_equal_return(rv, REDIS_OK);
 
     /* Address should be set when connection was made */
@@ -278,20 +255,14 @@ TEST(call_command_argv) {
 TEST(flush_against_full_kernel_buffer) {
     SETUP_CONNECT();
 
-    struct sockaddr_in sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(redis_port() + 1);
-    assert(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr) == 1);
+    redis_address addr = redis_address_in("127.0.0.1", redis_port() + 1);
 
     accept_and_ignore_args args;
-    args.address.sa_family = sa.sin_family;
-    args.address.sa_addrlen = sizeof(sa);
-    args.address.sa_addr.in = sa;
+    args.address = addr;
 
     spawn(accept_and_ignore, &args);
 
-    rv = redis_context_connect_in(&c, sa);
+    rv = redis_context_connect_in(&c, addr.sa_addr.in);
     assert_equal_return(rv, REDIS_OK);
 
     /* Now write and flush until error */

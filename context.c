@@ -57,7 +57,7 @@ unsigned long redis_context_get_timeout(redis_context *ctx) {
 static int redis__connect(redis_context *ctx) {
     int rv;
 
-    rv = redis_handle_connect_address(&ctx->handle, &ctx->address);
+    rv = redis_handle_connect_address(&ctx->handle, ctx->address);
     if (rv != REDIS_OK) {
         return rv;
     }
@@ -70,8 +70,10 @@ static int redis__connect(redis_context *ctx) {
     return REDIS_OK;
 }
 
-static int redis__first_connect(redis_context *ctx) {
+int redis_context_connect_address(redis_context *ctx, const redis_address addr) {
     int rv;
+
+    ctx->address = addr;
 
     rv = redis__connect(ctx);
     if (rv != REDIS_OK) {
@@ -83,24 +85,15 @@ static int redis__first_connect(redis_context *ctx) {
 }
 
 int redis_context_connect_in(redis_context *ctx, struct sockaddr_in addr) {
-    ctx->address.sa_family = AF_INET;
-    ctx->address.sa_addrlen = sizeof(addr);
-    ctx->address.sa_addr.in = addr;
-    return redis__first_connect(ctx);
+    return redis_context_connect_address(ctx, redis_address_from_in(addr));
 }
 
 int redis_context_connect_in6(redis_context *ctx, struct sockaddr_in6 addr) {
-    ctx->address.sa_family = AF_INET6;
-    ctx->address.sa_addrlen = sizeof(addr);
-    ctx->address.sa_addr.in6 = addr;
-    return redis__first_connect(ctx);
+    return redis_context_connect_address(ctx, redis_address_from_in6(addr));
 }
 
 int redis_context_connect_un(redis_context *ctx, struct sockaddr_un addr) {
-    ctx->address.sa_family = AF_LOCAL;
-    ctx->address.sa_addrlen = sizeof(addr);
-    ctx->address.sa_addr.un = addr;
-    return redis__first_connect(ctx);
+    return redis_context_connect_address(ctx, redis_address_from_un(addr));
 }
 
 int redis_context_connect_gai(redis_context *ctx, const char *host, int port) {
