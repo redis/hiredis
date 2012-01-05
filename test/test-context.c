@@ -255,6 +255,11 @@ TEST(call_command_argv) {
     redis_context_destroy(&c);
 }
 
+void run_server_ignore_connection(int fd, void *data) {
+    ((void) fd);
+    ((void) data);
+}
+
 TEST(flush_against_full_kernel_buffer) {
     SETUP_CONNECT();
 
@@ -262,6 +267,7 @@ TEST(flush_against_full_kernel_buffer) {
 
     run_server_args args;
     args.address = addr;
+    args.fn.ptr = run_server_ignore_connection;
 
     spawn(run_server, &args);
 
@@ -285,7 +291,8 @@ TEST(flush_against_full_kernel_buffer) {
     assert_equal_int(errno, ETIMEDOUT);
 }
 
-void close_after_accept(int fd, void *data) {
+void run_server_close_after_accept(int fd, void *data) {
+    ((void) data);
     close(fd);
 }
 
@@ -296,7 +303,7 @@ TEST(read_against_closed_connection) {
 
     run_server_args args;
     args.address = addr;
-    args.fn.ptr = close_after_accept;
+    args.fn.ptr = run_server_close_after_accept;
 
     spawn(run_server, &args);
 
