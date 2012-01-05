@@ -154,7 +154,7 @@ TEST(connect_gai_success) {
     rv = redis_context_connect_gai(&c, "localhost", redis_port());             \
     assert_equal_return(rv, REDIS_OK);
 
-static redis_object *read(redis_context *ctx) {
+static redis_object *read_from_context(redis_context *ctx) {
     redis_protocol *reply;
     int rv;
 
@@ -181,12 +181,12 @@ TEST(write_command) {
 
     rv = redis_context_write_command(&c, "set foo bar");
     assert_equal_return(rv, REDIS_OK);
-    compare_ok_status(read(&c));
+    compare_ok_status(read_from_context(&c));
 
     /* Check that the command was executed as intended */
     rv = redis_context_write_command(&c, "get foo");
     assert_equal_return(rv, REDIS_OK);
-    compare_string(read(&c), "bar", 3);
+    compare_string(read_from_context(&c), "bar", 3);
 
     redis_context_destroy(&c);
 }
@@ -199,7 +199,7 @@ TEST(write_command_argv) {
     size_t argvlen1[] = { 3, 3, 3 };
     rv = redis_context_write_command_argv(&c, argc1, argv1, argvlen1);
     assert_equal_return(rv, REDIS_OK);
-    compare_ok_status(read(&c));
+    compare_ok_status(read_from_context(&c));
 
     /* Check that the command was executed as intended */
     int argc2 = 2;
@@ -207,7 +207,7 @@ TEST(write_command_argv) {
     size_t argvlen2[] = { 3, argvlen1[1] };
     rv = redis_context_write_command_argv(&c, argc2, argv2, argvlen2);
     assert_equal_return(rv, REDIS_OK);
-    compare_string(read(&c), argv1[2], argvlen1[2]);
+    compare_string(read_from_context(&c), argv1[2], argvlen1[2]);
 
     redis_context_destroy(&c);
 }
