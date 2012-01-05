@@ -25,9 +25,9 @@
     redis_context c;                                                           \
     int rv;                                                                    \
     rv = redis_context_init(&c);                                               \
-    assert(rv == REDIS_OK);                                                    \
+    assert_equal_return(rv, REDIS_OK);                                         \
     rv = redis_context_set_timeout(&c, 10000);                                 \
-    assert(rv == REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
 
 TEST(connect_in_refused) {
     SETUP_CONNECT();
@@ -39,7 +39,7 @@ TEST(connect_in_refused) {
     assert(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr) == 1);
 
     rv = redis_context_connect_in(&c, sa);
-    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ECONNREFUSED);
 
     /* Address shouldn't be set when no connection could be made */
@@ -58,7 +58,7 @@ TEST(connect_in6_refused) {
     assert(inet_pton(AF_INET6, "::1", &sa.sin6_addr) == 1);
 
     rv = redis_context_connect_in6(&c, sa);
-    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ECONNREFUSED);
 
     /* Address shouldn't be set when no connection could be made */
@@ -76,7 +76,7 @@ TEST(connect_un_noent) {
     strcpy((char*)&sa.sun_path, "/tmp/idontexist.sock");
 
     rv = redis_context_connect_un(&c, sa);
-    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ENOENT);
 
     /* Address shouldn't be set when no connection could be made */
@@ -99,7 +99,7 @@ TEST(connect_timeout) {
     rv = redis_context_connect_in(&c, sa);
     t2 = usec();
 
-    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ETIMEDOUT);
     assert((t2 - t1) < 15000); /* 5ms of slack should be enough */
 
@@ -119,7 +119,7 @@ TEST(connect_success) {
     assert(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr) == 1);
 
     rv = redis_context_connect_in(&c, sa);
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
 
     /* Address should be set when connection was made */
     assert_equal_int(c.address.sa_family, AF_INET);
@@ -131,7 +131,7 @@ TEST(connect_gai_unknown_host) {
     SETUP_CONNECT();
 
     rv = redis_context_connect_gai(&c, "idontexist.foo", redis_port());
-    assert_equal_int(rv, REDIS_EGAI);
+    assert_equal_return(rv, REDIS_EGAI);
 
     /* Don't care about the specific error for now. */
     assert(1);
@@ -150,7 +150,7 @@ TEST(connect_gai_timeout) {
     rv = redis_context_connect_gai(&c, "10.255.255.254", redis_port());
     t2 = usec();
 
-    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ETIMEDOUT);
     assert((t2 - t1) < 15000); /* 5ms of slack should be enough */
 
@@ -164,7 +164,7 @@ TEST(connect_gai_success) {
     SETUP_CONNECT();
 
     rv = redis_context_connect_gai(&c, "localhost", redis_port());
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
 
     /* Address should be set when connection was made */
     assert_equal_int(c.address.sa_family, AF_INET);
@@ -175,7 +175,7 @@ TEST(connect_gai_success) {
 #define SETUP_CONNECTED()                                                      \
     SETUP_CONNECT();                                                           \
     rv = redis_context_connect_gai(&c, "localhost", redis_port());             \
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
 
 static redis_object *read(redis_context *ctx) {
     redis_protocol *reply;
@@ -203,12 +203,12 @@ TEST(write_command) {
     SETUP_CONNECTED();
 
     rv = redis_context_write_command(&c, "set foo bar");
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
     compare_ok_status(read(&c));
 
     /* Check that the command was executed as intended */
     rv = redis_context_write_command(&c, "get foo");
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
     compare_string(read(&c), "bar", 3);
 
     redis_context_destroy(&c);
@@ -221,7 +221,7 @@ TEST(write_command_argv) {
     const char *argv1[] = { "set", "foo", "bar" };
     size_t argvlen1[] = { 3, 3, 3 };
     rv = redis_context_write_command_argv(&c, argc1, argv1, argvlen1);
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
     compare_ok_status(read(&c));
 
     /* Check that the command was executed as intended */
@@ -229,7 +229,7 @@ TEST(write_command_argv) {
     const char *argv2[] = { "get", argv1[1] };
     size_t argvlen2[] = { 3, argvlen1[1] };
     rv = redis_context_write_command_argv(&c, argc2, argv2, argvlen2);
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
     compare_string(read(&c), argv1[2], argvlen1[2]);
 
     redis_context_destroy(&c);
@@ -241,12 +241,12 @@ TEST(call_command) {
     redis_protocol *reply;
 
     rv = redis_context_call_command(&c, &reply, "set foo bar");
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
     compare_ok_status(reply->data);
 
     /* Check that the command was executed as intended */
     rv = redis_context_call_command(&c, &reply, "get foo");
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
     compare_string(reply->data, "bar", 3);
 
     redis_context_destroy(&c);
@@ -261,7 +261,7 @@ TEST(call_command_argv) {
     const char *argv1[] = { "set", "foo", "bar" };
     size_t argvlen1[] = { 3, 3, 3 };
     rv = redis_context_call_command_argv(&c, &reply, argc1, argv1, argvlen1);
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
     compare_ok_status(reply->data);
 
     /* Check that the command was executed as intended */
@@ -269,7 +269,7 @@ TEST(call_command_argv) {
     const char *argv2[] = { "get", argv1[1] };
     size_t argvlen2[] = { 3, argvlen1[1] };
     rv = redis_context_call_command_argv(&c, &reply, argc2, argv2, argvlen2);
-    assert_equal_int(rv, REDIS_OK);
+    assert_equal_return(rv, REDIS_OK);
     compare_string(reply->data, argv1[2], argvlen1[2]);
 
     redis_context_destroy(&c);
@@ -307,7 +307,7 @@ TEST(flush_against_full_kernel_buffer) {
 
     /* When the write buffer cannot be flushed, the operation should time out
      * instead of directly returning EAGAIN to the caller */
-    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_return(rv, REDIS_ESYS);
     assert_equal_int(errno, ETIMEDOUT);
 }
 
