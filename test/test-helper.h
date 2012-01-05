@@ -6,6 +6,15 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <errno.h>
+
+/* gai_strerror */
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+/* local */
+#include "../handle.h"
 
 /******************************************************************************/
 /* ASSERTS ********************************************************************/
@@ -44,6 +53,42 @@
         fprintf(stderr,                          \
             "%s:%d: %s != %s\n",                 \
             __FILE__, __LINE__, a, b);           \
+        assert(0);                               \
+    }                                            \
+} while(0)
+
+#define ERR_TO_STR_OFFSET 4
+static const char *err_to_str[] = {
+    [REDIS_OK      + ERR_TO_STR_OFFSET] = "REDIS_OK",
+    [REDIS_ESYS    + ERR_TO_STR_OFFSET] = "REDIS_ESYS",
+    [REDIS_EGAI    + ERR_TO_STR_OFFSET] = "REDIS_EGAI",
+    [REDIS_EPARSER + ERR_TO_STR_OFFSET] = "REDIS_EPARSER",
+    [REDIS_EEOF    + ERR_TO_STR_OFFSET] = "REDIS_EEOF"
+};
+
+static void assert_equal_return_failure(int actual, int expected, const char *file, int line) {
+    const char *actualstr = err_to_str[actual + ERR_TO_STR_OFFSET];
+    const char *expectedstr = err_to_str[expected + ERR_TO_STR_OFFSET];
+    char reason[128];
+
+    switch (actual) {
+    case REDIS_ESYS:
+        sprintf(reason, "%d:%s", errno, strerror(errno));
+        break;
+    case REDIS_EGAI:
+        sprintf(reason, "%d:%s", errno, gai_strerror(errno));
+        break;
+    }
+
+    fprintf(stderr, "%s:%d: ", file, line);
+    fprintf(stderr, "%s != %s (%s)\n", actualstr, expectedstr, reason);
+}
+
+#define assert_equal_return(a, b) do {           \
+    if ((a) != (b)) {                            \
+        assert_equal_return_failure(             \
+            (a), (b),                            \
+            __FILE__, __LINE__);                 \
         assert(0);                               \
     }                                            \
 } while(0)

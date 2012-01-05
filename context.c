@@ -1,8 +1,11 @@
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
+#include <errno.h>
 
 /* local */
 #include "context.h"
+#include "format.h"
 #include "object.h"
 
 static void redis__clear_address(redis_context *ctx) {
@@ -118,4 +121,156 @@ int redis_context_connect_gai(redis_context *ctx, const char *host, int port) {
     ctx->address = address;
 
     return REDIS_OK;
+}
+
+int redis_context_flush(redis_context *ctx) {
+    int rv;
+    int drained = 0;
+
+    while (!drained) {
+        rv = redis_handle_write_from_buffer(&ctx->handle, &drained);
+        if (rv != REDIS_OK) {
+            return rv;
+        }
+    }
+
+    return REDIS_OK;
+}
+
+int redis_context_read(redis_context *ctx, redis_protocol **reply) {
+    int rv;
+    redis_protocol *aux = NULL;
+
+    rv = redis_handle_read_from_buffer(&ctx->handle, &aux);
+    if (rv != REDIS_OK) {
+        return rv;
+    }
+
+    /* No error, no reply: make sure write buffers are flushed */
+    if (aux == NULL) {
+        rv = redis_context_flush(ctx);
+        if (rv != REDIS_OK) {
+            return rv;
+        }
+    }
+
+    while (aux == NULL) {
+        rv = redis_handle_wait_readable(&ctx->handle);
+        if (rv != REDIS_OK) {
+            return rv;
+        }
+
+        rv = redis_handle_read_to_buffer(&ctx->handle);
+        if (rv != REDIS_OK) {
+            return rv;
+        }
+
+        rv = redis_handle_read_from_buffer(&ctx->handle, &aux);
+        if (rv != REDIS_OK) {
+            return rv;
+        }
+    }
+
+    assert(aux != NULL);
+    *reply = aux;
+    return REDIS_OK;
+}
+
+int redis_context_write_vcommand(redis_context *ctx,
+                                 const char *format,
+                                 va_list ap)
+{
+    char *buf;
+    int len;
+    int rv;
+
+    len = redis_format_vcommand(&buf, format, ap);
+    if (len < 0) {
+        errno = ENOMEM;
+        return REDIS_ESYS;
+    }
+
+    /* Write command to output buffer in handle */
+    rv = redis_handle_write_to_buffer(&ctx->handle, buf, len);
+    free(buf);
+    return rv;
+}
+
+int redis_context_write_command(redis_context *ctx,
+                                const char *format,
+                                ...)
+{
+    va_list ap;
+    int rv;
+
+    va_start(ap, format);
+    rv = redis_context_write_vcommand(ctx, format, ap);
+    va_end(ap);
+    return rv;
+}
+
+int redis_context_write_command_argv(redis_context *ctx,
+                                    int argc,
+                                    const char **argv,
+                                    const size_t *argvlen)
+{
+    char *buf;
+    int len;
+    int rv;
+
+    len = redis_format_command_argv(&buf, argc, argv, argvlen);
+    if (len < 0) {
+        errno = ENOMEM;
+        return REDIS_ESYS;
+    }
+
+    /* Write command to output buffer in handle */
+    rv = redis_handle_write_to_buffer(&ctx->handle, buf, len);
+    free(buf);
+    return rv;
+}
+
+int redis_context_call_vcommand(redis_context *ctx,
+                                redis_protocol **reply,
+                                const char *format,
+                                va_list ap)
+{
+    int rv;
+
+    rv = redis_context_write_vcommand(ctx, format, ap);
+    if (rv != REDIS_OK) {
+        return rv;
+    }
+
+    return redis_context_read(ctx, reply);
+}
+
+int redis_context_call_command(redis_context *ctx,
+                               redis_protocol **reply,
+                               const char *format,
+                               ...)
+{
+    va_list ap;
+    int rv;
+
+    va_start(ap, format);
+    rv = redis_context_call_vcommand(ctx, reply, format, ap);
+    va_end(ap);
+    return rv;
+}
+
+int redis_context_call_command_argv(redis_context *ctx,
+                                    redis_protocol **reply,
+                                    int argc,
+                                    const char **argv,
+                                    const size_t *argvlen)
+{
+    int rv;
+
+    rv = redis_context_write_command_argv(ctx, argc, argv, argvlen);
+    if (rv != REDIS_OK) {
+        return rv;
+    }
+
+    return redis_context_read(ctx, reply);
 }

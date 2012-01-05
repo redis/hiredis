@@ -17,6 +17,7 @@
 
 /* local */
 #include "../context.h"
+#include "../object.h"
 #include "test-helper.h"
 
 #define SETUP_CONNECT()                                                        \
@@ -165,6 +166,109 @@ TEST(connect_gai_success) {
     redis_context_destroy(&c);
 }
 
+#define SETUP_CONNECTED()                                                      \
+    SETUP_CONNECT();                                                           \
+    rv = redis_context_connect_gai(&c, "localhost", redis_port());             \
+    assert_equal_int(rv, REDIS_OK);
+
+static redis_object *read(redis_context *ctx) {
+    redis_protocol *reply;
+    int rv;
+
+    rv = redis_context_read(ctx, &reply);
+    assert_equal_return(rv, REDIS_OK);
+
+    return (redis_object*)reply->data;
+}
+
+static void compare_ok_status(redis_object *obj) {
+    assert_equal_int(obj->type, REDIS_STATUS);
+    assert_equal_string(obj->str, "OK");
+    assert_equal_int(obj->len, 2);
+}
+
+static void compare_string(redis_object *obj, const char *str, size_t len) {
+    assert_equal_int(obj->type, REDIS_STRING);
+    assert_equal_string(obj->str, str);
+    assert_equal_int(obj->len, len);
+}
+
+TEST(write_command) {
+    SETUP_CONNECTED();
+
+    rv = redis_context_write_command(&c, "set foo bar");
+    assert_equal_int(rv, REDIS_OK);
+    compare_ok_status(read(&c));
+
+    /* Check that the command was executed as intended */
+    rv = redis_context_write_command(&c, "get foo");
+    assert_equal_int(rv, REDIS_OK);
+    compare_string(read(&c), "bar", 3);
+
+    redis_context_destroy(&c);
+}
+
+TEST(write_command_argv) {
+    SETUP_CONNECTED();
+
+    int argc1 = 3;
+    const char *argv1[] = { "set", "foo", "bar" };
+    size_t argvlen1[] = { 3, 3, 3 };
+    rv = redis_context_write_command_argv(&c, argc1, argv1, argvlen1);
+    assert_equal_int(rv, REDIS_OK);
+    compare_ok_status(read(&c));
+
+    /* Check that the command was executed as intended */
+    int argc2 = 2;
+    const char *argv2[] = { "get", argv1[1] };
+    size_t argvlen2[] = { 3, argvlen1[1] };
+    rv = redis_context_write_command_argv(&c, argc2, argv2, argvlen2);
+    assert_equal_int(rv, REDIS_OK);
+    compare_string(read(&c), argv1[2], argvlen1[2]);
+
+    redis_context_destroy(&c);
+}
+
+TEST(call_command) {
+    SETUP_CONNECTED();
+
+    redis_protocol *reply;
+
+    rv = redis_context_call_command(&c, &reply, "set foo bar");
+    assert_equal_int(rv, REDIS_OK);
+    compare_ok_status(reply->data);
+
+    /* Check that the command was executed as intended */
+    rv = redis_context_call_command(&c, &reply, "get foo");
+    assert_equal_int(rv, REDIS_OK);
+    compare_string(reply->data, "bar", 3);
+
+    redis_context_destroy(&c);
+}
+
+TEST(call_command_argv) {
+    SETUP_CONNECTED();
+
+    redis_protocol *reply;
+
+    int argc1 = 3;
+    const char *argv1[] = { "set", "foo", "bar" };
+    size_t argvlen1[] = { 3, 3, 3 };
+    rv = redis_context_call_command_argv(&c, &reply, argc1, argv1, argvlen1);
+    assert_equal_int(rv, REDIS_OK);
+    compare_ok_status(reply->data);
+
+    /* Check that the command was executed as intended */
+    int argc2 = 2;
+    const char *argv2[] = { "get", argv1[1] };
+    size_t argvlen2[] = { 3, argvlen1[1] };
+    rv = redis_context_call_command_argv(&c, &reply, argc2, argv2, argvlen2);
+    assert_equal_int(rv, REDIS_OK);
+    compare_string(reply->data, argv1[2], argvlen1[2]);
+
+    redis_context_destroy(&c);
+}
+
 int main(void) {
     test_connect_in_refused();
     test_connect_in6_refused();
@@ -174,4 +278,9 @@ int main(void) {
     test_connect_gai_unknown_host();
     test_connect_gai_timeout();
     test_connect_gai_success();
+
+    test_write_command();
+    test_write_command_argv();
+    test_call_command();
+    test_call_command_argv();
 }
