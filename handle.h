@@ -1,15 +1,12 @@
 #ifndef _HIREDIS_HANDLE_H
 #define _HIREDIS_HANDLE_H 1
 
-/* struct sockaddr_(in|in6|un) */
-#include <netinet/in.h>
-#include <sys/un.h>
-
 /* struct timeval */
 #include <sys/time.h>
 
 /* local */
 #include "parser.h"
+#include "address.h"
 
 #define REDIS_OK 0
 #define REDIS_ESYS -1
@@ -18,7 +15,6 @@
 #define REDIS_EEOF -4
 
 typedef struct redis_handle_s redis_handle;
-typedef struct redis_address_s redis_address;
 
 struct redis_handle_s {
     int fd;
@@ -26,17 +22,6 @@ struct redis_handle_s {
     redis_parser parser;
     char *wbuf;
     char *rbuf;
-};
-
-struct redis_address_s {
-    int sa_family;
-    socklen_t sa_addrlen;
-    union {
-        struct sockaddr addr;
-        struct sockaddr_in in;
-        struct sockaddr_in6 in6;
-        struct sockaddr_un un;
-    } sa_addr;
 };
 
 int redis_handle_init(redis_handle *h);
