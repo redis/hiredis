@@ -19,6 +19,7 @@
 #include "../context.h"
 #include "../object.h"
 #include "test-helper.h"
+#include "net-helper.h"
 
 #define SETUP_CONNECT()                                                        \
     redis_context c;                                                           \
@@ -32,6 +33,7 @@ TEST(connect_in_refused) {
     SETUP_CONNECT();
 
     struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(redis_port() + 1);
     assert(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr) == 1);
@@ -50,6 +52,7 @@ TEST(connect_in6_refused) {
     SETUP_CONNECT();
 
     struct sockaddr_in6 sa;
+    memset(&sa, 0, sizeof(sa));
     sa.sin6_family = AF_INET6;
     sa.sin6_port = htons(redis_port() + 1);
     assert(inet_pton(AF_INET6, "::1", &sa.sin6_addr) == 1);
@@ -68,6 +71,7 @@ TEST(connect_un_noent) {
     SETUP_CONNECT();
 
     struct sockaddr_un sa;
+    memset(&sa, 0, sizeof(sa));
     sa.sun_family = AF_LOCAL;
     strcpy((char*)&sa.sun_path, "/tmp/idontexist.sock");
 
@@ -85,6 +89,7 @@ TEST(connect_timeout) {
     SETUP_CONNECT();
 
     struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(redis_port());
     assert(inet_pton(AF_INET, "10.255.255.254", &sa.sin_addr) == 1);
@@ -108,6 +113,7 @@ TEST(connect_success) {
     SETUP_CONNECT();
 
     struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(redis_port());
     assert(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr) == 1);
@@ -269,6 +275,42 @@ TEST(call_command_argv) {
     redis_context_destroy(&c);
 }
 
+TEST(flush_against_full_kernel_buffer) {
+    SETUP_CONNECT();
+
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(redis_port() + 1);
+    assert(inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr) == 1);
+
+    accept_and_ignore_args args;
+    args.address.sa_family = sa.sin_family;
+    args.address.sa_addrlen = sizeof(sa);
+    args.address.sa_addr.in = sa;
+
+    spawn(accept_and_ignore, &args);
+
+    rv = redis_context_connect_in(&c, sa);
+    assert_equal_return(rv, REDIS_OK);
+
+    /* Now write and flush until error */
+    while (1) {
+        rv = redis_context_write_command(&c, "ping");
+        assert_equal_return(rv, REDIS_OK);
+
+        rv = redis_context_flush(&c);
+        if (rv != REDIS_OK) {
+            break;
+        }
+    }
+
+    /* When the write buffer cannot be flushed, the operation should time out
+     * instead of directly returning EAGAIN to the caller */
+    assert_equal_int(rv, REDIS_ESYS);
+    assert_equal_int(errno, ETIMEDOUT);
+}
+
 int main(void) {
     test_connect_in_refused();
     test_connect_in6_refused();
@@ -283,4 +325,5 @@ int main(void) {
     test_write_command_argv();
     test_call_command();
     test_call_command_argv();
+    test_flush_against_full_kernel_buffer();
 }

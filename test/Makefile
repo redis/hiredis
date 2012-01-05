@@ -1,13 +1,14 @@
 include ../Makefile.common
 
 TESTS=test-format test-parser test-object test-handle test-context
+OBJ=spawn.o net-helper.o
 
 all: $(TESTS)
 
 ../$(STLIBNAME):
 	cd .. && $(MAKE) $(STLIBNAME)
 
-test-%: test-%.o ../$(STLIBNAME)
+test-%: test-%.o $(OBJ) ../$(STLIBNAME)
 	$(CC) -o $@ $(REAL_LDFLAGS) $^
 
 .c.o:

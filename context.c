@@ -129,9 +129,22 @@ int redis_context_flush(redis_context *ctx) {
 
     while (!drained) {
         rv = redis_handle_write_from_buffer(&ctx->handle, &drained);
-        if (rv != REDIS_OK) {
-            return rv;
+
+        if (rv == REDIS_OK) {
+            continue;
         }
+
+        /* Wait for the socket to become writable on EAGAIN */
+        if (rv == REDIS_ESYS && errno == EAGAIN) {
+            rv = redis_handle_wait_writable(&ctx->handle);
+            if (rv != REDIS_OK) {
+                return rv;
+            }
+
+            continue;
+        }
+
+        return rv;
     }
 
     return REDIS_OK;

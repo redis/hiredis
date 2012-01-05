@@ -14,6 +14,7 @@
 #include <netdb.h>
 
 /* local */
+#include "spawn.h"
 #include "../handle.h"
 
 /******************************************************************************/
@@ -103,7 +104,9 @@ static const char *current_test = NULL;
 static void test__##name(void);                                                \
 static void test_##name(void) {                                                \
     current_test = #name;                                                      \
+    spawn_init();                                                              \
     test__##name();                                                            \
+    spawn_destroy();                                                           \
     printf("%s: PASSED\n", current_test);                                      \
 }                                                                              \
 static void test__##name(void)
