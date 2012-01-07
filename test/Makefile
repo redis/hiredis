@@ -1,6 +1,6 @@
 include ../Makefile.common
 
-TESTS=test-format test-parser test-object test-handle test-context
+TESTS=test-format test-parser test-object test-handle test-context test-request
 OBJ=spawn.o net-helper.o
 
 all: $(TESTS)

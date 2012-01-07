@@ -5,7 +5,7 @@
 
 include ./Makefile.common
 
-OBJ=net.o hiredis.o sds.o async.o parser.o object.o handle.o format.o context.o address.o
+OBJ=net.o hiredis.o sds.o async.o parser.o object.o handle.o format.o context.o address.o request.o
 BINS=hiredis-example hiredis-test
 
 all: $(DYLIBNAME) $(BINS)
