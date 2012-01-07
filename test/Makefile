@@ -17,7 +17,7 @@ test-%: test-%.o $(OBJ) ../$(STLIBNAME)
 clean:
 	rm -f *.o $(TESTS)
 
-include ./Makefile.dep
+-include ./Makefile.dep
 
 dep:
 	$(CC) -MM *.c > Makefile.dep

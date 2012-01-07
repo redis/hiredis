@@ -10,14 +10,6 @@ BINS=hiredis-example hiredis-test
 
 all: $(DYLIBNAME) $(BINS)
 
-# Deps (use make dep to generate this)
-net.o: net.c fmacros.h net.h hiredis.h
-async.o: async.c async.h hiredis.h sds.h dict.c dict.h
-example.o: example.c hiredis.h
-hiredis.o: hiredis.c fmacros.h hiredis.h net.h sds.h
-sds.o: sds.c sds.h
-test.o: test.c hiredis.h
-
 $(DYLIBNAME): $(OBJ)
 	$(DYLIB_MAKE_CMD) $(OBJ)
 
@@ -67,8 +59,10 @@ check: hiredis-test
 clean:
 	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov test/*.o
 
+-include ./Makefile.dep
+
 dep:
-	$(CC) -MM *.c
+	$(CC) -MM *.c > Makefile.dep
 
 # Installation related variables and target
 PREFIX?=/usr/local
