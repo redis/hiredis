@@ -17,6 +17,12 @@
 #include "spawn.h"
 #include "../handle.h"
 
+#ifdef __GNUC__
+#define UNUSED __attribute__ ((unused))
+#else
+#define UNUSED
+#endif
+
 /******************************************************************************/
 /* ASSERTS ********************************************************************/
 /******************************************************************************/
@@ -59,7 +65,7 @@
 } while(0)
 
 #define ERR_TO_STR_OFFSET 4
-static const char *err_to_str[] = {
+UNUSED static const char *err_to_str[] = {
     [REDIS_OK      + ERR_TO_STR_OFFSET] = "REDIS_OK",
     [REDIS_ESYS    + ERR_TO_STR_OFFSET] = "REDIS_ESYS",
     [REDIS_EGAI    + ERR_TO_STR_OFFSET] = "REDIS_EGAI",
@@ -67,7 +73,7 @@ static const char *err_to_str[] = {
     [REDIS_EEOF    + ERR_TO_STR_OFFSET] = "REDIS_EEOF"
 };
 
-static void assert_equal_return_failure(int actual, int expected, const char *file, int line) {
+UNUSED static void assert_equal_return_failure(int actual, int expected, const char *file, int line) {
     const char *actualstr = err_to_str[actual + ERR_TO_STR_OFFSET];
     const char *expectedstr = err_to_str[expected + ERR_TO_STR_OFFSET];
     char reason[128];
@@ -98,7 +104,7 @@ static void assert_equal_return_failure(int actual, int expected, const char *fi
 /* TEST DEFINITION ************************************************************/
 /******************************************************************************/
 
-static const char *current_test = NULL;
+UNUSED static const char *current_test = NULL;
 
 #define TEST(name)                                                             \
 static void test__##name(void);                                                \
@@ -115,7 +121,7 @@ static void test__##name(void)
 /* TIMING *********************************************************************/
 /******************************************************************************/
 
-static long long usec(void) {
+UNUSED static long long usec(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (long long)tv.tv_sec * 1000000 + tv.tv_usec;
@@ -127,7 +133,7 @@ static long long usec(void) {
 
 #define REDIS_DEFAULT_PORT 6379
 
-static int redis_port(void) {
+UNUSED static int redis_port(void) {
     char *env, *eptr;
     long port = REDIS_DEFAULT_PORT;
 
