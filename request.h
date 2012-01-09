@@ -114,6 +114,8 @@ struct redis_request_queue_s {
     request_queue_to_write_cb *request_to_write_cb;
     request_queue_wait_write_cb *request_wait_write_cb;
     request_queue_wait_read_cb *request_wait_read_cb;
+
+    void *data;
 };
 
 int redis_request_init(redis_request *self);
