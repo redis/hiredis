@@ -80,37 +80,30 @@ redis_request *redis__request_queue_pop_to_write(redis_request_queue *self) {
 }
 
 int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, size_t *len) {
-    ngx_queue_t *q;
-    redis_request *req;
+    ngx_queue_t *q = NULL;
+    redis_request *req = NULL;
+    int done = 0;
 
-    /* We need at least one element in the wait_write queue */
-    if (ngx_queue_empty(&self->request_wait_write)) {
+    if (!ngx_queue_empty(&self->request_wait_write)) {
+        q = ngx_queue_head(&self->request_wait_write);
+        req = ngx_queue_data(q, redis_request, queue);
+    }
+
+    /* We need one non-done request in the wait_write queue */
+    while (req == NULL || req->write_ptr_done) {
         if (redis__request_queue_pop_to_write(self) == NULL) {
             return -1;
         }
-    }
 
-    while (1) {
-        assert(!ngx_queue_empty(&self->request_wait_write));
         q = ngx_queue_head(&self->request_wait_write);
         req = ngx_queue_data(q, redis_request, queue);
+    }
 
-        const char *auxbuf = NULL;
-        size_t auxlen = 0;
+    assert(req->write_ptr);
+    req->write_ptr(req, buf, len, &done);
 
-        assert(req->write_ptr);
-        req->write_ptr(req, &auxbuf, &auxlen);
-        if (auxbuf == NULL) {
-            if (redis__request_queue_pop_to_write(self) == NULL) {
-                return -1;
-            }
-
-            continue;
-        }
-
-        *buf = auxbuf;
-        *len = auxlen;
-        break;
+    if (done) {
+        req->write_ptr_done = 1;
     }
 
     return 0;

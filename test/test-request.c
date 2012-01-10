@@ -138,15 +138,11 @@ struct t1_redis_request_s {
     int free_calls;
 };
 
-void t1_write_ptr(redis_request *_self, const char **buf, size_t *len) {
+void t1_write_ptr(redis_request *_self, const char **buf, size_t *len, int *done) {
     t1_redis_request *self = (t1_redis_request*)_self;
     size_t to_emit;
 
-    if (self->nemitted == self->len) {
-        *buf = NULL;
-        *len = 0;
-        return;
-    }
+    assert(self->nemitted < self->len);
 
     to_emit = self->len - self->nemitted;
     if (to_emit > self->emit) {
@@ -156,6 +152,10 @@ void t1_write_ptr(redis_request *_self, const char **buf, size_t *len) {
     *buf = self->buf + self->nemitted;
     *len = to_emit;
     self->nemitted += to_emit;
+
+    if (self->nemitted == self->len) {
+        *done = 1;
+    }
 }
 
 int t1_write_cb(redis_request *_self, int n) {

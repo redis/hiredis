@@ -14,12 +14,14 @@ typedef struct redis_request_queue_s redis_request_queue;
  *
  * Arguments:
  *  self      the request as previously inserted in the queue
- *  buf       buffer to write, or NULL when there are no more
- *  len       length of the buffer to write
+ *  buf       buffer with request data
+ *  len       length of the buffer with request data
+ *  done      set to non-zero by the request when it doesn't have more ptrs
  */
 typedef void (redis_request_write_ptr)(redis_request *self,
                                        const char **buf,
-                                       size_t *len);
+                                       size_t *len,
+                                       int *done);
 
 /*
  * Let the request know that (some part of) it has been written.
