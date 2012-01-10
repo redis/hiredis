@@ -124,7 +124,7 @@ int redis_request_destroy(redis_request *self);
 int redis_request_queue_init(redis_request_queue *self);
 int redis_request_queue_destroy(redis_request_queue *self);
 
-int redis_request_queue_insert(redis_request_queue *self, redis_request *request);
+void redis_request_queue_insert(redis_request_queue *self, redis_request *request);
 int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, size_t *len);
 int redis_request_queue_write_cb(redis_request_queue *self, int n);
 int redis_request_queue_read_cb(redis_request_queue *self, const char *buf, size_t len);

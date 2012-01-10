@@ -209,8 +209,7 @@ TEST(insert_request) {
     req.len = strlen(req.buf);
     req.emit = 2;
 
-    rv = redis_request_queue_insert(&q, (redis_request*)&req);
-    assert_equal_return(rv, REDIS_OK);
+    redis_request_queue_insert(&q, (redis_request*)&req);
 
     /* Test that callback was correctly triggered */
     assert_equal_int(request_to_write_cb_calls.callc, 1);
@@ -231,10 +230,8 @@ TEST(insert_request) {
     req2.buf = "world";                                                       \
     req2.len = strlen(req2.buf);                                              \
     req2.emit = req2.len;                                                     \
-    rv = redis_request_queue_insert(&q, (redis_request*)&req1);               \
-    assert_equal_return(rv, REDIS_OK);                                        \
-    rv = redis_request_queue_insert(&q, (redis_request*)&req2);               \
-    assert_equal_return(rv, REDIS_OK);
+    redis_request_queue_insert(&q, (redis_request*)&req1);                    \
+    redis_request_queue_insert(&q, (redis_request*)&req2);                    \
 
 TEST(write_ptr) {
     SETUP_INSERTED();

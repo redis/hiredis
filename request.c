@@ -43,14 +43,12 @@ int redis_request_queue_destroy(redis_request_queue *self) {
     return REDIS_OK;
 }
 
-int redis_request_queue_insert(redis_request_queue *self, redis_request *request) {
+void redis_request_queue_insert(redis_request_queue *self, redis_request *request) {
     ngx_queue_insert_head(&self->request_to_write, &request->queue);
 
     if (self->request_to_write_cb) {
         self->request_to_write_cb(self, request);
     }
-
-    return REDIS_OK;
 }
 
 redis_request *redis__request_queue_move(ngx_queue_t *a, ngx_queue_t *b) {
