@@ -206,16 +206,13 @@ int redis_handle_write_from_buffer(redis_handle *h, int *drained) {
     }
 
     if (sdslen(h->wbuf)) {
-        do {
-            nwritten = write(h->fd, h->wbuf, sdslen(h->wbuf));
-        } while (nwritten == -1 && errno == EINTR);
-
-        if (nwritten == -1) {
+        nwritten = redis_fd_write(h->fd, h->wbuf, sdslen(h->wbuf));
+        if (nwritten < 0) {
             /* Let all errors bubble, including EAGAIN */
-            return REDIS_ESYS;
+            return nwritten;
         }
 
-        if (nwritten > 0) {
+        if (nwritten) {
             h->wbuf = sdsrange(h->wbuf, nwritten, -1);
         }
     }
@@ -246,17 +243,9 @@ int redis_handle_read_to_buffer(redis_handle *h) {
         return REDIS_ESYS;
     }
 
-    do {
-        nread = read(h->fd, buf, sizeof(buf));
-    } while (nread == -1 && errno == EINTR);
-
-    if (nread == -1) {
-        /* Let all errors bubble, including EAGAIN */
-        return REDIS_ESYS;
-    }
-
-    if (nread == 0) {
-        return REDIS_EEOF;
+    nread = redis_fd_read(h->fd, buf, sizeof(buf));
+    if (nread < 0) {
+        return nread;
     }
 
     h->rbuf = sdscatlen(h->rbuf, buf, nread);

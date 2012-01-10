@@ -33,6 +33,38 @@ int redis_fd_error(int fd) {
     return err;
 }
 
+int redis_fd_read(int fildes, void *buf, size_t nbyte) {
+    int nread;
+
+    do {
+        nread = read(fildes, buf, nbyte);
+    } while (nread == -1 && errno == EINTR);
+
+    if (nread == -1) {
+        return REDIS_ESYS;
+    }
+
+    if (nread == 0) {
+        return REDIS_EEOF;
+    }
+
+    return nread;
+}
+
+int redis_fd_write(int fildes, const void *buf, size_t nbyte) {
+    int nwritten;
+
+    do {
+        nwritten = write(fildes, buf, nbyte);
+    } while (nwritten == -1 && errno == EINTR);
+
+    if (nwritten == -1) {
+        return REDIS_ESYS;
+    }
+
+    return nwritten;
+}
+
 static int redis__nonblock(int fd, int nonblock) {
     int flags;
 
