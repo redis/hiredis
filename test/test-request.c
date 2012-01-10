@@ -158,7 +158,7 @@ void t1_write_ptr(redis_request *_self, const char **buf, size_t *len, int *done
     }
 }
 
-int t1_write_cb(redis_request *_self, int n) {
+int t1_write_cb(redis_request *_self, int n, int *done) {
     t1_redis_request *self = (t1_redis_request*)_self;
     int to_write;
 
@@ -168,6 +168,11 @@ int t1_write_cb(redis_request *_self, int n) {
     }
 
     self->nwritten += to_write;
+
+    if (self->nwritten == self->len) {
+        *done = 1;
+    }
+
     return to_write;
 }
 
@@ -393,10 +398,55 @@ TEST(read_cb_with_parse_error) {
     TEARDOWN();
 }
 
+TEST(read_cb_with_pending_write_ptr_emit) {
+    SETUP_INSERTED();
+
+    const char *buf;
+    size_t len;
+
+    req1.emit = 3;
+
+    /* Grab first 3 bytes from request */
+    rv = redis_request_queue_write_ptr(&q, &buf, &len);
+    assert_equal_size_t(rv, 0);
+    assert_equal_size_t(len, 3);
+    assert(strncmp(buf, "hel", len) == 0);
+
+    /* Assume 3 bytes were written ("hel" in req1) */
+    rv = redis_request_queue_write_cb(&q, 3);
+    assert_equal_size_t(rv, 0);
+    assert_equal_size_t(req1.nwritten, 3);
+
+    /* Feed part of the reply for request 1 */
+    rv = redis_request_queue_read_cb(&q, "+stat", 5);
+    assert_equal_size_t(rv, 0);
+
+    /* Grab remaining bytes from request */
+    rv = redis_request_queue_write_ptr(&q, &buf, &len);
+    assert_equal_size_t(rv, 0);
+    assert_equal_size_t(len, 2);
+    assert(strncmp(buf, "lo", len) == 0);
+
+    /* Assume remaining bytes were written */
+    rv = redis_request_queue_write_cb(&q, 2);
+    assert_equal_size_t(rv, 0);
+    assert_equal_size_t(req1.nwritten, 5);
+
+    /* Feed remaining part of the reply for request 1 */
+    rv = redis_request_queue_read_cb(&q, "us\r\n", 4);
+    assert_equal_size_t(rv, 0);
+
+    assert(req1.reply != NULL && req1.reply->type == REDIS_STATUS);
+    assert(req1.free_calls == 1);
+
+    TEARDOWN();
+}
+
 int main(void) {
     test_insert_request();
     test_write_ptr();
     test_write_cb();
     test_read_cb();
     test_read_cb_with_parse_error();
+    test_read_cb_with_pending_write_ptr_emit();
 }

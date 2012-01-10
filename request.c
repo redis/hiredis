@@ -7,12 +7,15 @@
 
 int redis_request_init(redis_request *self) {
     memset(self, 0, sizeof(*self));
+    ngx_queue_init(&self->wq);
+    ngx_queue_init(&self->rq);
     return REDIS_OK;
 }
 
-int redis_request_destroy(redis_request *self) {
-    ((void) self);
-    return REDIS_OK;
+void redis_request_destroy(redis_request *self) {
+    ngx_queue_remove(&self->rq);
+    ngx_queue_remove(&self->wq);
+    self->free(self);
 }
 
 int redis_request_queue_init(redis_request_queue *self) {
@@ -29,54 +32,44 @@ void redis__free_queue(ngx_queue_t *h) {
     redis_request *req;
 
     ngx_queue_foreach(q, h) {
-        ngx_queue_remove(q);
-        req = ngx_queue_data(q, redis_request, queue);
-        req->free(req);
+        req = ngx_queue_data(q, redis_request, rq);
+        redis_request_destroy(req);
     }
 }
 
 int redis_request_queue_destroy(redis_request_queue *self) {
-    redis__free_queue(&self->request_to_write);
-    redis__free_queue(&self->request_wait_write);
-    redis__free_queue(&self->request_wait_read);
+    ngx_queue_t *q;
+    redis_request *req;
+
+    while (!ngx_queue_empty(&self->request_wait_read)) {
+        q = ngx_queue_last(&self->request_wait_read);
+        req = ngx_queue_data(q, redis_request, rq);
+        redis_request_destroy(req);
+    }
+
+    while (!ngx_queue_empty(&self->request_wait_write)) {
+        q = ngx_queue_last(&self->request_wait_write);
+        req = ngx_queue_data(q, redis_request, wq);
+        redis_request_destroy(req);
+    }
+
+    while (!ngx_queue_empty(&self->request_to_write)) {
+        q = ngx_queue_last(&self->request_to_write);
+        req = ngx_queue_data(q, redis_request, wq);
+        redis_request_destroy(req);
+    }
+
     redis_parser_destroy(&self->parser);
     return REDIS_OK;
 }
 
 void redis_request_queue_insert(redis_request_queue *self, redis_request *request) {
     request->request_queue = self;
-    ngx_queue_insert_head(&self->request_to_write, &request->queue);
+    ngx_queue_insert_head(&self->request_to_write, &request->wq);
 
     if (self->request_to_write_cb) {
         self->request_to_write_cb(self, request);
     }
-}
-
-redis_request *redis__request_queue_move(ngx_queue_t *a, ngx_queue_t *b) {
-    ngx_queue_t *q;
-
-    /* Unable to move requests when there are none... */
-    if (ngx_queue_empty(a)) {
-        return NULL;
-    }
-
-    q = ngx_queue_last(a);
-    ngx_queue_remove(q);
-    ngx_queue_insert_head(b, q);
-    return ngx_queue_data(q, redis_request, queue);
-}
-
-redis_request *redis__request_queue_pop_to_write(redis_request_queue *self) {
-    redis_request *req;
-
-    req = redis__request_queue_move(&self->request_to_write,
-                                    &self->request_wait_write);
-
-    if (req && self->request_wait_write_cb) {
-        self->request_wait_write_cb(self, req);
-    }
-
-    return req;
 }
 
 int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, size_t *len) {
@@ -86,17 +79,25 @@ int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, s
 
     if (!ngx_queue_empty(&self->request_wait_write)) {
         q = ngx_queue_head(&self->request_wait_write);
-        req = ngx_queue_data(q, redis_request, queue);
+        req = ngx_queue_data(q, redis_request, wq);
     }
 
     /* We need one non-done request in the wait_write queue */
     while (req == NULL || req->write_ptr_done) {
-        if (redis__request_queue_pop_to_write(self) == NULL) {
+        if (ngx_queue_empty(&self->request_to_write)) {
             return -1;
         }
 
-        q = ngx_queue_head(&self->request_wait_write);
-        req = ngx_queue_data(q, redis_request, queue);
+        q = ngx_queue_last(&self->request_to_write);
+        req = ngx_queue_data(q, redis_request, wq);
+
+        /* Remove from tail of `to_write`, insert on head of `wait_write` */
+        ngx_queue_remove(q);
+        ngx_queue_insert_head(&self->request_wait_write, q);
+
+        if (req && self->request_wait_write_cb) {
+            self->request_wait_write_cb(self, req);
+        }
     }
 
     assert(req->write_ptr);
@@ -109,82 +110,84 @@ int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, s
     return 0;
 }
 
-redis_request *redis__request_queue_pop_wait_write(redis_request_queue *self) {
-    redis_request *req;
+int redis_request_queue_write_cb(redis_request_queue *self, size_t len) {
+    ngx_queue_t *q = NULL;
+    redis_request *req = NULL;
+    int nwritten, done;
 
-    req = redis__request_queue_move(&self->request_wait_write,
-                                    &self->request_wait_read);
-
-    if (req && self->request_wait_read_cb) {
-        self->request_wait_read_cb(self, req);
-    }
-
-    return req;
-}
-
-int redis_request_queue_write_cb(redis_request_queue *self, int n) {
-    ngx_queue_t *q;
-    redis_request *req;
-    int wrote;
-
-    /* We need at least one element in the wait_read queue */
-    if (ngx_queue_empty(&self->request_wait_read)) {
-        if (redis__request_queue_pop_wait_write(self) == NULL) {
-            /* The request cannot be NULL: it emitted bytes to write and should
-             * be present in the wait_write queue, waiting for a callback. */
+    while (len) {
+        if (ngx_queue_empty(&self->request_wait_write)) {
             return -1;
         }
-    }
 
-    while (n) {
-        assert(!ngx_queue_empty(&self->request_wait_read));
-        q = ngx_queue_head(&self->request_wait_read);
-        req = ngx_queue_data(q, redis_request, queue);
+        q = ngx_queue_last(&self->request_wait_write);
+        req = ngx_queue_data(q, redis_request, wq);
+        done = 0;
 
-        assert(req->write_cb);
-        wrote = req->write_cb(req, n);
-        if (wrote == 0) {
-            if (redis__request_queue_pop_wait_write(self) == NULL) {
-                return -1;
+        /* Add this request to `wait_read` if necessary */
+        if (ngx_queue_empty(&req->rq)) {
+            ngx_queue_insert_head(&self->request_wait_read, &req->rq);
+
+            if (req && self->request_wait_read_cb) {
+                self->request_wait_read_cb(self, req);
             }
-
-            continue;
         }
 
-        assert(wrote <= n);
-        n -= wrote;
+        assert(req->write_cb);
+        nwritten = req->write_cb(req, len, &done);
+
+        /* Abort on error */
+        if (nwritten < 0) {
+            return nwritten;
+        }
+
+        assert((unsigned)nwritten <= len);
+        len -= nwritten;
+
+        /* Remove this request from `wait_write` when done writing */
+        if (done) {
+            ngx_queue_remove(q);
+            ngx_queue_init(q);
+        }
     }
 
-    assert(n == 0);
     return 0;
 }
 
 int redis_request_queue_read_cb(redis_request_queue *self, const char *buf, size_t len) {
-    ngx_queue_t *q;
-    redis_request *req;
-    int n, done;
+    ngx_queue_t *q = NULL;
+    redis_request *req = NULL;
+    int nread, done;
 
     while (len) {
-        assert(!ngx_queue_empty(&self->request_wait_read));
+        if (ngx_queue_empty(&self->request_wait_read)) {
+            return -1;
+        }
+
         q = ngx_queue_last(&self->request_wait_read);
-        req = ngx_queue_data(q, redis_request, queue);
+        req = ngx_queue_data(q, redis_request, rq);
         done = 0;
 
-        /* Fire read callback */
-        n = req->read_cb(req, buf, len, &done);
-        if (n < 0) {
-            return n;
+        assert(req->read_cb);
+        nread = req->read_cb(req, buf, len, &done);
+
+        /* Abort on error */
+        if (nread < 0) {
+            return nread;
         }
 
+        assert((unsigned)nread <= len);
+        buf += nread;
+        len -= nread;
+
+        /* Remove this request from `wait_read` when done reading */
         if (done) {
             ngx_queue_remove(q);
+            ngx_queue_init(q);
             req->read_cb_done = 1;
-            req->free(req);
+            redis_request_destroy(req);
         }
-
-        buf += n;
-        len -= n;
     }
 
-    return REDIS_OK;
+    return 0;
 }

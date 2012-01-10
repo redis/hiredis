@@ -29,12 +29,14 @@ typedef void (redis_request_write_ptr)(redis_request *self,
  * Arguments:
  *  self      the request as previously inserted in the queue
  *  n         the number of bytes written
+ *  done      set to non-zero by the request when it has been written in full
  *
  * Return:
  *  the number of bytes (<= n) actually used
  */
 typedef int (redis_request_write_cb)(redis_request *self,
-                                     int n);
+                                     int n,
+                                     int *done);
 
 /*
  * Let the request know the wire-level data that was fed to the parser on its
@@ -45,7 +47,7 @@ typedef int (redis_request_write_cb)(redis_request *self,
  *  self      the request as previously inserted in the queue
  *  buf       buffer with reply data
  *  len       length of buffer with reply data
- *  done      set to non-zero by the request when it doesn't need more bytes
+ *  done      set to non-zero by the request when it has been read in full
  *
  * Return:
  *  the number of bytes (<= n) actually used
@@ -66,8 +68,8 @@ typedef int (redis_request_read_cb)(redis_request *self,
 typedef void (redis_request_free)(redis_request *self);
 
 #define REDIS_REQUEST_COMMON                                                  \
-    ngx_queue_t queue;                                                        \
     redis_request_queue *request_queue;                                       \
+    ngx_queue_t wq, rq;                                                       \
     unsigned write_ptr_done:1;                                                \
     unsigned write_cb_done:1;                                                 \
     unsigned read_cb_done:1;                                                  \
@@ -86,9 +88,9 @@ struct redis_request_s {
  * function, it ends up in the `to_write` queue and the `to_write_cb` callback
  * is called. Before the request emits one or more pointers to its buffers, it
  * is placed in the `wait_write` queue and the `wait_write_cb` callback is
- * called. Finally, when the request is fully put on the wire and its
- * `write_cb` function has indicated that it is done, the request is placed in
- * the `wait_read` queue and the `wait_read_cb` callback is called.
+ * called. Finally, when one or more bytes of the request have been put on the
+ * wire, the request is placed in the `wait_read` queue and the `wait_read_cb`
+ * callback is called.
  *
  * Arguments:
  *  self      request queue
@@ -115,14 +117,14 @@ struct redis_request_queue_s {
 };
 
 int redis_request_init(redis_request *self);
-int redis_request_destroy(redis_request *self);
+void redis_request_destroy(redis_request *self);
 
 int redis_request_queue_init(redis_request_queue *self);
 int redis_request_queue_destroy(redis_request_queue *self);
 
 void redis_request_queue_insert(redis_request_queue *self, redis_request *request);
 int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, size_t *len);
-int redis_request_queue_write_cb(redis_request_queue *self, int n);
+int redis_request_queue_write_cb(redis_request_queue *self, size_t len);
 int redis_request_queue_read_cb(redis_request_queue *self, const char *buf, size_t len);
 
 #endif
