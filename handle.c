@@ -7,28 +7,15 @@
 #include <errno.h>
 #include <assert.h>
 
-/* socket/connect/(get|set)sockopt*/
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/tcp.h> /* TCP_* constants */
-
-/* fcntl */
-#include <unistd.h>
-#include <fcntl.h>
-
 /* select */
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-/* getaddrinfo */
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-
 /* local */
 #include "handle.h"
+#include "fd.h"
 #include "sds.h"
 
 #define REDIS__READABLE 1
@@ -82,75 +69,6 @@ int redis_handle_destroy(redis_handle *h) {
     return REDIS_OK;
 }
 
-static int redis__nonblock(int fd, int nonblock) {
-    int flags;
-
-    if ((flags = fcntl(fd, F_GETFL)) == -1) {
-        return -1;
-    }
-
-    if (nonblock) {
-        flags |= O_NONBLOCK;
-    } else {
-        flags &= ~O_NONBLOCK;
-    }
-
-    if (fcntl(fd, F_SETFL, flags) == -1) {
-        return -1;
-    }
-
-    return 0;
-}
-
-static int redis__so_error(int fd) {
-    int err = 0;
-    socklen_t errlen = sizeof(err);
-
-    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-        return -1;
-    }
-
-    return err;
-}
-
-static int redis__handle_connect(int family, const struct sockaddr *addr, socklen_t addrlen) {
-    int fd;
-    int on = 1;
-
-    if ((fd = socket(family, SOCK_STREAM, 0)) == -1) {
-        return -1;
-    }
-
-    if (family == AF_INET || family == AF_INET6) {
-        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
-            close(fd);
-            return -1;
-        }
-    }
-
-    /* The socket needs to be non blocking to be able to timeout connect(2). */
-    if (redis__nonblock(fd, 1) == -1) {
-        close(fd);
-        return -1;
-    }
-
-    if (connect(fd, addr, addrlen) == -1) {
-        if (errno == EINPROGRESS) {
-            /* The user should figure out if connect(2) succeeded */
-        } else {
-            close(fd);
-            return -1;
-        }
-    }
-
-    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on)) == -1) {
-        close(fd);
-        return -1;
-    }
-
-    return fd;
-}
-
 static int redis__finish_connect(redis_handle *h, int fd) {
     h->fd = fd;
     h->wbuf = sdsempty();
@@ -166,9 +84,9 @@ int redis_handle_connect_address(redis_handle *h, const redis_address addr) {
         return REDIS_ESYS;
     }
 
-    fd = redis__handle_connect(addr.sa_family, &addr.sa_addr.addr, addr.sa_addrlen);
-    if (fd == -1) {
-        return REDIS_ESYS;
+    fd = redis_fd_connect_address(addr);
+    if (fd < 0) {
+        return fd;
     }
 
     return redis__finish_connect(h, fd);
@@ -191,50 +109,19 @@ int redis_handle_connect_gai(redis_handle *h,
                              const char *addr,
                              int port,
                              redis_address *_addr) {
-    char _port[6];  /* strlen("65535"); */
-    struct addrinfo hints, *servinfo, *p;
-    int rv, fd;
+    int fd;
 
-    snprintf(_port, 6, "%d", port);
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = family;
-    hints.ai_socktype = SOCK_STREAM;
-
-    if ((rv = getaddrinfo(addr, _port, &hints, &servinfo)) != 0) {
-        errno = rv;
-        return REDIS_EGAI;
+    if (h->fd >= 0) {
+        errno = EALREADY;
+        return REDIS_ESYS;
     }
 
-    /* Expect at least one record. */
-    assert(servinfo != NULL);
-
-    for (p = servinfo; p != NULL; p = p->ai_next) {
-        fd = redis__handle_connect(p->ai_family, p->ai_addr, p->ai_addrlen);
-        if (fd == -1) {
-            if (errno == EHOSTUNREACH) {
-                /* AF_INET6 record on a machine without IPv6 support.
-                 * See c4ed06d9 for more information. */
-                continue;
-            }
-
-            goto error;
-        }
-
-        /* Pass address we connect to back to caller */
-        if (_addr != NULL) {
-            memset(_addr, 0, sizeof(*_addr));
-            memcpy(&_addr->sa_addr, p->ai_addr, p->ai_addrlen);
-            _addr->sa_family = p->ai_family;
-            _addr->sa_addrlen = p->ai_addrlen;
-        }
-
-        freeaddrinfo(servinfo);
-        return redis__finish_connect(h, fd);
+    fd = redis_fd_connect_gai(family, addr, port, _addr);
+    if (fd < 0) {
+        return fd;
     }
 
-error:
-    freeaddrinfo(servinfo);
-    return REDIS_ESYS;
+    return redis__finish_connect(h, fd);
 }
 
 static int redis__select(int mode, int fd, struct timeval timeout) {
@@ -258,28 +145,28 @@ static int redis__select(int mode, int fd, struct timeval timeout) {
     }
 
     if (select(FD_SETSIZE, _rfd, _wfd, NULL, &timeout) == -1) {
-        return -1;
+        return REDIS_ESYS;
     }
 
     /* Not in set means select(2) timed out */
     if (!FD_ISSET(fd, _set)) {
         errno = ETIMEDOUT;
-        return -1;
+        return REDIS_ESYS;
     }
 
-    /* Check for socket errors. */
-    so_error = redis__so_error(fd);
-    if (so_error == -1) {
-        return -1;
+    /* Check for socket error */
+    so_error = redis_fd_error(fd);
+    if (so_error < 0) {
+        return so_error;
     }
 
     if (so_error) {
         /* Act as if the socket error occured with select(2). */
         errno = so_error;
-        return -1;
+        return REDIS_ESYS;
     }
 
-    return 0;
+    return REDIS_OK;
 }
 
 static int redis__wait(redis_handle *h, int mode) {

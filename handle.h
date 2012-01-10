@@ -5,14 +5,9 @@
 #include <sys/time.h>
 
 /* local */
+#include "common.h"
 #include "parser.h"
 #include "address.h"
-
-#define REDIS_OK 0
-#define REDIS_ESYS -1
-#define REDIS_EGAI -2
-#define REDIS_EPARSER -3
-#define REDIS_EEOF -4
 
 typedef struct redis_handle_s redis_handle;
 
