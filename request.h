@@ -7,6 +7,8 @@
 
 typedef struct redis_request_s redis_request;
 
+typedef struct redis_request_queue_s redis_request_queue;
+
 /*
  * Obtain a char* to a buffer representing (some part of) the request.
  *
@@ -27,7 +29,7 @@ typedef void (redis_request_write_ptr)(redis_request *self,
  *  n         the number of bytes written
  *
  * Return:
- *  the number of bytes (< n) that could be accounted for
+ *  the number of bytes (<= n) actually used
  */
 typedef int (redis_request_write_cb)(redis_request *self,
                                      int n);
@@ -41,24 +43,15 @@ typedef int (redis_request_write_cb)(redis_request *self,
  *  self      the request as previously inserted in the queue
  *  buf       buffer with reply data
  *  len       length of buffer with reply data
- */
-typedef void (redis_request_read_raw_cb)(redis_request *self,
-                                         const char *buf,
-                                         size_t len);
-
-/*
- * Let the request know that a full reply was read on its behalf. This
- * function is called when the protocol parser parsed a full reply and this
- * request is on the head of the list of requests waiting for a reply.
+ *  done      set to non-zero by the request when it doesn't need more bytes
  *
- * Arguments:
- *  self      the request as previously inserted in the queue
- *  reply     reply as read by the parser
- *  done      set to non-zero by the request when this is the last reply
+ * Return:
+ *  the number of bytes (<= n) actually used
  */
-typedef void (redis_request_read_cb)(redis_request *self,
-                                     redis_protocol *reply,
-                                     int *done);
+typedef int (redis_request_read_cb)(redis_request *self,
+                                    const char *buf,
+                                    size_t len,
+                                    int *done);
 
 /*
  * Free the request. This function is called after the last reply has been
@@ -72,17 +65,18 @@ typedef void (redis_request_free)(redis_request *self);
 
 #define REDIS_REQUEST_COMMON                                                  \
     ngx_queue_t queue;                                                        \
+    redis_request_queue *request_queue;                                       \
+    unsigned write_ptr_done:1;                                                \
+    unsigned write_cb_done:1;                                                 \
+    unsigned read_cb_done:1;                                                  \
     redis_request_write_ptr *write_ptr;                                       \
     redis_request_write_cb *write_cb;                                         \
-    redis_request_read_raw_cb *read_raw_cb;                                   \
     redis_request_read_cb *read_cb;                                           \
     redis_request_free *free;
 
 struct redis_request_s {
     REDIS_REQUEST_COMMON
 };
-
-typedef struct redis_request_queue_s redis_request_queue;
 
 /*
  * These functions are called whenever a request is inserted in a new queue.

@@ -44,6 +44,7 @@ int redis_request_queue_destroy(redis_request_queue *self) {
 }
 
 void redis_request_queue_insert(redis_request_queue *self, redis_request *request) {
+    request->request_queue = self;
     ngx_queue_insert_head(&self->request_to_write, &request->queue);
 
     if (self->request_to_write_cb) {
@@ -168,44 +169,28 @@ int redis_request_queue_write_cb(redis_request_queue *self, int n) {
 int redis_request_queue_read_cb(redis_request_queue *self, const char *buf, size_t len) {
     ngx_queue_t *q;
     redis_request *req;
-    redis_protocol *p;
-    size_t nparsed;
+    int n, done;
 
     while (len) {
-        p = NULL;
-        nparsed = redis_parser_execute(&self->parser, &p, buf, len);
+        assert(!ngx_queue_empty(&self->request_wait_read));
+        q = ngx_queue_last(&self->request_wait_read);
+        req = ngx_queue_data(q, redis_request, queue);
+        done = 0;
 
-        /* Test for parse error */
-        if (nparsed < len && p == NULL) {
-            errno = redis_parser_err(&self->parser);
-            return REDIS_EPARSER;
+        /* Fire read callback */
+        n = req->read_cb(req, buf, len, &done);
+        if (n < 0) {
+            return n;
         }
 
-        if (!ngx_queue_empty(&self->request_wait_read)) {
-            q = ngx_queue_last(&self->request_wait_read);
-            req = ngx_queue_data(q, redis_request, queue);
-
-            /* Fire raw read callback when defined */
-            if (req->read_raw_cb) {
-                req->read_raw_cb(req, buf, nparsed);
-            }
-
-            /* Fire read callback when the parser produced something */
-            if (p != NULL) {
-                int done = 0;
-
-                req->read_cb(req, p, &done);
-                if (done) {
-                    ngx_queue_remove(q);
-                    req->free(req);
-                }
-            }
-        } else {
-            assert(NULL && "todo");
+        if (done) {
+            ngx_queue_remove(q);
+            req->read_cb_done = 1;
+            req->free(req);
         }
 
-        buf += nparsed;
-        len -= nparsed;
+        buf += n;
+        len -= n;
     }
 
     return REDIS_OK;
