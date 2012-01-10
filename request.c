@@ -148,6 +148,7 @@ int redis_request_queue_write_cb(redis_request_queue *self, size_t len) {
         if (done) {
             ngx_queue_remove(q);
             ngx_queue_init(q);
+            req->write_cb_done = 1;
         }
     }
 

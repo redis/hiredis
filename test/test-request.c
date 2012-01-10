@@ -262,6 +262,7 @@ TEST(write_ptr) {
     assert_equal_size_t(rv, 0);
     assert_equal_size_t(len, 3);
     assert(strncmp(buf, "hel", len) == 0);
+    assert(req1.write_ptr_done == 0);
 
     /* The first request should have moved to the wait_write queue now */
     assert_equal_int(request_wait_write_cb_calls.callc, 1);
@@ -272,11 +273,13 @@ TEST(write_ptr) {
     assert_equal_size_t(rv, 0);
     assert_equal_size_t(len, 2);
     assert(strncmp(buf, "lo", len) == 0);
+    assert(req1.write_ptr_done == 1);
 
     rv = redis_request_queue_write_ptr(&q, &buf, &len);
     assert_equal_size_t(rv, 0);
     assert_equal_size_t(len, 3);
     assert(strncmp(buf, "wor", len) == 0);
+    assert(req2.write_ptr_done == 0);
 
     /* The second request should have moved to the wait_write queue now */
     assert_equal_int(request_wait_write_cb_calls.callc, 2);
@@ -287,6 +290,7 @@ TEST(write_ptr) {
     assert_equal_size_t(rv, 0);
     assert_equal_size_t(len, 2);
     assert(strncmp(buf, "ld", len) == 0);
+    assert(req2.write_ptr_done == 1);
 
     rv = redis_request_queue_write_ptr(&q, &buf, &len);
     assert_equal_size_t(rv, -1);
@@ -309,6 +313,9 @@ TEST(write_cb) {
     rv = redis_request_queue_write_cb(&q, 3);
     assert_equal_size_t(rv, 0);
     assert_equal_size_t(req1.nwritten, 3);
+    assert_equal_size_t(req2.nwritten, 0);
+    assert(req1.write_cb_done == 0);
+    assert(req2.write_cb_done == 0);
 
     /* The first request should have moved to the wait_read queue now */
     assert_equal_int(request_wait_read_cb_calls.callc, 1);
@@ -320,6 +327,8 @@ TEST(write_cb) {
     assert_equal_size_t(rv, 0);
     assert_equal_size_t(req1.nwritten, 5);
     assert_equal_size_t(req2.nwritten, 1);
+    assert(req1.write_cb_done == 1);
+    assert(req2.write_cb_done == 0);
 
     /* The second request should have moved to the wait_read queue now */
     assert_equal_int(request_wait_read_cb_calls.callc, 2);
@@ -331,6 +340,8 @@ TEST(write_cb) {
     assert_equal_size_t(rv, 0);
     assert_equal_size_t(req1.nwritten, 5);
     assert_equal_size_t(req2.nwritten, 5);
+    assert(req1.write_cb_done == 1);
+    assert(req2.write_cb_done == 1);
 
     /* More bytes cannot be mapped to requests... */
     rv = redis_request_queue_write_cb(&q, 4);
@@ -357,6 +368,7 @@ TEST(read_cb) {
     assert(strncmp(req1.read_raw_buf, "+stat", req1.read_raw_len) == 0);
     assert(req1.reply == NULL);
     assert(req1.free_calls == 0);
+    assert(req1.read_cb_done == 0);
 
     /* Feed remaining part for request 1, and first part for request 2 */
     rv = redis_request_queue_read_cb(&q, "us\r\n+st", 7);
@@ -366,11 +378,13 @@ TEST(read_cb) {
     assert(strncmp(req1.read_raw_buf, "us\r\n", req1.read_raw_len) == 0);
     assert(req1.reply != NULL && req1.reply->type == REDIS_STATUS);
     assert(req1.free_calls == 1);
+    assert(req1.read_cb_done == 1);
 
     assert_equal_size_t(req2.read_raw_len, 3);
     assert(strncmp(req2.read_raw_buf, "+st", req2.read_raw_len) == 0);
     assert(req2.reply == NULL);
     assert(req2.free_calls == 0);
+    assert(req2.read_cb_done == 0);
 
     /* Feed remaining part for request 2 */
     rv = redis_request_queue_read_cb(&q, "atus\r\n", 6);
@@ -380,6 +394,7 @@ TEST(read_cb) {
     assert(strncmp(req2.read_raw_buf, "atus\r\n", req2.read_raw_len) == 0);
     assert(req2.reply != NULL && req1.reply->type == REDIS_STATUS);
     assert(req2.free_calls == 1);
+    assert(req2.read_cb_done == 1);
 
     TEARDOWN();
 }
