@@ -22,7 +22,7 @@ Hiredis only supports the binary-safe Redis protocol, so you can use it with any
 The library comes with multiple APIs. There is the synchronous API, the asynchronous API and the reply parsing API.
 
 %package devel
-Summary: ZooKeeper C binding library
+Summary: Redis C binding library
 Group: System/Libraries
 
 %description devel
