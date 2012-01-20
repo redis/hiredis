@@ -129,6 +129,8 @@ static int redis__select(int mode, int fd, struct timeval timeout) {
     fd_set *_set = NULL, *_rfd = NULL, *_wfd = NULL;
     int so_error;
 
+    assert(fd < FD_SETSIZE);
+
     switch(mode) {
         case REDIS__READABLE:
             FD_ZERO(&rfd);
