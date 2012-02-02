@@ -449,10 +449,10 @@ static int processMultiBulkItem(redisReader *r) {
     long elements;
     int root = 0;
 
-    /* Set error for nested multi bulks with depth > 1 */
-    if (r->ridx == 2) {
+    /* Set error for nested multi bulks with depth > 2 */
+    if (r->ridx == 3) {
         __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
-            "No support for nested multi bulk replies with depth > 1");
+            "No support for nested multi bulk replies with depth > 2");
         return REDIS_ERR;
     }
 
@@ -752,6 +752,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
             default:
                 /* Try to detect printf format */
                 {
+                    static const char intfmts[] = "diouxX";
                     char _format[16];
                     const char *_p = c+1;
                     size_t _l = 0;
@@ -773,33 +774,79 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                         while (*_p != '\0' && isdigit(*_p)) _p++;
                     }
 
-                    /* Modifiers */
-                    if (*_p != '\0') {
-                        if (*_p == 'h' || *_p == 'l') {
-                            /* Allow a single repetition for these modifiers */
-                            if (_p[0] == _p[1]) _p++;
-                            _p++;
-                        }
+                    /* Copy va_list before consuming with va_arg */
+                    va_copy(_cpy,ap);
+
+                    /* Integer conversion (without modifiers) */
+                    if (strchr(intfmts,*_p) != NULL) {
+                        va_arg(ap,int);
+                        goto fmt_valid;
                     }
 
-                    /* Conversion specifier */
-                    if (*_p != '\0' && strchr("diouxXeEfFgGaA",*_p) != NULL) {
-                        _l = (_p+1)-c;
-                        if (_l < sizeof(_format)-2) {
-                            memcpy(_format,c,_l);
-                            _format[_l] = '\0';
-                            va_copy(_cpy,ap);
-                            newarg = sdscatvprintf(curarg,_format,_cpy);
-                            va_end(_cpy);
-
-                            /* Update current position (note: outer blocks
-                             * increment c twice so compensate here) */
-                            c = _p-1;
-                        }
+                    /* Double conversion (without modifiers) */
+                    if (strchr("eEfFgGaA",*_p) != NULL) {
+                        va_arg(ap,double);
+                        goto fmt_valid;
                     }
 
-                    /* Consume and discard vararg */
-                    va_arg(ap,char*);
+                    /* Size: char */
+                    if (_p[0] == 'h' && _p[1] == 'h') {
+                        _p += 2;
+                        if (*_p != '\0' && strchr(intfmts,*_p) != NULL) {
+                            va_arg(ap,int); /* char gets promoted to int */
+                            goto fmt_valid;
+                        }
+                        goto fmt_invalid;
+                    }
+
+                    /* Size: short */
+                    if (_p[0] == 'h') {
+                        _p += 1;
+                        if (*_p != '\0' && strchr(intfmts,*_p) != NULL) {
+                            va_arg(ap,int); /* short gets promoted to int */
+                            goto fmt_valid;
+                        }
+                        goto fmt_invalid;
+                    }
+
+                    /* Size: long long */
+                    if (_p[0] == 'l' && _p[1] == 'l') {
+                        _p += 2;
+                        if (*_p != '\0' && strchr(intfmts,*_p) != NULL) {
+                            va_arg(ap,long long);
+                            goto fmt_valid;
+                        }
+                        goto fmt_invalid;
+                    }
+
+                    /* Size: long */
+                    if (_p[0] == 'l') {
+                        _p += 1;
+                        if (*_p != '\0' && strchr(intfmts,*_p) != NULL) {
+                            va_arg(ap,long);
+                            goto fmt_valid;
+                        }
+                        goto fmt_invalid;
+                    }
+
+                fmt_invalid:
+                    va_end(_cpy);
+                    goto err;
+
+                fmt_valid:
+                    _l = (_p+1)-c;
+                    if (_l < sizeof(_format)-2) {
+                        memcpy(_format,c,_l);
+                        _format[_l] = '\0';
+                        newarg = sdscatvprintf(curarg,_format,_cpy);
+
+                        /* Update current position (note: outer blocks
+                         * increment c twice so compensate here) */
+                        c = _p-1;
+                    }
+
+                    va_end(_cpy);
+                    break;
                 }
             }
 
@@ -1083,10 +1130,10 @@ int redisBufferRead(redisContext *c) {
  *
  * Returns REDIS_OK when the buffer is empty, or (a part of) the buffer was
  * succesfully written to the socket. When the buffer is empty after the
- * write operation, "wdone" is set to 1 (if given).
+ * write operation, "done" is set to 1 (if given).
  *
  * Returns REDIS_ERR if an error occured trying to write and sets
- * c->error to hold the appropriate error string.
+ * c->errstr to hold the appropriate error string.
  */
 int redisBufferWrite(redisContext *c, int *done) {
     int nwritten;

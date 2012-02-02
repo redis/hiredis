@@ -1,3 +1,5 @@
+#ifndef __HIREDIS_AE_H__
+#define __HIREDIS_AE_H__
 #include <sys/types.h>
 #include <ae.h>
 #include "../hiredis.h"
@@ -10,21 +12,21 @@ typedef struct redisAeEvents {
     int reading, writing;
 } redisAeEvents;
 
-void redisAeReadEvent(aeEventLoop *el, int fd, void *privdata, int mask) {
+static void redisAeReadEvent(aeEventLoop *el, int fd, void *privdata, int mask) {
     ((void)el); ((void)fd); ((void)mask);
 
     redisAeEvents *e = (redisAeEvents*)privdata;
     redisAsyncHandleRead(e->context);
 }
 
-void redisAeWriteEvent(aeEventLoop *el, int fd, void *privdata, int mask) {
+static void redisAeWriteEvent(aeEventLoop *el, int fd, void *privdata, int mask) {
     ((void)el); ((void)fd); ((void)mask);
 
     redisAeEvents *e = (redisAeEvents*)privdata;
     redisAsyncHandleWrite(e->context);
 }
 
-void redisAeAddRead(void *privdata) {
+static void redisAeAddRead(void *privdata) {
     redisAeEvents *e = (redisAeEvents*)privdata;
     aeEventLoop *loop = e->loop;
     if (!e->reading) {
@@ -33,7 +35,7 @@ void redisAeAddRead(void *privdata) {
     }
 }
 
-void redisAeDelRead(void *privdata) {
+static void redisAeDelRead(void *privdata) {
     redisAeEvents *e = (redisAeEvents*)privdata;
     aeEventLoop *loop = e->loop;
     if (e->reading) {
@@ -42,7 +44,7 @@ void redisAeDelRead(void *privdata) {
     }
 }
 
-void redisAeAddWrite(void *privdata) {
+static void redisAeAddWrite(void *privdata) {
     redisAeEvents *e = (redisAeEvents*)privdata;
     aeEventLoop *loop = e->loop;
     if (!e->writing) {
@@ -51,7 +53,7 @@ void redisAeAddWrite(void *privdata) {
     }
 }
 
-void redisAeDelWrite(void *privdata) {
+static void redisAeDelWrite(void *privdata) {
     redisAeEvents *e = (redisAeEvents*)privdata;
     aeEventLoop *loop = e->loop;
     if (e->writing) {
@@ -60,14 +62,14 @@ void redisAeDelWrite(void *privdata) {
     }
 }
 
-void redisAeCleanup(void *privdata) {
+static void redisAeCleanup(void *privdata) {
     redisAeEvents *e = (redisAeEvents*)privdata;
     redisAeDelRead(privdata);
     redisAeDelWrite(privdata);
     free(e);
 }
 
-int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
+static int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     redisAeEvents *e;
 
@@ -92,4 +94,4 @@ int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
 
     return REDIS_OK;
 }
-
+#endif

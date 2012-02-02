@@ -31,6 +31,7 @@
 
 #include "config.h"
 #include "fmacros.h"
+#include <stdlib.h>
 #include <string.h>
 #ifndef HIREDIS_WIN
 #include <strings.h>
