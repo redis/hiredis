@@ -103,7 +103,7 @@ static int redisCreateSocket(redisContext *c, int type) {
 static int redisSetBlocking(redisContext *c, int fd, int blocking) {
 #ifdef HIREDIS_WIN
     int iResult;
-    int flag;
+    unsigned long flag;
 
     if (blocking)
         flag = 0;
@@ -260,7 +260,12 @@ int redisContextConnectTcp(redisContext *c, const char *addr, int port, struct t
         if (redisSetBlocking(c,s,0) != REDIS_OK)
             goto error;
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+            SETERRNO;
+#ifdef HIREDIS_WIN
+            if (errno == WSAEHOSTUNREACH) {
+#else
             if (errno == EHOSTUNREACH) {
+#endif
                 close(s);
                 continue;
             } else if (errno == EINPROGRESS && !blocking) {
