@@ -286,7 +286,8 @@ is being disconnected per user-request, no new commands may be added to the outp
 returned on calls to the `redisAsyncCommand` family.
 
 If the reply for a command with a `NULL` callback is read, it is immediately free'd. When the callback
-for a command is non-`NULL`, it is responsible for cleaning up the reply.
+for a command is non-`NULL`, the memory is free'd immediately following the callback: the reply is only
+valid for the duration of the callback.
 
 All pending callbacks are called with a `NULL` reply when the context encountered an error.
 
