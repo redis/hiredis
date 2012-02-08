@@ -4,7 +4,7 @@
 # This file is released under the BSD license, see the COPYING file
 
 OBJ=net.o hiredis.o sds.o async.o
-EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev
+EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
 TESTS=hiredis-test
 LIBNAME=libhiredis
 
@@ -79,6 +79,9 @@ hiredis-example-libevent: examples/example-libevent.c adapters/libevent.h $(STLI
 hiredis-example-libev: examples/example-libev.c adapters/libev.h $(STLIBNAME)
 	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -lev $(STLIBNAME)
 
+hiredis-example-glib: examples/example-glib.c adapters/glib.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) $(shell pkg-config --cflags --libs glib-2.0) -I. $< $(STLIBNAME)
+
 ifndef AE_DIR
 hiredis-example-ae:
 	@echo "Please specify AE_DIR (e.g. <redis repository>/src)"
@@ -103,6 +106,8 @@ hiredis-example: examples/example.c $(STLIBNAME)
 examples: $(EXAMPLES)
 
 hiredis-test: test.o $(STLIBNAME)
+
+hiredis-%: %.o $(STLIBNAME)
 	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
