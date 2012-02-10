@@ -1,24 +1,38 @@
 #ifndef __HIREDIS_LIBEVENT_H__
 #define __HIREDIS_LIBEVENT_H__
 #include <event.h>
+#include <pthread.h>
 #include "../hiredis.h"
 #include "../async.h"
 
 typedef struct redisLibeventEvents {
     redisAsyncContext *context;
     struct event rev, wev;
+    pthread_mutex_t *mutex;
 } redisLibeventEvents;
 
 static void redisLibeventReadEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
     redisLibeventEvents *e = (redisLibeventEvents*)arg;
-    redisAsyncHandleRead(e->context);
+    if (e->mutex) {
+        pthread_mutex_lock(e->mutex);
+        redisAsyncHandleRead(e->context);
+        pthread_mutex_unlock(e->mutex);
+    } else {
+        redisAsyncHandleRead(e->context);
+    }
 }
 
 static void redisLibeventWriteEvent(int fd, short event, void *arg) {
     ((void)fd); ((void)event);
     redisLibeventEvents *e = (redisLibeventEvents*)arg;
-    redisAsyncHandleWrite(e->context);
+    if (e->mutex) {
+        pthread_mutex_lock(e->mutex);
+        redisAsyncHandleWrite(e->context);
+        pthread_mutex_unlock(e->mutex);
+    } else {
+        redisAsyncHandleWrite(e->context);
+    }
 }
 
 static void redisLibeventAddRead(void *privdata) {
@@ -48,7 +62,7 @@ static void redisLibeventCleanup(void *privdata) {
     free(e);
 }
 
-static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
+static int redisLibeventAttachThreaded(redisAsyncContext *ac, struct event_base *base, pthread_mutex_t *mutex) {
     redisContext *c = &(ac->c);
     redisLibeventEvents *e;
 
@@ -59,6 +73,7 @@ static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
     /* Create container for context and r/w events */
     e = (redisLibeventEvents*)malloc(sizeof(*e));
     e->context = ac;
+    e->mutex = mutex;
 
     /* Register functions to start/stop listening for events */
     ac->ev.addRead = redisLibeventAddRead;
@@ -75,4 +90,7 @@ static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
     event_base_set(base,&e->wev);
     return REDIS_OK;
 }
+
+#define redisLibeventAttach(ac, base) redisLibeventAttachThreaded(ac, base, NULL)
+
 #endif

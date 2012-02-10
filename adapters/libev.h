@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <ev.h>
+#include <pthread.h>
 #include "../hiredis.h"
 #include "../async.h"
 
@@ -11,6 +12,7 @@ typedef struct redisLibevEvents {
     struct ev_loop *loop;
     int reading, writing;
     ev_io rev, wev;
+    pthread_mutex_t *mutex;
 } redisLibevEvents;
 
 static void redisLibevReadEvent(EV_P_ ev_io *watcher, int revents) {
@@ -20,7 +22,13 @@ static void redisLibevReadEvent(EV_P_ ev_io *watcher, int revents) {
     ((void)revents);
 
     redisLibevEvents *e = (redisLibevEvents*)watcher->data;
-    redisAsyncHandleRead(e->context);
+    if (e->mutex) {
+        pthread_mutex_lock(e->mutex);
+        redisAsyncHandleRead(e->context);
+        pthread_mutex_unlock(e->mutex);
+    } else {
+        redisAsyncHandleRead(e->context);
+    }
 }
 
 static void redisLibevWriteEvent(EV_P_ ev_io *watcher, int revents) {
@@ -30,7 +38,13 @@ static void redisLibevWriteEvent(EV_P_ ev_io *watcher, int revents) {
     ((void)revents);
 
     redisLibevEvents *e = (redisLibevEvents*)watcher->data;
-    redisAsyncHandleWrite(e->context);
+    if (e->mutex) {
+        pthread_mutex_lock(e->mutex);
+        redisAsyncHandleWrite(e->context);
+        pthread_mutex_unlock(e->mutex);
+    } else {
+        redisAsyncHandleWrite(e->context);
+    }
 }
 
 static void redisLibevAddRead(void *privdata) {
@@ -80,7 +94,7 @@ static void redisLibevCleanup(void *privdata) {
     free(e);
 }
 
-static int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
+static int redisLibevAttachThreaded(EV_P_ redisAsyncContext *ac, pthread_mutex_t *mutex) {
     redisContext *c = &(ac->c);
     redisLibevEvents *e;
 
@@ -99,6 +113,7 @@ static int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
     e->reading = e->writing = 0;
     e->rev.data = e;
     e->wev.data = e;
+    e->mutex = mutex;
 
     /* Register functions to start/stop listening for events */
     ac->ev.addRead = redisLibevAddRead;
@@ -113,5 +128,7 @@ static int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
     ev_io_init(&e->wev,redisLibevWriteEvent,c->fd,EV_WRITE);
     return REDIS_OK;
 }
+
+#define redisLibevAttach(EV_P_ ac) redisLibevAttachThreaded(EV_P_ ac, NULL)
 
 #endif

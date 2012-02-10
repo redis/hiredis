@@ -2,6 +2,7 @@
 #define __HIREDIS_AE_H__
 #include <sys/types.h>
 #include <ae.h>
+#include <pthread.h>
 #include "../hiredis.h"
 #include "../async.h"
 
@@ -10,20 +11,33 @@ typedef struct redisAeEvents {
     aeEventLoop *loop;
     int fd;
     int reading, writing;
+    pthread_mutex_t *mutex;
 } redisAeEvents;
 
 static void redisAeReadEvent(aeEventLoop *el, int fd, void *privdata, int mask) {
     ((void)el); ((void)fd); ((void)mask);
 
     redisAeEvents *e = (redisAeEvents*)privdata;
-    redisAsyncHandleRead(e->context);
+    if (e->mutex) {
+        pthread_mutex_lock(e->mutex);
+        redisAsyncHandleRead(e->context);
+        pthread_mutex_unlock(e->mutex);
+    } else {
+        redisAsyncHandleRead(e->context);
+    }
 }
 
 static void redisAeWriteEvent(aeEventLoop *el, int fd, void *privdata, int mask) {
     ((void)el); ((void)fd); ((void)mask);
 
     redisAeEvents *e = (redisAeEvents*)privdata;
-    redisAsyncHandleWrite(e->context);
+    if (e->mutex) {
+        pthread_mutex_lock(e->mutex);
+        redisAsyncHandleWrite(e->context);
+        pthread_mutex_unlock(e->mutex);
+    } else {
+        redisAsyncHandleWrite(e->context);
+    }
 }
 
 static void redisAeAddRead(void *privdata) {
@@ -69,7 +83,7 @@ static void redisAeCleanup(void *privdata) {
     free(e);
 }
 
-static int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
+static int redisAeAttachThreaded(aeEventLoop *loop, redisAsyncContext *ac, pthread_mutex_t *mutex) {
     redisContext *c = &(ac->c);
     redisAeEvents *e;
 
@@ -83,6 +97,7 @@ static int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
     e->loop = loop;
     e->fd = c->fd;
     e->reading = e->writing = 0;
+    e->mutex = mutex;
 
     /* Register functions to start/stop listening for events */
     ac->ev.addRead = redisAeAddRead;
@@ -94,4 +109,7 @@ static int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
 
     return REDIS_OK;
 }
+
+#define redisAeAttach(loop, ac) redisAeAttachThreaded(loop, ac, NULL)
+
 #endif
