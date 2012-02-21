@@ -136,7 +136,7 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
         FD_ZERO(&wfd);
         FD_SET(fd, &wfd);
 
-        if (select(FD_SETSIZE, NULL, &wfd, NULL, toptr) == -1) {
+        if (select(fd+1, NULL, &wfd, NULL, toptr) == -1) {
             __redisSetErrorFromErrno(c,REDIS_ERR_IO,"select(2)");
             close(fd);
             return REDIS_ERR;
