@@ -956,7 +956,11 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     pos = sprintf(cmd,"*%d\r\n",argc);
     for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
+#ifdef HIREDIS_WIN
+        pos += sprintf(cmd+pos,"$%d\r\n",len);	// fixed by gunoodaddy
+#else
         pos += sprintf(cmd+pos,"$%zu\r\n",len);
+#endif
         memcpy(cmd+pos,argv[j],len);
         pos += len;
         cmd[pos++] = '\r';
