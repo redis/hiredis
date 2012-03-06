@@ -101,6 +101,34 @@ void request_wait_read_cb(redis_request_queue *q, redis_request *r) {
     s->callc++;
 }
 
+static struct write_fn_s {
+    int callc;
+    struct {
+        redis_request_queue *q;
+    } *callv;
+} write_fn_calls = { .callc = 0, .callv = NULL };
+
+void write_fn_reset(void) {
+    struct write_fn_s *s = &write_fn_calls;
+
+    if (s->callc) {
+        free(s->callv);
+    }
+
+    s->callc = 0;
+    s->callv = NULL;
+}
+
+void write_fn(redis_request_queue *q) {
+    struct write_fn_s *s = &write_fn_calls;
+
+    s->callv = realloc(s->callv, sizeof(*s->callv) * (s->callc + 1));
+    assert(s->callv != NULL);
+
+    s->callv[s->callc].q = q;
+    s->callc++;
+}
+
 #define SETUP()                                                               \
     redis_request_queue q;                                                    \
     int rv;                                                                   \
@@ -108,13 +136,15 @@ void request_wait_read_cb(redis_request_queue *q, redis_request *r) {
     request_to_write_cb_reset();                                              \
     request_wait_write_cb_reset();                                            \
     request_wait_read_cb_reset();                                             \
+    write_fn_reset();                                                         \
                                                                               \
     rv = redis_request_queue_init(&q);                                        \
     assert_equal_return(rv, REDIS_OK);                                        \
                                                                               \
     q.request_to_write_cb = request_to_write_cb;                              \
     q.request_wait_write_cb = request_wait_write_cb;                          \
-    q.request_wait_read_cb = request_wait_read_cb;
+    q.request_wait_read_cb = request_wait_read_cb;                            \
+    q.write_fn = write_fn;
 
 #define TEARDOWN()                                                            \
     redis_request_queue_destroy(&q);
@@ -235,17 +265,17 @@ TEST(insert_request) {
     TEARDOWN();
 }
 
+#define INIT_REQUEST(_var, _str)                                              \
+    t1_redis_request (_var);                                                  \
+    t1_init(&(_var));                                                         \
+    (_var).buf = (_str);                                                      \
+    (_var).len = strlen((_var).buf);                                          \
+    (_var).emit = (_var).len;
+
 #define SETUP_INSERTED()                                                      \
     SETUP();                                                                  \
-    t1_redis_request req1, req2;                                              \
-    t1_init(&req1);                                                           \
-    t1_init(&req2);                                                           \
-    req1.buf = "hello";                                                       \
-    req1.len = strlen(req1.buf);                                              \
-    req1.emit = req1.len;                                                     \
-    req2.buf = "world";                                                       \
-    req2.len = strlen(req2.buf);                                              \
-    req2.emit = req2.len;                                                     \
+    INIT_REQUEST(req1, "hello");                                              \
+    INIT_REQUEST(req2, "world");                                              \
     redis_request_queue_insert(&q, (redis_request*)&req1);                    \
     redis_request_queue_insert(&q, (redis_request*)&req2);                    \
 
@@ -457,6 +487,50 @@ TEST(read_cb_with_pending_write_ptr_emit) {
     TEARDOWN();
 }
 
+TEST(write_fn_call_on_first_insert) {
+    SETUP();
+
+    INIT_REQUEST(req, "hello");
+
+    redis_request_queue_insert(&q, (redis_request*)&req);
+
+    /* Test that the write fn was called */
+    assert_equal_int(write_fn_calls.callc, 1);
+    assert(write_fn_calls.callv[0].q == &q);
+
+    TEARDOWN();
+}
+
+TEST(write_fn_no_call_on_second_insert) {
+    SETUP();
+
+    INIT_REQUEST(req1, "hello");
+    INIT_REQUEST(req2, "world");
+
+    redis_request_queue_insert(&q, (redis_request*)&req1);
+    redis_request_queue_insert(&q, (redis_request*)&req2);
+
+    /* Test that the write fn wasn't called twice */
+    assert_equal_int(write_fn_calls.callc, 1);
+    assert(write_fn_calls.callv[0].q == &q);
+
+    TEARDOWN();
+}
+
+TEST(write_fn_call_after_drain) {
+    SETUP_WRITTEN_CONFIRMED();
+
+    INIT_REQUEST(reqN, "hi");
+
+    redis_request_queue_insert(&q, (redis_request*)&reqN);
+
+    /* Test that the write fn was called */
+    assert_equal_int(write_fn_calls.callc, 2);
+    assert(write_fn_calls.callv[0].q == &q);
+
+    TEARDOWN();
+}
+
 int main(void) {
     test_insert_request();
     test_write_ptr();
@@ -464,4 +538,7 @@ int main(void) {
     test_read_cb();
     test_read_cb_with_parse_error();
     test_read_cb_with_pending_write_ptr_emit();
+    test_write_fn_call_on_first_insert();
+    test_write_fn_no_call_on_second_insert();
+    test_write_fn_call_after_drain();
 }

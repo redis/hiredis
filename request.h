@@ -103,7 +103,26 @@ typedef void (redis_request_queue_wait_write_cb)(redis_request_queue *self,
 typedef void (redis_request_queue_wait_read_cb)(redis_request_queue *self,
                                                 redis_request *request);
 
+/*
+ * This type of function is called when I/O needs to happen. All requests that
+ * a request queue takes in eventually need to be written to a socket. When a
+ * request is inserted while the I/O library was not yet busy draining the
+ * queue of requests to write, one of the I/O functions will be called to
+ * _kickstart_ writes. After the kickstart the I/O library is supposed to
+ * continue writing until it no longer can retrieve `char *`'s to write. After
+ * that, it should be kickstarted by user code when user code stopped emitting
+ * `char*`'s, or is automatically kickstarted when the queue of requests to
+ * write was drained.
+ *
+ * Arguments:
+ *  self      request queue
+ */
+
+typedef void (redis_request_queue_io_fn)(redis_request_queue *self);
+
 struct redis_request_queue_s {
+    size_t pending_writes;
+
     ngx_queue_t request_to_write;
     ngx_queue_t request_wait_write;
     ngx_queue_t request_wait_read;
@@ -113,6 +132,10 @@ struct redis_request_queue_s {
     redis_request_queue_wait_write_cb *request_wait_write_cb;
     redis_request_queue_wait_read_cb *request_wait_read_cb;
 
+    redis_request_queue_io_fn *write_fn;
+    redis_request_queue_io_fn *start_read_fn;
+    redis_request_queue_io_fn *stop_read_fn;
+
     void *data;
 };
 
@@ -121,6 +144,10 @@ void redis_request_destroy(redis_request *self);
 
 int redis_request_queue_init(redis_request_queue *self);
 int redis_request_queue_destroy(redis_request_queue *self);
+
+void redis_request_queue_start_write(redis_request_queue *self);
+void redis_request_queue_start_read(redis_request_queue *self);
+void redis_request_queue_stop_read(redis_request_queue *self);
 
 void redis_request_queue_insert(redis_request_queue *self, redis_request *request);
 int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, size_t *len);

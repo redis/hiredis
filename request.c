@@ -53,12 +53,36 @@ int redis_request_queue_destroy(redis_request_queue *self) {
     return REDIS_OK;
 }
 
+void redis_request_queue_write(redis_request_queue *self) {
+    if (self->write_fn) {
+        self->write_fn(self);
+    }
+}
+
+void redis_request_queue_start_read(redis_request_queue *self) {
+    if (self->start_read_fn) {
+        self->start_read_fn(self);
+    }
+}
+
+void redis_request_queue_stop_read(redis_request_queue *self) {
+    if (self->stop_read_fn) {
+        self->stop_read_fn(self);
+    }
+}
+
 void redis_request_queue_insert(redis_request_queue *self, redis_request *request) {
     request->request_queue = self;
     ngx_queue_insert_head(&self->request_to_write, &request->wq);
 
     if (self->request_to_write_cb) {
         self->request_to_write_cb(self, request);
+    }
+
+    /* Kickstart writes when this is the first pending write */
+    self->pending_writes++;
+    if (self->pending_writes == 1) {
+        redis_request_queue_write(self);
     }
 }
 
@@ -95,6 +119,7 @@ int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, s
 
     if (done) {
         req->write_ptr_done = 1;
+        self->pending_writes--;
     }
 
     return 0;
