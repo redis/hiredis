@@ -27,16 +27,6 @@ int redis_request_queue_init(redis_request_queue *self) {
     return REDIS_OK;
 }
 
-void redis__free_queue(ngx_queue_t *h) {
-    ngx_queue_t *q;
-    redis_request *req;
-
-    ngx_queue_foreach(q, h) {
-        req = ngx_queue_data(q, redis_request, rq);
-        redis_request_destroy(req);
-    }
-}
-
 int redis_request_queue_destroy(redis_request_queue *self) {
     ngx_queue_t *q;
     redis_request *req;
