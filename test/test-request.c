@@ -389,6 +389,40 @@ TEST(write_cb) {
     TEARDOWN();
 }
 
+TEST(write_cb_skip_empty) {
+    SETUP_INSERTED("", "hello");
+    SETUP_DRAIN_WRITE_PTR();
+
+    /* Assume 1 byte was written ("h") */
+    rv = redis_request_queue_write_cb(&q, 1);
+    assert_equal_size_t(rv, 0);
+    assert_equal_size_t(req1.nwritten, 0);
+    assert_equal_size_t(req2.nwritten, 1);
+    assert(req1.write_cb_done == 1);
+    assert(req2.write_cb_done == 0);
+
+    /* Both requests should have moved to the wait_read queue now */
+    assert_equal_int(request_wait_read_cb_calls.callc, 2);
+    assert(request_wait_read_cb_calls.callv[0].q == &q);
+    assert(request_wait_read_cb_calls.callv[0].r == (redis_request*)&req1);
+    assert(request_wait_read_cb_calls.callv[1].q == &q);
+    assert(request_wait_read_cb_calls.callv[1].r == (redis_request*)&req2);
+
+    /* Run callback for remaining bytes */
+    rv = redis_request_queue_write_cb(&q, 4);
+    assert_equal_size_t(rv, 0);
+    assert_equal_size_t(req1.nwritten, 0);
+    assert_equal_size_t(req2.nwritten, 5);
+    assert(req1.write_cb_done == 1);
+    assert(req2.write_cb_done == 1);
+
+    /* More bytes cannot be mapped to requests... */
+    rv = redis_request_queue_write_cb(&q, 4);
+    assert_equal_size_t(rv, -1);
+
+    TEARDOWN();
+}
+
 #define SETUP_WRITTEN_CONFIRMED()                                             \
     SETUP_WRITTEN_UNCONFIRMED();                                              \
     rv = redis_request_queue_write_cb(&q, req1.len);                          \
@@ -545,6 +579,7 @@ int main(void) {
     test_write_ptr();
     test_write_ptr_skip_empty();
     test_write_cb();
+    test_write_cb_skip_empty();
     test_read_cb();
     test_read_cb_with_parse_error();
     test_read_cb_with_pending_write_ptr_emit();
