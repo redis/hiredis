@@ -85,7 +85,7 @@ int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, s
         ngx_queue_remove(q);
         ngx_queue_insert_head(&self->request_wait_write, q);
 
-        if (req && self->request_wait_write_cb) {
+        if (self->request_wait_write_cb) {
             self->request_wait_write_cb(self, req);
         }
     }
@@ -118,7 +118,7 @@ int redis_request_queue_write_cb(redis_request_queue *self, size_t len) {
         if (ngx_queue_empty(&req->rq)) {
             ngx_queue_insert_head(&self->request_wait_read, &req->rq);
 
-            if (req && self->request_wait_read_cb) {
+            if (self->request_wait_read_cb) {
                 self->request_wait_read_cb(self, req);
             }
         }
