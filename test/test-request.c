@@ -260,15 +260,15 @@ TEST(insert_request) {
     (_var).len = strlen((_var).buf);                                          \
     (_var).emit = (_var).len;
 
-#define SETUP_INSERTED()                                                      \
+#define SETUP_INSERTED(_var1, _var2)                                          \
     SETUP();                                                                  \
-    INIT_REQUEST(req1, "hello");                                              \
-    INIT_REQUEST(req2, "world");                                              \
+    INIT_REQUEST(req1, (_var1));                                              \
+    INIT_REQUEST(req2, (_var2));                                              \
     redis_request_queue_insert(&q, (redis_request*)&req1);                    \
     redis_request_queue_insert(&q, (redis_request*)&req2);                    \
 
 TEST(write_ptr) {
-    SETUP_INSERTED();
+    SETUP_INSERTED("hello", "world");
 
     const char *buf;
     size_t len;
@@ -317,13 +317,7 @@ TEST(write_ptr) {
 }
 
 TEST(write_ptr_skip_empty) {
-    SETUP();
-
-    INIT_REQUEST(req1, "");
-    INIT_REQUEST(req2, "hello");
-
-    redis_request_queue_insert(&q, (redis_request*)&req1);
-    redis_request_queue_insert(&q, (redis_request*)&req2);
+    SETUP_INSERTED("", "hello");
 
     const char *buf;
     size_t len;
@@ -340,13 +334,16 @@ TEST(write_ptr_skip_empty) {
     TEARDOWN();
 }
 
-#define SETUP_WRITTEN_UNCONFIRMED()                                           \
-    SETUP_INSERTED();                                                         \
+#define SETUP_DRAIN_WRITE_PTR()                                               \
     do {                                                                      \
         const char *buf;                                                      \
         size_t len;                                                           \
         rv = redis_request_queue_write_ptr(&q, &buf, &len);                   \
     } while (rv == 0);
+
+#define SETUP_WRITTEN_UNCONFIRMED()                                           \
+    SETUP_INSERTED("hello", "world");                                         \
+    SETUP_DRAIN_WRITE_PTR();
 
 TEST(write_cb) {
     SETUP_WRITTEN_UNCONFIRMED();
@@ -456,7 +453,7 @@ TEST(read_cb_with_parse_error) {
 }
 
 TEST(read_cb_with_pending_write_ptr_emit) {
-    SETUP_INSERTED();
+    SETUP_INSERTED("hello", "world");
 
     const char *buf;
     size_t len;
