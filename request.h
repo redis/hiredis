@@ -29,14 +29,8 @@ typedef void (redis_request_write_ptr)(redis_request *self,
  * Arguments:
  *  self      the request as previously inserted in the queue
  *  n         the number of bytes written
- *  done      set to non-zero by the request when it has been written in full
- *
- * Return:
- *  the number of bytes (<= n) actually used
  */
-typedef int (redis_request_write_cb)(redis_request *self,
-                                     int n,
-                                     int *done);
+typedef void (redis_request_write_cb)(redis_request *self, int n);
 
 /*
  * Let the request know the wire-level data that was fed to the parser on its
@@ -71,6 +65,9 @@ typedef void (redis_request_free)(redis_request *self);
     unsigned write_ptr_done:1;                                                \
     unsigned write_cb_done:1;                                                 \
     unsigned read_cb_done:1;                                                  \
+    size_t write_ptr_len;                                                     \
+    size_t write_cb_len;                                                      \
+    size_t read_cb_len;                                                       \
     redis_request_write_ptr *write_ptr;                                       \
     redis_request_write_cb *write_cb;                                         \
     redis_request_read_cb *read_cb;                                           \

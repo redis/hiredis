@@ -126,6 +126,7 @@ int redis_request_queue_write_ptr(redis_request_queue *self, const char **dstbuf
 
         assert(req->write_ptr);
         req->write_ptr(req, &buf, &len, &done);
+        req->write_ptr_len += len;
 
         if (done) {
             req->write_ptr_done = 1;
@@ -142,7 +143,7 @@ int redis_request_queue_write_ptr(redis_request_queue *self, const char **dstbuf
 int redis_request_queue_write_cb(redis_request_queue *self, size_t len) {
     ngx_queue_t *q = NULL;
     redis_request *req = NULL;
-    int nwritten, done;
+    size_t nwritten;
 
     while (len) {
         if (ngx_queue_empty(&self->request_wait_write)) {
@@ -151,7 +152,6 @@ int redis_request_queue_write_cb(redis_request_queue *self, size_t len) {
 
         q = ngx_queue_last(&self->request_wait_write);
         req = ngx_queue_data(q, redis_request, wq);
-        done = 0;
 
         /* Add this request to `wait_read` if necessary */
         if (ngx_queue_empty(&req->rq)) {
@@ -162,23 +162,23 @@ int redis_request_queue_write_cb(redis_request_queue *self, size_t len) {
             }
         }
 
-        assert(req->write_cb);
-        nwritten = req->write_cb(req, len, &done);
-
-        /* Abort on error */
-        if (nwritten < 0) {
-            return nwritten;
+        nwritten = req->write_ptr_len - req->write_cb_len;
+        if (nwritten > len) {
+            nwritten = len;
         }
 
-        assert((unsigned)nwritten <= len);
-        len -= nwritten;
+        assert(req->write_cb);
+        req->write_cb(req, nwritten);
+        req->write_cb_len += nwritten;
 
         /* Remove this request from `wait_write` when done writing */
-        if (done) {
+        if (req->write_ptr_done && req->write_ptr_len == req->write_cb_len) {
             ngx_queue_remove(q);
             ngx_queue_init(q);
             req->write_cb_done = 1;
         }
+
+        len -= nwritten;
     }
 
     return 0;
@@ -208,6 +208,7 @@ int redis_request_queue_read_cb(redis_request_queue *self, const char *buf, size
 
         assert(req->read_cb);
         req->read_cb(req, p, buf, nparsed, &done);
+        req->read_cb_len += nparsed;
 
         /* Request cannot be done on partial reply */
         assert(p || !done);
