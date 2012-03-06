@@ -4,6 +4,7 @@
 
 #include "handle.h" /* return values */
 #include "request.h"
+#include "object.h" /* default parser callbacks */
 
 int redis_request_init(redis_request *self) {
     memset(self, 0, sizeof(*self));
@@ -23,7 +24,7 @@ int redis_request_queue_init(redis_request_queue *self) {
     ngx_queue_init(&self->request_to_write);
     ngx_queue_init(&self->request_wait_write);
     ngx_queue_init(&self->request_wait_read);
-    redis_parser_init(&self->parser, NULL);
+    redis_parser_init(&self->parser, &redis_object_parser_callbacks);
     return REDIS_OK;
 }
 
