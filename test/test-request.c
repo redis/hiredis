@@ -206,18 +206,8 @@ int t1_write_cb(redis_request *_self, int n, int *done) {
     return to_write;
 }
 
-int t1_read_cb(redis_request *_self, const char *buf, size_t len, int *done) {
+void t1_read_cb(redis_request *_self, redis_protocol *p, const char *buf, size_t len, int *done) {
     t1_redis_request *self = (t1_redis_request*)_self;
-    redis_protocol *p = NULL;
-    size_t nparsed;
-
-    nparsed = redis_parser_execute(&self->request_queue->parser, &p, buf, len);
-
-    /* Test for parse error */
-    if (nparsed < len && p == NULL) {
-        errno = redis_parser_err(&self->request_queue->parser);
-        return REDIS_EPARSER;
-    }
 
     if (p != NULL) {
         self->reply = p;
@@ -225,9 +215,7 @@ int t1_read_cb(redis_request *_self, const char *buf, size_t len, int *done) {
     }
 
     self->read_raw_buf = buf;
-    self->read_raw_len = nparsed;
-
-    return nparsed;
+    self->read_raw_len = len;
 }
 
 void t1_free(redis_request *_self) {

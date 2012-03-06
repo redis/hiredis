@@ -173,7 +173,9 @@ int redis_request_queue_write_cb(redis_request_queue *self, size_t len) {
 int redis_request_queue_read_cb(redis_request_queue *self, const char *buf, size_t len) {
     ngx_queue_t *q = NULL;
     redis_request *req = NULL;
-    int nread, done;
+    redis_protocol *p = NULL;
+    size_t nparsed = 0;
+    int done;
 
     while (len) {
         if (ngx_queue_empty(&self->request_wait_read)) {
@@ -184,17 +186,21 @@ int redis_request_queue_read_cb(redis_request_queue *self, const char *buf, size
         req = ngx_queue_data(q, redis_request, rq);
         done = 0;
 
-        assert(req->read_cb);
-        nread = req->read_cb(req, buf, len, &done);
-
-        /* Abort on error */
-        if (nread < 0) {
-            return nread;
+        nparsed = redis_parser_execute(&self->parser, &p, buf, len);
+        if (nparsed < len && p == NULL) {
+            errno = redis_parser_err(&self->parser);
+            return REDIS_EPARSER;
         }
 
-        assert((unsigned)nread <= len);
-        buf += nread;
-        len -= nread;
+        assert(req->read_cb);
+        req->read_cb(req, p, buf, nparsed, &done);
+
+        /* Request cannot be done on partial reply */
+        assert(p || !done);
+
+        /* Update buffer */
+        buf += nparsed;
+        len -= nparsed;
 
         /* Remove this request from `wait_read` when done reading */
         if (done) {

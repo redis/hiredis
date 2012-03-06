@@ -48,14 +48,12 @@ typedef int (redis_request_write_cb)(redis_request *self,
  *  buf       buffer with reply data
  *  len       length of buffer with reply data
  *  done      set to non-zero by the request when it has been read in full
- *
- * Return:
- *  the number of bytes (<= n) actually used
  */
-typedef int (redis_request_read_cb)(redis_request *self,
-                                    const char *buf,
-                                    size_t len,
-                                    int *done);
+typedef void (redis_request_read_cb)(redis_request *self,
+                                     redis_protocol *p,
+                                     const char *buf,
+                                     size_t len,
+                                     int *done);
 
 /*
  * Free the request. This function is called after the last reply has been
@@ -126,7 +124,6 @@ struct redis_request_queue_s {
     ngx_queue_t request_to_write;
     ngx_queue_t request_wait_write;
     ngx_queue_t request_wait_read;
-    redis_parser parser;
 
     redis_request_queue_to_write_cb *request_to_write_cb;
     redis_request_queue_wait_write_cb *request_wait_write_cb;
@@ -135,6 +132,8 @@ struct redis_request_queue_s {
     redis_request_queue_io_fn *write_fn;
     redis_request_queue_io_fn *start_read_fn;
     redis_request_queue_io_fn *stop_read_fn;
+
+    redis_parser parser;
 
     void *data;
 };
