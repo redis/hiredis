@@ -172,7 +172,7 @@ void t1_write_ptr(redis_request *_self, const char **buf, size_t *len, int *done
     t1_redis_request *self = (t1_redis_request*)_self;
     size_t to_emit;
 
-    assert(self->nemitted < self->len);
+    assert(self->nemitted <= self->len);
 
     to_emit = self->len - self->nemitted;
     if (to_emit > self->emit) {
@@ -312,6 +312,30 @@ TEST(write_ptr) {
 
     rv = redis_request_queue_write_ptr(&q, &buf, &len);
     assert_equal_size_t(rv, -1);
+
+    TEARDOWN();
+}
+
+TEST(write_ptr_skip_empty) {
+    SETUP();
+
+    INIT_REQUEST(req1, "");
+    INIT_REQUEST(req2, "hello");
+
+    redis_request_queue_insert(&q, (redis_request*)&req1);
+    redis_request_queue_insert(&q, (redis_request*)&req2);
+
+    const char *buf;
+    size_t len;
+
+    rv = redis_request_queue_write_ptr(&q, &buf, &len);
+    assert_equal_size_t(rv, 0);
+    assert_equal_size_t(len, 5);
+    assert(strncmp(buf, "hello", len) == 0);
+
+    /* Both req1 and req2 should be marked as done */
+    assert(req1.write_ptr_done == 1);
+    assert(req2.write_ptr_done == 1);
 
     TEARDOWN();
 }
@@ -522,6 +546,7 @@ TEST(write_fn_call_after_drain) {
 int main(void) {
     test_insert_request();
     test_write_ptr();
+    test_write_ptr_skip_empty();
     test_write_cb();
     test_read_cb();
     test_read_cb_with_parse_error();

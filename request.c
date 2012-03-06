@@ -87,9 +87,11 @@ void redis_request_queue_insert(redis_request_queue *self, redis_request *reques
     }
 }
 
-int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, size_t *len) {
+int redis_request_queue_write_ptr(redis_request_queue *self, const char **dstbuf, size_t *dstlen) {
     ngx_queue_t *q = NULL;
     redis_request *req = NULL;
+    const char *buf = NULL;
+    size_t len = 0;
     int done = 0;
 
     if (!ngx_queue_empty(&self->request_wait_write)) {
@@ -97,31 +99,42 @@ int redis_request_queue_write_ptr(redis_request_queue *self, const char **buf, s
         req = ngx_queue_data(q, redis_request, wq);
     }
 
-    /* We need one non-done request in the wait_write queue */
-    while (req == NULL || req->write_ptr_done) {
-        if (ngx_queue_empty(&self->request_to_write)) {
-            return -1;
+    /* Continue until write_ptr returned a non-empty buffer */
+    while (len == 0) {
+
+        /* Make sure that `req` is assigned a non-done request */
+        if (req == NULL || req->write_ptr_done) {
+            if (ngx_queue_empty(&self->request_to_write)) {
+                return -1;
+            }
+
+            q = ngx_queue_last(&self->request_to_write);
+            req = ngx_queue_data(q, redis_request, wq);
+
+            /* Remove from tail of `to_write`, insert on head of `wait_write` */
+            ngx_queue_remove(q);
+            ngx_queue_insert_head(&self->request_wait_write, q);
+
+            if (self->request_wait_write_cb) {
+                self->request_wait_write_cb(self, req);
+            }
         }
 
-        q = ngx_queue_last(&self->request_to_write);
-        req = ngx_queue_data(q, redis_request, wq);
+        buf = NULL;
+        len = 0;
+        done = 0;
 
-        /* Remove from tail of `to_write`, insert on head of `wait_write` */
-        ngx_queue_remove(q);
-        ngx_queue_insert_head(&self->request_wait_write, q);
+        assert(req->write_ptr);
+        req->write_ptr(req, &buf, &len, &done);
 
-        if (self->request_wait_write_cb) {
-            self->request_wait_write_cb(self, req);
+        if (done) {
+            req->write_ptr_done = 1;
+            self->pending_writes--;
         }
     }
 
-    assert(req->write_ptr);
-    req->write_ptr(req, buf, len, &done);
-
-    if (done) {
-        req->write_ptr_done = 1;
-        self->pending_writes--;
-    }
+    *dstbuf = buf;
+    *dstlen = len;
 
     return 0;
 }
