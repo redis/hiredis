@@ -96,12 +96,12 @@ struct redis_request_s {
  *  self      request queue
  *  request   request that was moved to a new queue
  */
-typedef void (request_queue_to_write_cb)(redis_request_queue *self,
-                                         redis_request *request);
-typedef void (request_queue_wait_write_cb)(redis_request_queue *self,
-                                           redis_request *request);
-typedef void (request_queue_wait_read_cb)(redis_request_queue *self,
-                                          redis_request *request);
+typedef void (redis_request_queue_to_write_cb)(redis_request_queue *self,
+                                               redis_request *request);
+typedef void (redis_request_queue_wait_write_cb)(redis_request_queue *self,
+                                                 redis_request *request);
+typedef void (redis_request_queue_wait_read_cb)(redis_request_queue *self,
+                                                redis_request *request);
 
 struct redis_request_queue_s {
     ngx_queue_t request_to_write;
@@ -109,9 +109,9 @@ struct redis_request_queue_s {
     ngx_queue_t request_wait_read;
     redis_parser parser;
 
-    request_queue_to_write_cb *request_to_write_cb;
-    request_queue_wait_write_cb *request_wait_write_cb;
-    request_queue_wait_read_cb *request_wait_read_cb;
+    redis_request_queue_to_write_cb *request_to_write_cb;
+    redis_request_queue_wait_write_cb *request_wait_write_cb;
+    redis_request_queue_wait_read_cb *request_wait_read_cb;
 
     void *data;
 };
