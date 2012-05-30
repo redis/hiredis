@@ -173,12 +173,12 @@ typedef struct redisContext {
 } redisContext;
 
 redisContext *redisConnect(const char *ip, int port);
-redisContext *redisConnectWithTimeout(const char *ip, int port, struct timeval tv);
+redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
 redisContext *redisConnectUnix(const char *path);
-redisContext *redisConnectUnixWithTimeout(const char *path, struct timeval tv);
+redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
-int redisSetTimeout(redisContext *c, struct timeval tv);
+int redisSetTimeout(redisContext *c, const struct timeval tv);
 int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
