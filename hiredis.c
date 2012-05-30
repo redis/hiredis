@@ -1019,7 +1019,7 @@ redisContext *redisConnect(const char *ip, int port) {
     return c;
 }
 
-redisContext *redisConnectWithTimeout(const char *ip, int port, struct timeval tv) {
+redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv) {
     redisContext *c = redisContextInit();
     c->flags |= REDIS_BLOCK;
     redisContextConnectTcp(c,ip,port,&tv);
@@ -1040,7 +1040,7 @@ redisContext *redisConnectUnix(const char *path) {
     return c;
 }
 
-redisContext *redisConnectUnixWithTimeout(const char *path, struct timeval tv) {
+redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv) {
     redisContext *c = redisContextInit();
     c->flags |= REDIS_BLOCK;
     redisContextConnectUnix(c,path,&tv);
@@ -1055,7 +1055,7 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
 }
 
 /* Set read/write timeout on a blocking socket. */
-int redisSetTimeout(redisContext *c, struct timeval tv) {
+int redisSetTimeout(redisContext *c, const struct timeval tv) {
     if (c->flags & REDIS_BLOCK)
         return redisContextSetTimeout(c,tv);
     return REDIS_ERR;
