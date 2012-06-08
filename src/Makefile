@@ -28,7 +28,7 @@ dynamic: $(DYLIBNAME)
 static: $(STLIBNAME)
 
 .c.o:
-	$(CC) $(FINAL_CFLAGS) -c $<
+	$(HIREDIS_CC) -c $<
 
 clean:
 	rm -rf $(DYLIBNAME) $(STLIBNAME) *.o
@@ -36,4 +36,4 @@ clean:
 -include ./Makefile.dep
 
 dep:
-	$(CC) -MM *.c > Makefile.dep
+	$(HIREDIS_CC) -MM *.c > Makefile.dep

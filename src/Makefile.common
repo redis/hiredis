@@ -17,15 +17,19 @@ WARN= -Wall -W -Wstrict-prototypes -Wwrite-strings -Wno-unused-label
 OPT= -O3
 FINAL_CFLAGS= $(STD) $(WARN) $(OPT) $(DEBUG) -fPIC $(CFLAGS) $(HIREDIS_CFLAGS)
 FINAL_LDFLAGS= $(DEBUG) $(LDFLAGS) $(HIREDIS_LDFLAGS)
+FINAL_LIBS= $(HIREDIS_LIBS)
 DEBUG= -g -ggdb
+HIREDIS_CC= $(CC) $(FINAL_CFLAGS)
+HIREDIS_LD= $(CC) $(FINAL_LDFLAGS)
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 
 # SunOS overrides
 ifeq ($(uname_S),SunOS)
   HIREDIS_CFLAGS= -D__EXTENSIONS__ -D_XPG6
-  HIREDIS_LDFLAGS= -ldl -lnsl -lsocket
-  DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
+  HIREDIS_LDFLAGS=
+  HIREDIS_LIBS= -ldl -lnsl -lsocket
+  DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(FINAL_LDFLAGS) $(FINAL_LIBS)
   INSTALL= cp -r
 endif
 
@@ -34,5 +38,5 @@ ifeq ($(uname_S),Darwin)
   DYLIBSUFFIX= dylib
   DYLIB_MINOR_NAME= $(LIBNAME).$(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(DYLIBSUFFIX)
   DYLIB_MAJOR_NAME= $(LIBNAME).$(HIREDIS_MAJOR).$(DYLIBSUFFIX)
-  DYLIB_MAKE_CMD= $(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(FINAL_LDFLAGS)
+  DYLIB_MAKE_CMD= $(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(FINAL_LDFLAGS) $(FINAL_LIBS)
 endif
