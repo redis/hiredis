@@ -1,18 +1,23 @@
-include ../Makefile.common
+include ../src/Makefile.common
+
+STD= -std=c99 -pedantic
+OPT= -O0
+WARN= -Wall -W
+HIREDIS_CFLAGS+= -I../src
 
 TESTS=test-format test-parser test-object test-handle test-context test-request
 OBJ=spawn.o net-helper.o
 
 all: $(TESTS)
 
-../$(STLIBNAME):
+../src/$(STLIBNAME):
 	cd .. && $(MAKE) $(STLIBNAME)
 
-test-%: test-%.o $(OBJ) ../$(STLIBNAME)
-	$(CC) -o $@ $(REAL_LDFLAGS) $^
+test-%: test-%.o $(OBJ) ../src/$(STLIBNAME)
+	$(HIREDIS_LD) -o $@ $^ $(FINAL_LIBS)
 
 .c.o:
-	$(CC) -std=c99 -pedantic -c -O0 $(REAL_CFLAGS) $<
+	$(HIREDIS_CC) -c $<
 
 clean:
 	rm -f *.o $(TESTS)
@@ -20,6 +25,6 @@ clean:
 -include ./Makefile.dep
 
 dep:
-	$(CC) -MM *.c > Makefile.dep
+	$(HIREDIS_CC) -MM *.c > Makefile.dep
 
 .PHONY: all clean dep

@@ -1,4 +1,4 @@
-#include "../fmacros.h"
+#include "fmacros.h"
 
 /* misc */
 #include <stdlib.h>
@@ -7,8 +7,8 @@
 
 /* local */
 #include "test-helper.h"
-#include "../parser.h"
-#include "../object.h"
+#include "parser.h"
+#include "object.h"
 
 void test_string(redis_parser *parser) {
     const char *buf = "$5\r\nhello\r\n";

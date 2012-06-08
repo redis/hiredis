@@ -1,4 +1,4 @@
-#include "../fmacros.h"
+#include "fmacros.h"
 
 /* misc */
 #include <stdlib.h>
@@ -16,7 +16,7 @@
 #include <netdb.h>
 
 /* local */
-#include "../handle.h"
+#include "handle.h"
 #include "test-helper.h"
 
 TEST(connect_in_refused) {

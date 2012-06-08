@@ -1,4 +1,4 @@
-#include "../fmacros.h"
+#include "fmacros.h"
 
 /* misc */
 #include <stdlib.h>
@@ -8,7 +8,7 @@
 #include <errno.h>
 
 /* local */
-#include "../request.h"
+#include "request.h"
 #include "test-helper.h"
 
 static struct request_to_write_cb_s {

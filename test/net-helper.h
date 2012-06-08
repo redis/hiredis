@@ -1,7 +1,7 @@
 #ifndef TEST_NET_HELPER
 #define TEST_NET_HELPER 1
 
-#include "../handle.h"
+#include "handle.h"
 
 typedef struct run_server_args_s run_server_args;
 
