@@ -1,4 +1,4 @@
-#include "../fmacros.h"
+#include "fmacros.h"
 
 /* misc */
 #include <stdlib.h>
@@ -8,8 +8,8 @@
 
 /* local */
 #include "test-helper.h"
-#include "../parser.h"
-#include "../sds.h"
+#include "parser.h"
+#include "sds.h"
 
 typedef struct log_entry_s log_entry_t;
 

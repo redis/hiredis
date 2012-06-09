@@ -1,4 +1,4 @@
-#include "../fmacros.h"
+#include "fmacros.h"
 
 /* misc */
 #include <stdlib.h>
@@ -19,8 +19,8 @@
 #include <unistd.h>
 
 /* local */
-#include "../context.h"
-#include "../object.h"
+#include "context.h"
+#include "object.h"
 #include "test-helper.h"
 #include "net-helper.h"
 

@@ -15,7 +15,7 @@
 
 /* local */
 #include "spawn.h"
-#include "../handle.h"
+#include "handle.h"
 
 #ifdef __GNUC__
 #define UNUSED __attribute__ ((unused))

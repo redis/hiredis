@@ -1,4 +1,4 @@
-#include "../fmacros.h"
+#include "fmacros.h"
 
 /* misc */
 #include <stdlib.h>
@@ -7,7 +7,7 @@
 #include <assert.h>
 
 /* local */
-#include "../format.h"
+#include "format.h"
 #include "test-helper.h"
 
 #define SETUP()                                                                \
