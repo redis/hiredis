@@ -241,22 +241,32 @@ instantly return if the specified host and port is able to accept a connection.
         // handle error
     }
 
-The asynchronous context can hold a disconnect callback function that is called when the
-connection is disconnected (either because of an error or per user request). This function should
-have the following prototype:
+The asynchronous context can hold a connect callback and a disconnect callback function.
+The connect callback is called when the connection was successfully established, or when there was
+an error in the process of connecting. The disconnect callback is called when the connection was
+disconnected (either because of an error or per user request). This functions should have the
+following prototype:
 
     void(const redisAsyncContext *c, int status);
 
-On a disconnect, the `status` argument is set to `REDIS_OK` when disconnection was initiated by the
-user, or `REDIS_ERR` when the disconnection was caused by an error. When it is `REDIS_ERR`, the `err`
-field in the context can be accessed to find out the cause of the error.
+On a connection the `status` argument is set to `REDIS_OK` when there are no connection errors.
+When it is set to `REDIS_ERR` it signals that there was an error during the connection
+(the error can be accessed using the `err` field of the context).
 
-The context object is always free'd after the disconnect callback fired. When a reconnect is needed,
-the disconnect callback is a good point to do so.
+On a disconnection, the `status` argument is set to `REDIS_OK` when the disconnection was initiated
+by the user, or `REDIS_ERR` when the disconnection was caused by an error. When it is `REDIS_ERR`, the
+`err` field in the context can be accessed to find out the cause of the error.
 
-Setting the disconnect callback can only be done once per context. For subsequent calls it will
-return `REDIS_ERR`. The function to set the disconnect callback has the following prototype:
+**Note**: On connection errors only the connect callback is called (with `REDIS_ERR` as status), while
+the diconnect callback is not called because the context actually never established the connection.
 
+The context object is always freed after the disconnect callback (or the connection callback
+signaling an error) fired. When a reconnect is needed, the disconnect callback is a good point to do so.
+
+Setting the connect or disconnect callback can only be done once per context. For subsequent calls it
+will return `REDIS_ERR`. The functions to set the callbacks have the following prototypes:
+
+    int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
     int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 
 ### Sending commands and their callbacks
@@ -289,7 +299,9 @@ If the reply for a command with a `NULL` callback is read, it is immediately fre
 for a command is non-`NULL`, the memory is free'd immediately following the callback: the reply is only
 valid for the duration of the callback.
 
-All pending callbacks are called with a `NULL` reply when the context encountered an error.
+All pending callbacks are called with a `NULL` reply when the context encountered an error, so you can
+assume that for every asynchronous command sent there is always a callback called (possibly with a NULL
+reply object).
 
 ### Disconnecting
 
@@ -302,6 +314,14 @@ commands are no longer accepted and the connection is only terminated when all p
 have been written to the socket, their respective replies have been read and their respective
 callbacks have been executed. After this, the disconnection callback is executed with the
 `REDIS_OK` status and the context object is free'd.
+
+It is also possible to perform an *hard* disconnection that does not wait for pending commands
+using the following function:
+
+    void redisAsyncFree(redisAsyncContext *ac);
+
+This function immediately terminates the connection, calls all the pending callbacks, and
+frees the context.
 
 ### Hooking it up to event library *X*
 
