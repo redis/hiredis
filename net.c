@@ -192,7 +192,7 @@ int redisCheckSocketError(redisContext *c, int fd) {
     return REDIS_OK;
 }
 
-int redisContextSetTimeout(redisContext *c, struct timeval tv) {
+int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
     if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(SO_RCVTIMEO)");
         return REDIS_ERR;
@@ -204,7 +204,7 @@ int redisContextSetTimeout(redisContext *c, struct timeval tv) {
     return REDIS_OK;
 }
 
-int redisContextConnectTcp(redisContext *c, const char *addr, int port, struct timeval *timeout) {
+int redisContextConnectTcp(redisContext *c, const char *addr, int port, const struct timeval *timeout) {
     int s, rv;
     char _port[6];  /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *p;
@@ -260,7 +260,7 @@ end:
     return rv;  // Need to return REDIS_OK if alright
 }
 
-int redisContextConnectUnix(redisContext *c, const char *path, struct timeval *timeout) {
+int redisContextConnectUnix(redisContext *c, const char *path, const struct timeval *timeout) {
     int s;
     int blocking = (c->flags & REDIS_BLOCK);
     struct sockaddr_un sa;
