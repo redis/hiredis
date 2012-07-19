@@ -76,6 +76,9 @@ hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
 	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I$(AE_DIR) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
 endif
 
+hiredis-example-glib: example-glib.c adapters/glib.h $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) `pkg-config glib-2.0 --cflags --libs` example-glib.c $(STLIBNAME)
+
 hiredis-%: %.o $(STLIBNAME)
 	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
 

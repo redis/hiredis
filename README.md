@@ -224,8 +224,8 @@ of the error.
 ## Asynchronous API
 
 Hiredis comes with an asynchronous API that works easily with any event library.
-Examples are bundled that show using Hiredis with [libev](http://software.schmorp.de/pkg/libev.html)
-and [libevent](http://monkey.org/~provos/libevent/).
+Examples are bundled that show using Hiredis with [libev](http://software.schmorp.de/pkg/libev.html), 
+[libevent](http://monkey.org/~provos/libevent/) and [glib](http://developer.gnome.org/glib/).
 
 ### Connecting
 
