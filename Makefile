@@ -61,6 +61,9 @@ dynamic: $(DYLIBNAME)
 static: $(STLIBNAME)
 
 # Binaries:
+hiredis-example-glib: example-glib.c adapters/glib.h $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(shell pkg-config glib-2.0 --cflags --libs) $(REAL_LDFLAGS) example-glib.c $(STLIBNAME)
+
 hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
 	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -levent example-libevent.c $(STLIBNAME)
 
