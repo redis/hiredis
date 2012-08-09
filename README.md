@@ -66,7 +66,7 @@ When you need to pass binary safe strings in a command, the `%b` specifier can b
 used. Together with a pointer to the string, it requires a `size_t` length argument
 of the string:
 
-    reply = redisCommand(context, "SET foo %b", value, valuelen);
+    reply = redisCommand(context, "SET foo %b", value, (size_t) valuelen);
 
 Internally, Hiredis splits the command in different arguments and will
 convert it to the protocol used to communicate with Redis.
