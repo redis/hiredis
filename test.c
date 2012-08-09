@@ -125,13 +125,13 @@ static void test_format_commands(void) {
     free(cmd);
 
     test("Format command with %%b string interpolation: ");
-    len = redisFormatCommand(&cmd,"SET %b %b","foo",3,"b\0r",3);
+    len = redisFormatCommand(&cmd,"SET %b %b","foo",(size_t)3,"b\0r",(size_t)3);
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nb\0r\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(3+2));
     free(cmd);
 
     test("Format command with %%b and an empty string: ");
-    len = redisFormatCommand(&cmd,"SET %b %b","foo",3,"",0);
+    len = redisFormatCommand(&cmd,"SET %b %b","foo",(size_t)3,"",(size_t)0);
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(0+2));
     free(cmd);
@@ -177,7 +177,7 @@ static void test_format_commands(void) {
     FLOAT_WIDTH_TEST(double);
 
     test("Format command with invalid printf format: ");
-    len = redisFormatCommand(&cmd,"key:%08p %b",(void*)1234,"foo",3);
+    len = redisFormatCommand(&cmd,"key:%08p %b",(void*)1234,"foo",(size_t)3);
     test_cond(len == -1);
 
     const char *argv[3];
@@ -326,7 +326,7 @@ static void test_blocking_connection(struct config config) {
     freeReplyObject(reply);
 
     test("%%b String interpolation works: ");
-    reply = redisCommand(c,"SET %b %b","foo",3,"hello\x00world",11);
+    reply = redisCommand(c,"SET %b %b","foo",(size_t)3,"hello\x00world",(size_t)11);
     freeReplyObject(reply);
     reply = redisCommand(c,"GET foo");
     test_cond(reply->type == REDIS_REPLY_STRING &&
