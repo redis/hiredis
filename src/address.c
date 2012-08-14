@@ -58,7 +58,7 @@ redis_address redis_address_un(const char *path) {
     struct sockaddr_un sa;
 
     memset(&sa, 0, sizeof(sa));
-    sa.sun_family = AF_LOCAL;
+    sa.sun_family = AF_UNIX;
     strncpy((char*)&sa.sun_path, path, sizeof(sa.sun_path));
     sa.sun_path[sizeof(sa.sun_path) - 1] = '\0';
     return redis_address_from_un(sa);
