@@ -12,7 +12,7 @@ STLIBNAME= $(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD= ar rcs $(STLIBNAME)
 
 # Default settings
-STD= -std=c99 -pedantic
+STD= -std=c99 -pedantic -D_POSIX_C_SOURCE=200112L
 WARN= -Wall -W -Wstrict-prototypes -Wwrite-strings -Wno-unused-label
 OPT= -O3
 FINAL_CFLAGS= $(STD) $(WARN) $(OPT) $(DEBUG) -fPIC $(CFLAGS) $(HIREDIS_CFLAGS)

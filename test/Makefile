@@ -1,6 +1,6 @@
 include ../src/Makefile.common
 
-STD= -std=c99 -pedantic
+STD= -std=c99 -pedantic -D_POSIX_C_SOURCE=200112L
 OPT= -O0
 WARN= -Wall -W
 HIREDIS_CFLAGS+= -I../src
