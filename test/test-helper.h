@@ -1,21 +1,18 @@
 #ifndef _TEST_HELPER_H
 #define _TEST_HELPER_H 1
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/time.h>
 #include <assert.h>
 #include <errno.h>
-
-/* gai_strerror */
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
 
-/* local */
-#include "spawn.h"
 #include "handle.h"
+#include "spawn.h"
 
 #ifdef __GNUC__
 #define UNUSED __attribute__ ((unused))

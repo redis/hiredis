@@ -1,12 +1,10 @@
-/* misc */
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-/* local */
-#include "test-helper.h"
-#include "parser.h"
 #include "object.h"
+#include "parser.h"
+#include "test-helper.h"
 
 void test_string(redis_parser *parser) {
     const char *buf = "$5\r\nhello\r\n";
