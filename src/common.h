@@ -1,5 +1,5 @@
-#ifndef HIREDIS_COMMON_H
-#define HIREDIS_COMMON_H 1
+#ifndef _HIREDIS_COMMON_H
+#define _HIREDIS_COMMON_H 1
 
 #define REDIS_OK 0
 #define REDIS_ESYS -1

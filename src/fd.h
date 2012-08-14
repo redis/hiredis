@@ -1,5 +1,5 @@
-#ifndef HIREDIS_FD_H
-#define HIREDIS_FD_H 1
+#ifndef _HIREDIS_FD_H
+#define _HIREDIS_FD_H 1
 
 #include "common.h"
 #include "address.h"

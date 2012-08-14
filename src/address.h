@@ -1,5 +1,5 @@
-#ifndef HIREDIS_ADDRESS_H
-#define HIREDIS_ADDRESS_H 1
+#ifndef _HIREDIS_ADDRESS_H
+#define _HIREDIS_ADDRESS_H 1
 
 /* struct sockaddr_(in|in6|un) */
 #include <netinet/in.h>

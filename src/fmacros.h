@@ -1,5 +1,5 @@
-#ifndef __HIREDIS_FMACRO_H
-#define __HIREDIS_FMACRO_H
+#ifndef _HIREDIS_FMACRO_H
+#define _HIREDIS_FMACRO_H 1
 
 #if !defined(_BSD_SOURCE)
 #define _BSD_SOURCE
