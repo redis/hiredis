@@ -11,7 +11,7 @@ OBJ=spawn.o net-helper.o
 all: $(TESTS)
 
 ../src/$(STLIBNAME):
-	cd .. && $(MAKE) $(STLIBNAME)
+	cd ../src && $(MAKE) $(STLIBNAME)
 
 test-%: test-%.o $(OBJ) ../src/$(STLIBNAME)
 	$(HIREDIS_LD) -o $@ $^ $(FINAL_LIBS)
