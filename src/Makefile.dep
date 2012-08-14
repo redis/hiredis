@@ -1,0 +1,11 @@
+address.o: address.c address.h
+context.o: context.c context.h handle.h address.h common.h parser.h \
+  format.h object.h
+fd.o: fd.c fd.h address.h common.h
+format.o: format.c format.h sds.h
+handle.o: handle.c fd.h address.h common.h handle.h parser.h sds.h
+object.o: object.c object.h parser.h
+parser.o: parser.c parser.h
+request.o: request.c handle.h address.h common.h parser.h object.h \
+  request.h ngx-queue.h
+sds.o: sds.c sds.h

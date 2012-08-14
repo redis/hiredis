@@ -1,0 +1,18 @@
+net-helper.o: net-helper.c net-helper.h ../src/handle.h ../src/address.h \
+  ../src/common.h ../src/parser.h
+spawn.o: spawn.c spawn.h
+test-context.o: test-context.c ../src/context.h ../src/handle.h \
+  ../src/address.h ../src/common.h ../src/parser.h net-helper.h \
+  ../src/object.h test-helper.h spawn.h
+test-format.o: test-format.c ../src/format.h test-helper.h \
+  ../src/handle.h ../src/address.h ../src/common.h ../src/parser.h \
+  spawn.h
+test-handle.o: test-handle.c ../src/handle.h ../src/address.h \
+  ../src/common.h ../src/parser.h test-helper.h spawn.h
+test-object.o: test-object.c ../src/object.h ../src/parser.h \
+  test-helper.h ../src/handle.h ../src/address.h ../src/common.h spawn.h
+test-parser.o: test-parser.c ../src/parser.h ../src/sds.h test-helper.h \
+  ../src/handle.h ../src/address.h ../src/common.h spawn.h
+test-request.o: test-request.c ../src/request.h ../src/ngx-queue.h \
+  ../src/parser.h test-helper.h ../src/handle.h ../src/address.h \
+  ../src/common.h spawn.h
