@@ -7,10 +7,8 @@
 #include <errno.h>
 #include <assert.h>
 
-/* select */
-#include <sys/select.h>
-#include <sys/time.h>
-#include <sys/types.h>
+/* poll */
+#include <poll.h>
 #include <unistd.h>
 
 /* local */
@@ -124,51 +122,64 @@ int redis_handle_connect_gai(redis_handle *h,
     return redis__finish_connect(h, fd);
 }
 
-static int redis__select(int mode, int fd, struct timeval timeout) {
-    fd_set rfd, wfd;
-    fd_set *_set = NULL, *_rfd = NULL, *_wfd = NULL;
-    int so_error;
+static int redis__poll(int mode, int fd, struct timeval timeout) {
+    struct pollfd pfd;
+    int msec;
+    int rv;
 
-    assert(fd < FD_SETSIZE);
+    pfd.fd = fd;
+    pfd.events = 0;
+    pfd.revents = 0;
 
-    switch(mode) {
-        case REDIS__READABLE:
-            FD_ZERO(&rfd);
-            FD_SET(fd, &rfd);
-            _rfd = _set = &rfd;
-            break;
-        case REDIS__WRITABLE:
-            FD_ZERO(&wfd);
-            FD_SET(fd, &wfd);
-            _wfd = _set = &wfd;
-            break;
-        default:
-            assert(NULL && "invalid mode");
+    if (mode & REDIS__READABLE) {
+        pfd.events |= POLLIN;
     }
 
-    if (select(FD_SETSIZE, _rfd, _wfd, NULL, &timeout) == -1) {
+    if (mode & REDIS__WRITABLE) {
+        pfd.events |= POLLOUT;
+    }
+
+    msec = (timeout.tv_sec * 1000) + ((timeout.tv_usec + 999) / 1000);
+    if (msec < 0) {
+        msec = 0;
+    }
+
+    rv = poll(&pfd, 1, msec);
+    if (rv == -1) {
         return REDIS_ESYS;
     }
 
-    /* Not in set means select(2) timed out */
-    if (!FD_ISSET(fd, _set)) {
+    /* No events means poll(2) timed out */
+    if (rv == 0) {
         errno = ETIMEDOUT;
         return REDIS_ESYS;
     }
 
-    /* Check for socket error */
-    so_error = redis_fd_error(fd);
-    if (so_error < 0) {
-        return so_error;
+    /* POLLERR is always bad */
+    if (pfd.revents & POLLERR) {
+        goto error;
     }
 
-    if (so_error) {
-        /* Act as if the socket error occured with select(2). */
-        errno = so_error;
-        return REDIS_ESYS;
+    /* POLLHUP is only bad when interested in POLLOUT.
+     * When interested in POLLIN, reads can continue until EOF. */
+    if ((pfd.revents & POLLHUP) && (pfd.events & POLLOUT)) {
+        goto error;
     }
 
     return REDIS_OK;
+
+error:
+    rv = redis_fd_error(fd);
+    if (rv < 0) {
+        return rv;
+    }
+
+    /* We got POLLERR so the socket error MUST be non-zero */
+    assert(rv && "Expected socket error");
+
+    /* Act as if the socket error occured */
+    errno = rv;
+    return REDIS_ESYS;
 }
 
 static int redis__wait(redis_handle *h, int mode) {
@@ -179,7 +190,7 @@ static int redis__wait(redis_handle *h, int mode) {
         return REDIS_ESYS;
     }
 
-    rv = redis__select(mode, h->fd, h->timeout);
+    rv = redis__poll(mode, h->fd, h->timeout);
     if (rv < 0) {
         return REDIS_ESYS;
     }
