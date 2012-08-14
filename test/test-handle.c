@@ -157,7 +157,6 @@ TEST(connect_gai_redis_address) {
     assert(address.sa_addrlen == sizeof(struct sockaddr_in));
 
     /* Match sockaddr specific fields */
-    assert(address.sa_addr.in.sin_len == sizeof(struct sockaddr_in));
     assert(address.sa_addr.in.sin_family == AF_INET);
     assert(ntohs(address.sa_addr.in.sin_port) == redis_port());
     assert(strcmp(inet_ntoa(address.sa_addr.in.sin_addr), "127.0.0.1") == 0);
