@@ -1,8 +1,8 @@
 #ifndef _HIREDIS_FD_H
 #define _HIREDIS_FD_H 1
 
-#include "common.h"
 #include "address.h"
+#include "common.h"
 
 int redis_fd_error(int fd);
 int redis_fd_read(int fildes, void *buf, size_t nbyte);

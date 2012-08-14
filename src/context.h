@@ -3,7 +3,6 @@
 
 #include <stdarg.h>
 
-/* local */
 #include "handle.h"
 
 typedef struct redis_context_s redis_context;

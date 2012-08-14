@@ -1,10 +1,10 @@
-#include <string.h>
 #include <assert.h>
 #include <errno.h>
+#include <string.h>
 
-#include "handle.h" /* return values */
+#include "handle.h"
+#include "object.h"
 #include "request.h"
-#include "object.h" /* default parser callbacks */
 
 int redis_request_init(redis_request *self) {
     memset(self, 0, sizeof(*self));

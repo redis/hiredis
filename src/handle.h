@@ -1,13 +1,11 @@
 #ifndef _HIREDIS_HANDLE_H
 #define _HIREDIS_HANDLE_H 1
 
-/* struct timeval */
 #include <sys/time.h>
 
-/* local */
+#include "address.h"
 #include "common.h"
 #include "parser.h"
-#include "address.h"
 
 typedef struct redis_handle_s redis_handle;
 

@@ -1,13 +1,11 @@
 #include "fmacros.h"
 
-/* misc */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
 #include <assert.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-/* local */
 #include "format.h"
 #include "sds.h"
 

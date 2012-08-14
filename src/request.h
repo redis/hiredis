@@ -1,7 +1,8 @@
 #ifndef _HIREDIS_REQUEST_H
 #define _HIREDIS_REQUEST_H 1
 
-#include <stddef.h> /* offsetof */
+#include <stddef.h>
+
 #include "ngx-queue.h"
 #include "parser.h"
 

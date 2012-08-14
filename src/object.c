@@ -1,6 +1,7 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+
 #include "object.h"
 
 void redis_object_free(redis_object **ptr) {

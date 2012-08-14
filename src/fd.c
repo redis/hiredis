@@ -1,24 +1,15 @@
 #include "fmacros.h"
 
-/* misc */
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
-#include <assert.h>
-
-/* socket/connect/(get|set)sockopt*/
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/tcp.h> /* TCP_* constants */
-
-/* fcntl */
+#include <sys/types.h>
 #include <unistd.h>
-#include <fcntl.h>
-
-/* getaddrinfo */
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
 
 #include "fd.h"
 

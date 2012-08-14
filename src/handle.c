@@ -1,19 +1,15 @@
 #include "fmacros.h"
 
-/* misc */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
 #include <assert.h>
-
-/* poll */
+#include <errno.h>
 #include <poll.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
-/* local */
-#include "handle.h"
 #include "fd.h"
+#include "handle.h"
 #include "sds.h"
 
 #define REDIS__READABLE 1

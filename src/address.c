@@ -1,6 +1,7 @@
-#include <string.h>
-#include <assert.h>
 #include <arpa/inet.h>
+#include <assert.h>
+#include <string.h>
+
 #include "address.h"
 
 redis_address redis_address_from_in(struct sockaddr_in sa) {
