@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "spawn.h"
@@ -59,6 +60,11 @@ void spawn(spawn_function *fn, void *ptr) {
         exit(0);
     }
 
+    struct timespec ts;
+
+    ts.tv_sec = 0;
+    ts.tv_nsec = 1000 * 1000;
+
     /* Give the fork some time to boot... */
-    usleep(1000);
+    nanosleep(&ts, NULL);
 }
