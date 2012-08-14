@@ -97,6 +97,8 @@ int redis_format_vcommand(char **target, const char *format, va_list ap) {
             default:
                 /* Try to detect printf format */
                 {
+                    static const char int_fmts[] = "diouxX";
+                    static const char double_fmts[] = "eEfFgGaA";
                     char _format[16];
                     const char *_p = c+1;
                     size_t _l = 0;
@@ -122,13 +124,13 @@ int redis_format_vcommand(char **target, const char *format, va_list ap) {
                     va_copy(_cpy,ap);
 
                     /* Integer conversion (without modifiers) */
-                    if (strchr("diouxX",*_p) != NULL) {
+                    if (strchr(int_fmts, *_p) != NULL) {
                         va_arg(ap,int);
                         goto fmt_valid;
                     }
 
                     /* Double conversion (without modifiers) */
-                    if (strchr("eEfFgGaA",*_p) != NULL) {
+                    if (strchr(double_fmts, *_p) != NULL) {
                         va_arg(ap,double);
                         goto fmt_valid;
                     }
@@ -136,7 +138,7 @@ int redis_format_vcommand(char **target, const char *format, va_list ap) {
                     /* Size: char */
                     if (_p[0] == 'h' && _p[1] == 'h') {
                         _p += 2;
-                        if (*_p != '\0' && strchr("diouxX",*_p) != NULL) {
+                        if (*_p != '\0' && strchr(int_fmts, *_p) != NULL) {
                             va_arg(ap,int); /* char gets promoted to int */
                             goto fmt_valid;
                         }
@@ -146,7 +148,7 @@ int redis_format_vcommand(char **target, const char *format, va_list ap) {
                     /* Size: short */
                     if (_p[0] == 'h') {
                         _p += 1;
-                        if (*_p != '\0' && strchr("diouxX",*_p) != NULL) {
+                        if (*_p != '\0' && strchr(int_fmts, *_p) != NULL) {
                             va_arg(ap,int); /* short gets promoted to int */
                             goto fmt_valid;
                         }
@@ -156,7 +158,7 @@ int redis_format_vcommand(char **target, const char *format, va_list ap) {
                     /* Size: long long */
                     if (_p[0] == 'l' && _p[1] == 'l') {
                         _p += 2;
-                        if (*_p != '\0' && strchr("diouxX",*_p) != NULL) {
+                        if (*_p != '\0' && strchr(int_fmts, *_p) != NULL) {
                             va_arg(ap,long long);
                             goto fmt_valid;
                         }
@@ -166,7 +168,7 @@ int redis_format_vcommand(char **target, const char *format, va_list ap) {
                     /* Size: long */
                     if (_p[0] == 'l') {
                         _p += 1;
-                        if (*_p != '\0' && strchr("diouxX",*_p) != NULL) {
+                        if (*_p != '\0' && strchr(int_fmts, *_p) != NULL) {
                             va_arg(ap,long);
                             goto fmt_valid;
                         }
