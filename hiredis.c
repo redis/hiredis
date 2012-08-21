@@ -1068,7 +1068,7 @@ int redisSetTimeout(redisContext *c, struct timeval tv) {
  * After this function is called, you may use redisContextReadReply to
  * see if there is a reply available. */
 int redisBufferRead(redisContext *c) {
-    char buf[2048];
+    char buf[1024*16];
     int nread;
 
     /* Return early when the context has seen an error. */
