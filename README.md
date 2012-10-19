@@ -18,6 +18,18 @@ Redis version >= 1.2.0.
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
 
+## COMPILING
+
+The standard procedure 'make' followed by a 'make install' applies when 
+compiling and installing hiredis from source. When compiling under windows
+using cygwin, you need to have clang installed. To compile the library
+issue the following command:
+
+    CC=clang make
+
+This should successfully build the library and the command line tools.
+
+
 ## UPGRADING
 
 Version 0.9.0 is a major overhaul of hiredis in every aspect. However, upgrading existing
