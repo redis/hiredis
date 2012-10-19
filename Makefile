@@ -40,6 +40,9 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAJOR_NAME=$(LIBNAME).$(HIREDIS_MAJOR).$(DYLIBSUFFIX)
   DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
 endif
+ifeq ($(findstring CYGWIN,$(uname_S)),CYGWIN)
+  REAL_CFLAGS+=-Wno-char-subscripts -Wno-implicit-function-declaration
+endif
 
 all: $(DYLIBNAME) $(BINS)
 
