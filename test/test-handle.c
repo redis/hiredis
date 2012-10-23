@@ -63,7 +63,7 @@ TEST(connect_un_noent) {
     assert(rv == REDIS_OK);
 
     struct sockaddr_un sa;
-    sa.sun_family = AF_LOCAL;
+    sa.sun_family = AF_UNIX;
     strcpy((char*)&sa.sun_path, "/tmp/idontexist.sock");
 
     rv = redis_handle_connect_un(&h, sa);
