@@ -1,5 +1,5 @@
-#ifndef _HIREDIS_HANDLE_H
-#define _HIREDIS_HANDLE_H 1
+#ifndef HIREDIS_HANDLE_H
+#define HIREDIS_HANDLE_H 1
 
 #include <sys/time.h>
 

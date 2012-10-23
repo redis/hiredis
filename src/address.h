@@ -1,5 +1,5 @@
-#ifndef _HIREDIS_ADDRESS_H
-#define _HIREDIS_ADDRESS_H 1
+#ifndef HIREDIS_ADDRESS_H
+#define HIREDIS_ADDRESS_H 1
 
 #include <netinet/in.h>
 #include <sys/un.h>

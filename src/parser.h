@@ -1,5 +1,5 @@
-#ifndef _HIREDIS_PARSER_H
-#define _HIREDIS_PARSER_H 1
+#ifndef HIREDIS_PARSER_H
+#define HIREDIS_PARSER_H 1
 
 #include <stdint.h>
 

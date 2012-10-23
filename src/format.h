@@ -1,5 +1,5 @@
-#ifndef _HIREDIS_FORMAT_H
-#define _HIREDIS_FORMAT_H 1
+#ifndef HIREDIS_FORMAT_H
+#define HIREDIS_FORMAT_H 1
 
 #include <stdarg.h>
 

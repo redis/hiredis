@@ -1,5 +1,5 @@
-#ifndef _HIREDIS_OBJECT_H
-#define _HIREDIS_OBJECT_H 1
+#ifndef HIREDIS_OBJECT_H
+#define HIREDIS_OBJECT_H 1
 
 #include "parser.h"
 

@@ -1,5 +1,5 @@
-#ifndef _HIREDIS_CONTEXT_H
-#define _HIREDIS_CONTEXT_H 1
+#ifndef HIREDIS_CONTEXT_H
+#define HIREDIS_CONTEXT_H 1
 
 #include <stdarg.h>
 
