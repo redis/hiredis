@@ -109,6 +109,12 @@ INCLUDE_PATH?=include/hiredis
 LIBRARY_PATH?=lib
 INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
 INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
+INSTALL_PKGCONFIG_PATH?= $(PREFIX)/$(LIBRARY_PATH)/pkgconfig
+ifeq ($(CMAKE_ROOT),)
+	INSTALL_CMAKE_MODULES_PATH?= $(PREFIX)/share/cmake/Modules
+else
+	INSTALL_CMAKE_MODULES_PATH?= $(CMAKE_ROOT)/Modules
+endif
 
 ifeq ($(uname_S),SunOS)
   INSTALL?= cp -r
@@ -116,13 +122,23 @@ endif
 
 INSTALL?= cp -a
 
-install: $(DYLIBNAME) $(STLIBNAME)
+hiredis.pc: hiredis.pc.in
+	test -d $(INSTALL_PKGCONFIG_PATH) && \
+	test -x $(SED) && \
+		$(SED) -e 's,@PREFIX@,$(PREFIX),g' \
+				-e 's,@LIBRARY_PATH@,$(INSTALL_LIBRARY_PATH),g' $< >$@ || true
+
+install: $(DYLIBNAME) $(STLIBNAME) hiredis.pc
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
 	$(INSTALL) hiredis.h async.h adapters $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MAJOR_NAME) $(DYLIBNAME)
 	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
+	test -d $(INSTALL_PKGCONFIG_PATH) && \
+		$(INSTALL) hiredis.pc $(INSTALL_PKGCONFIG_PATH) && \
+	test -d "$(INSTALL_CMAKE_MODULES_PATH)" && \
+		$(INSTALL) FindHiredis.cmake $(INSTALL_CMAKE_MODULES_PATH) || true
 
 32bit:
 	@echo ""
