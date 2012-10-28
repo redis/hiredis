@@ -1,6 +1,6 @@
-prefix=/usr
+prefix=@PREFIX@
 exec_prefix=${prefix}
-libdir=${exec_prefix}/lib
+libdir=@LIBRARY_PATH@
 includedir=${prefix}/include
 
 Name: Hiredis

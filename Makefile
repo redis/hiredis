@@ -104,6 +104,7 @@ dep:
 	$(CC) -MM *.c
 
 # Installation related variables and target
+SED?=/bin/sed
 PREFIX?=/usr/local
 INCLUDE_PATH?=include/hiredis
 LIBRARY_PATH?=lib
@@ -135,6 +136,7 @@ install: $(DYLIBNAME) $(STLIBNAME) hiredis.pc
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MAJOR_NAME) $(DYLIBNAME)
 	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
+	test -f hiredis.pc && \
 	test -d $(INSTALL_PKGCONFIG_PATH) && \
 		$(INSTALL) hiredis.pc $(INSTALL_PKGCONFIG_PATH) && \
 	test -d "$(INSTALL_CMAKE_MODULES_PATH)" && \
@@ -161,4 +163,4 @@ coverage: gcov
 noopt:
 	$(MAKE) OPTIMIZATION=""
 
-.PHONY: all test check clean dep install 32bit gprof gcov noopt
+.PHONY: all test check clean dep install 32bit gprof gcov noopt hiredis.pc
