@@ -1,4 +1,4 @@
-/hiredis-test
+/hiredis-test*
 /hiredis-example*
 /*.o
 /*.so
