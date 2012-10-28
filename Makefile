@@ -104,7 +104,7 @@ dep:
 	$(CC) -MM *.c
 
 # Installation related variables and target
-SED?=/bin/sed
+SED?=sed
 PREFIX?=/usr/local
 INCLUDE_PATH?=include/hiredis
 LIBRARY_PATH?=lib
