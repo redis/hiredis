@@ -116,6 +116,7 @@ ifeq ($(CMAKE_ROOT),)
 else
 	INSTALL_CMAKE_MODULES_PATH?= $(CMAKE_ROOT)/Modules
 endif
+PKG_CONFIG_CFLAGS?= -D_FILE_OFFSET_BITS=64
 
 ifeq ($(uname_S),SunOS)
   INSTALL?= cp -r
@@ -127,7 +128,8 @@ hiredis.pc: hiredis.pc.in
 	test -d $(INSTALL_PKGCONFIG_PATH) && \
 	test -x $(SED) && \
 		$(SED) -e 's,@PREFIX@,$(PREFIX),g' \
-				-e 's,@LIBRARY_PATH@,$(INSTALL_LIBRARY_PATH),g' $< >$@ || true
+				-e 's,@LIBRARY_PATH@,$(INSTALL_LIBRARY_PATH),g' \
+				-e 's,@CFLAGS@,$(PKG_CONFIG_CFLAGS),g' $< >$@ || true
 
 install: $(DYLIBNAME) $(STLIBNAME) hiredis.pc
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)

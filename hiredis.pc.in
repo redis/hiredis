@@ -7,5 +7,5 @@ Name: Hiredis
 Description: Minimalistic C client library for the Redis database.
 Version: 0.11.0
 Libs: -L${libdir} -lhiredis
-Cflags: -I${includedir}
+Cflags: -I${includedir} @CFLAGS@
 
