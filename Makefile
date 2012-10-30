@@ -126,7 +126,6 @@ INSTALL?= cp -a
 
 hiredis.pc: hiredis.pc.in
 	test -d $(INSTALL_PKGCONFIG_PATH) && \
-	test -x $(SED) && \
 		$(SED) -e 's,@PREFIX@,$(PREFIX),g' \
 				-e 's,@LIBRARY_PATH@,$(INSTALL_LIBRARY_PATH),g' \
 				-e 's,@CFLAGS@,$(PKG_CONFIG_CFLAGS),g' $< >$@ || true
