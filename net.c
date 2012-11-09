@@ -33,7 +33,7 @@
 #include "config.h"
 #include "fmacros.h"
 #include <sys/types.h>
-#ifndef HIREDIS_WIN
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <sys/un.h>
@@ -54,7 +54,7 @@
 #include "net.h"
 #include "sds.h"
 
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
 #define close closesocket
 #define SETERRNO errnox = WSAGetLastError()
 #undef errno
@@ -103,7 +103,7 @@ static int redisCreateSocket(redisContext *c, int type) {
 }
 
 static int redisSetBlocking(redisContext *c, int fd, int blocking) {
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
     int iResult;
     unsigned long flag;
 
@@ -181,7 +181,7 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
         }
     }
 
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
     if (errno == EINPROGRESS || errno == WSAEWOULDBLOCK) {
 #else
     if (errno == EINPROGRESS) {
@@ -194,7 +194,7 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
             close(fd);
             return REDIS_ERR;
         } else if (res == 0) {
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
             errno = WSAETIMEDOUT;
 #else
             errno = ETIMEDOUT;
@@ -273,7 +273,7 @@ int redisContextConnectTcp(redisContext *c, const char *addr, int port, struct t
             goto error;
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             SETERRNO;
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
             if (errno == WSAEHOSTUNREACH) {
 #else
             if (errno == EHOSTUNREACH) {
@@ -311,7 +311,7 @@ end:
     return rv;  // Need to return REDIS_OK if alright
 }
 
-#ifndef HIREDIS_WIN
+#ifndef _WIN32
 int redisContextConnectUnix(redisContext *c, const char *path, struct timeval *timeout) {
     int s;
     int blocking = (c->flags & REDIS_BLOCK);

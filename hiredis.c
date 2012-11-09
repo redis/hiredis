@@ -33,7 +33,7 @@
 #include "fmacros.h"
 #include <string.h>
 #include <stdlib.h>
-#ifndef HIREDIS_WIN
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <assert.h>
@@ -883,7 +883,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     pos = sprintf(cmd,"*%d\r\n",argc);
     for (j = 0; j < argc; j++) {
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
         /* %zu not understood by VS2008 */
         pos += sprintf(cmd+pos,"$%lu\r\n",sdslen(curargv[j]));
 #else
@@ -965,7 +965,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     pos = sprintf(cmd,"*%d\r\n",argc);
     for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
         /* %zu not understood by VS2008 */
         pos += sprintf(cmd+pos,"$%lu\r\n",len);
 #else
@@ -1002,7 +1002,7 @@ void __redisSetError(redisContext *c, int type, const char *str) {
 static redisContext *redisContextInit(void) {
     redisContext *c;
 
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
     /* fireup Windows socket stuff */
     WORD wVersionRequested = MAKEWORD(2, 0);
     WSADATA wsaData;
@@ -1028,7 +1028,7 @@ static redisContext *redisContextInit(void) {
 
 void redisFree(redisContext *c) {
     if (c->fd > 0)
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
         closesocket(c->fd);
 #else
         close(c->fd);
@@ -1064,7 +1064,7 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
     return c;
 }
 
-#ifndef HIREDIS_WIN
+#ifndef _WIN32
 /* no Unix Domaind stuff */
 redisContext *redisConnectUnix(const char *path) {
     redisContext *c = redisContextInit();
@@ -1108,7 +1108,7 @@ int redisBufferRead(redisContext *c) {
     if (c->err)
         return REDIS_ERR;
 
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
     nread = recv(c->fd,buf,sizeof(buf),0);
 #else
     nread = read(c->fd,buf,sizeof(buf));
@@ -1149,7 +1149,7 @@ int redisBufferWrite(redisContext *c, int *done) {
         return REDIS_ERR;
 
     if (sdslen(c->obuf) > 0) {
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
         /* not treated as a file */
         nwritten = send(c->fd,c->obuf,sdslen(c->obuf),0);
 #else

@@ -4,7 +4,7 @@
 
 #include "hiredis.h"
 
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
 #define snprintf sprintf_s
 #endif
 

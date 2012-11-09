@@ -7,7 +7,7 @@ Does absolutely nothing for Unix!
 #define __CONFIG_H
 
 #include "hiredis.h"
-#ifdef HIREDIS_WIN
+#ifdef _WIN32
 
 #ifndef va_copy
 /* WARNING - DANGER - ASSUMES TYPICAL STACK MACHINE */

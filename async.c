@@ -33,7 +33,7 @@
 #include "fmacros.h"
 #include <stdlib.h>
 #include <string.h>
-#ifndef HIREDIS_WIN
+#ifndef _WIN32
 #include <strings.h>
 #endif
 #include <assert.h>
@@ -152,7 +152,7 @@ redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
     return ac;
 }
 
-#ifndef HIREDIS_WIN
+#ifndef _WIN32
 redisAsyncContext *redisAsyncConnectUnix(const char *path) {
     redisContext *c = redisConnectUnixNonBlock(path);
     redisAsyncContext *ac = redisAsyncInitialize(c);
