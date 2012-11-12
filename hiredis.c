@@ -665,7 +665,7 @@ int redisReaderGetReply(redisReader *r, void **reply) {
 }
 
 /* Calculate the number of bytes needed to represent an integer as string. */
-static int intlen(int i) {
+static const int intlen(int i) {
     int len = 0;
     if (i < 0) {
         len++;
@@ -679,7 +679,7 @@ static int intlen(int i) {
 }
 
 /* Helper that calculates the bulk length given a certain string length. */
-static size_t bulklen(size_t len) {
+static const size_t bulklen(size_t len) {
     return 1+intlen(len)+2+len+2;
 }
 
