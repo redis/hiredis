@@ -159,10 +159,6 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
     struct timeval to;
     struct timeval *toptr = NULL;
     fd_set wfd;
-    
-    msec          = -1;
-    wfd[0].fd     = fd;
-    wfd[0].events = POLLOUT;
 
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
@@ -175,8 +171,6 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
 #else
     if (errno == EINPROGRESS) {
 #endif
-        int res;
-
         FD_ZERO(&wfd);
         FD_SET(fd, &wfd);
 
@@ -185,7 +179,9 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
             __redisSetErrorFromErrno(c,REDIS_ERR_IO,"select(2)");
             close(fd);
             return REDIS_ERR;
-        } else if (res == 0) {
+        }
+
+        if (!FD_ISSET(fd, &wfd)) {
 #ifdef _WIN32
             errno = WSAETIMEDOUT;
 #else
