@@ -48,8 +48,6 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <poll.h>
-#include <limits.h>
 
 #include "net.h"
 #include "sds.h"
@@ -157,28 +155,19 @@ static int redisSetTcpNoDelay(redisContext *c, int fd) {
     return REDIS_OK;
 }
 
-#define __MAX_MSEC (((LONG_MAX) - 999) / 1000)
-
 static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *timeout) {
-    struct pollfd   wfd[1];
-    long msec;
-
+    struct timeval to;
+    struct timeval *toptr = NULL;
+    fd_set wfd;
+    
     msec          = -1;
     wfd[0].fd     = fd;
     wfd[0].events = POLLOUT;
 
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
-        if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
-            close(fd);
-            return REDIS_ERR;
-        }
-
-        msec = (timeout->tv_sec * 1000) + ((timeout->tv_usec + 999) / 1000);
-
-        if (msec < 0 || msec > INT_MAX) {
-            msec = INT_MAX;
-        }
+        to = *timeout;
+        toptr = &to;
     }
 
 #ifdef _WIN32
@@ -188,9 +177,12 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
 #endif
         int res;
 
-        if ((res = poll(wfd, 1, msec)) == -1) {
+        FD_ZERO(&wfd);
+        FD_SET(fd, &wfd);
+
+        if (select(FD_SETSIZE, NULL, &wfd, NULL, toptr) == -1) {
             SETERRNO;
-            __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
+            __redisSetErrorFromErrno(c,REDIS_ERR_IO,"select(2)");
             close(fd);
             return REDIS_ERR;
         } else if (res == 0) {
