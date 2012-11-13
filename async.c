@@ -29,10 +29,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "config.h"
 #include "fmacros.h"
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <strings.h>
+#endif
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -66,8 +69,9 @@ static unsigned int callbackHash(const void *key) {
 }
 
 static void *callbackValDup(void *privdata, const void *src) {
+    redisCallback *dup;
     ((void) privdata);
-    redisCallback *dup = malloc(sizeof(*dup));
+    dup = malloc(sizeof(*dup));
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }
@@ -148,12 +152,14 @@ redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
     return ac;
 }
 
+#ifndef _WIN32
 redisAsyncContext *redisAsyncConnectUnix(const char *path) {
     redisContext *c = redisConnectUnixNonBlock(path);
     redisAsyncContext *ac = redisAsyncInitialize(c);
     __redisAsyncCopyError(ac);
     return ac;
 }
+#endif
 
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn) {
     if (ac->onConnect == NULL) {

@@ -4,6 +4,10 @@
 
 #include "hiredis.h"
 
+#ifdef _WIN32
+#define snprintf sprintf_s
+#endif
+
 int main(void) {
     unsigned int j;
     redisContext *c;
@@ -27,7 +31,7 @@ int main(void) {
     freeReplyObject(reply);
 
     /* Set a key using binary safe API */
-    reply = redisCommand(c,"SET %b %b", "bar", 3, "hello", 5);
+    reply = redisCommand(c,"SET %b %b", "bar", (size_t)3, "hello", (size_t)5);
     printf("SET (binary API): %s\n", reply->str);
     freeReplyObject(reply);
 

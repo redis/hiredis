@@ -5,6 +5,7 @@
 * Increase the read buffer size from 2k to 16k.
 
 * Use poll(2) instead of select(2) to support large fds (>= 1024).
+  (reverted in the Windows version)
 
 ### 0.10.1
 
