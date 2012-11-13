@@ -38,7 +38,7 @@
 #include <errno.h>
 #include "async.h"
 #include "net.h"
-#include "dict.c"
+#include "dict.h"
 #include "sds.h"
 
 #define _EL_ADD_READ(ctx) do { \
