@@ -725,19 +725,6 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                 } else {
                     commented = 0;
                 }
-                /*
-                if( touched ){
-                    newargv = realloc(curargv,sizeof(char*)*(argc+1));
-                    if (newargv == NULL) goto err;
-                    curargv = newargv;
-                    curargv[argc++] = curarg;
-                    totlen += bulklen(sdslen(curarg));
-
-                    curarg = sdsempty();
-                    if (curarg == NULL) goto err;
-                    touched = 0;
-                }
-                */
             } else {
                 newarg = sdscatlen(curarg,c,1);
                 if (newarg == NULL) goto err;
