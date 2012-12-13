@@ -607,7 +607,9 @@ int main(int argc, char **argv) {
     int throughput = 1;
 
     /* Ignore broken pipe signal (for I/O error tests). */
+#ifdef SIGPIPE
     signal(SIGPIPE, SIG_IGN);
+#endif
 
     /* Parse command line options. */
     argv++; argc--;

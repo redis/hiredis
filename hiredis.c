@@ -36,6 +36,10 @@
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
+#ifdef _WIN32
+#include <ws2tcpip.h>
+#define close(x) closesocket(x)
+#endif
 
 #include "hiredis.h"
 #include "net.h"
@@ -997,6 +1001,12 @@ static redisContext *redisContextInit(void) {
     c->errstr[0] = '\0';
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
+#ifdef _WIN32
+    {
+        WSADATA d;
+        WSAStartup(MAKEWORD(2, 0), &d);
+    }
+#endif
     return c;
 }
 
@@ -1075,7 +1085,11 @@ int redisBufferRead(redisContext *c) {
     if (c->err)
         return REDIS_ERR;
 
+#ifndef _WIN32
     nread = read(c->fd,buf,sizeof(buf));
+#else
+    nread = recv(c->fd,buf,sizeof(buf),0);
+#endif
     if (nread == -1) {
         if (errno == EAGAIN && !(c->flags & REDIS_BLOCK)) {
             /* Try again later */
@@ -1112,7 +1126,11 @@ int redisBufferWrite(redisContext *c, int *done) {
         return REDIS_ERR;
 
     if (sdslen(c->obuf) > 0) {
+#ifndef _WIN32
         nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
+#else
+        nwritten = send(c->fd,c->obuf,sdslen(c->obuf),0);
+#endif
         if (nwritten == -1) {
             if (errno == EAGAIN && !(c->flags & REDIS_BLOCK)) {
                 /* Try again later */

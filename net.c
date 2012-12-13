@@ -31,6 +31,7 @@
  */
 
 #include "fmacros.h"
+#ifndef _WIN32
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -47,6 +48,181 @@
 #include <stdio.h>
 #include <poll.h>
 #include <limits.h>
+#else
+#include <ws2tcpip.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <limits.h>
+int
+strerror_r(int errnum, char *buf, size_t buflen) {
+    if (strncpy(buf, strerror(errnum), buflen) > buflen) {
+        return ERANGE;
+    }
+    return 0;
+}
+int
+inet_aton(const char *cp, struct in_addr *addr) {
+    register unsigned int val;
+    register int base, n;
+    register char c;
+    unsigned int parts[4];
+    register unsigned int *pp = parts;
+
+    c = *cp;
+    for (;;) {
+        if (!isdigit(c))
+            return (0);
+        val = 0; base = 10;
+        if (c == '0') {
+            c = *++cp;
+            if (c == 'x' || c == 'X')
+                base = 16, c = *++cp;
+            else
+                base = 8;
+        }
+        for (;;) {
+            if (isascii(c) && isdigit(c)) {
+                val = (val * base) + (c - '0');
+                c = *++cp;
+            } else if (base == 16 && isascii(c) && isxdigit(c)) {
+                val = (val << 4) |
+                    (c + 10 - (islower(c) ? 'a' : 'A'));
+                c = *++cp;
+            } else
+                break;
+        }
+        if (c == '.') {
+            if (pp >= parts + 3)
+                return (0);
+            *pp++ = val;
+            c = *++cp;
+        } else
+            break;
+    }
+    if (c != '\0' && (!isascii(c) || !isspace(c)))
+        return (0);
+    n = pp - parts + 1;
+    switch (n) {
+
+    case 0:
+        return (0);        /* initial nondigit */
+
+    case 1:                /* a -- 32 bits */
+        break;
+
+    case 2:                /* a.b -- 8.24 bits */
+        if ((val > 0xffffff) || (parts[0] > 0xff))
+            return (0);
+        val |= parts[0] << 24;
+        break;
+
+    case 3:                /* a.b.c -- 8.8.16 bits */
+        if ((val > 0xffff) || (parts[0] > 0xff) || (parts[1] > 0xff))
+            return (0);
+        val |= (parts[0] << 24) | (parts[1] << 16);
+        break;
+
+    case 4:                /* a.b.c.d -- 8.8.8.8 bits */
+        if ((val > 0xff) || (parts[0] > 0xff) || (parts[1] > 0xff) || (parts[2] > 0xff))
+            return (0);
+        val |= (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8);
+        break;
+    }
+    if (addr)
+        addr->s_addr = htonl(val);
+    return (1);
+}
+static struct addrinfo*
+malloc_ai(int port, u_long addr) {
+    struct addrinfo *ai;
+
+    ai = (struct addrinfo*) malloc(sizeof(struct addrinfo) + sizeof(struct sockaddr_in));
+    if (ai == NULL)
+        return(NULL);
+
+    memset(ai, 0, sizeof(struct addrinfo) + sizeof(struct sockaddr_in));
+
+    ai->ai_addr = (struct sockaddr *)(ai + 1);
+    ai->ai_addrlen = sizeof(struct sockaddr_in);
+    ai->ai_addr->sa_family = ai->ai_family = AF_INET;
+
+    ((struct sockaddr_in *)(ai)->ai_addr)->sin_port = port;
+    ((struct sockaddr_in *)(ai)->ai_addr)->sin_addr.s_addr = addr;
+
+    return(ai);
+}
+
+int
+getaddrinfo(const char *hostname, const char *servname,
+                const struct addrinfo *hints, struct addrinfo **res) {
+    struct addrinfo *cur, *prev = NULL;
+    struct hostent *hp;
+    struct in_addr in;
+    int i, port;
+
+    if (servname) {
+        struct servent *se;
+        if ((se = getservbyname(servname, "tcp")))
+            port = se->s_port;
+        else
+            port = htons(atoi(servname));
+    } else
+        port = 0;
+
+    if (hints && hints->ai_flags & AI_PASSIVE) {
+        if (NULL != (*res = malloc_ai(port, htonl(0x00000000))))
+            return 0;
+        else
+            return EAI_MEMORY;
+    }
+
+    if (!hostname) {
+        if (NULL != (*res = malloc_ai(port, htonl(0x7f000001))))
+            return 0;
+        else
+            return EAI_MEMORY;
+    }
+
+    if (inet_aton(hostname, &in)) {
+        if (NULL != (*res = malloc_ai(port, in.s_addr)))
+            return 0;
+        else
+            return EAI_MEMORY;
+    }
+
+    hp = gethostbyname(hostname);
+    if (hp && hp->h_name && hp->h_name[0] && hp->h_addr_list[0]) {
+        for (i = 0; hp->h_addr_list[i]; i++) {
+            cur = malloc_ai(port, ((struct in_addr *)hp->h_addr_list[i])->s_addr);
+            if (cur == NULL) {
+                if (*res)
+                    freeaddrinfo(*res);
+                return EAI_MEMORY;
+            }
+            if (prev) prev->ai_next = cur;
+            else *res = cur;
+            prev = cur;
+        }
+        return 0;
+    }
+
+    return EAI_NODATA;
+}
+void
+freeaddrinfo(struct addrinfo *ai) {
+    struct addrinfo *next;
+
+    do {
+        next = ai->ai_next;
+        free(ai);
+    } while (NULL != (ai = next));
+}
+#define close(x) closesocket(x)
+#define EINPROGRESS WSAEINPROGRESS
+#define ETIMEDOUT WSAETIMEDOUT
+#define EHOSTUNREACH WSAEHOSTUNREACH
+#endif
 
 #include "net.h"
 #include "sds.h"
@@ -94,6 +270,7 @@ static int redisSetBlocking(redisContext *c, int fd, int blocking) {
     /* Set the socket nonblocking.
      * Note that fcntl(2) for F_GETFL and F_SETFL can't be
      * interrupted by a signal. */
+#ifndef _WIN32
     if ((flags = fcntl(fd, F_GETFL)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(F_GETFL)");
         close(fd);
@@ -110,6 +287,10 @@ static int redisSetBlocking(redisContext *c, int fd, int blocking) {
         close(fd);
         return REDIS_ERR;
     }
+#else
+    DWORD b = (DWORD) blocking;
+    //ioctlsocket(fd, FIONBIO, &b);
+#endif
     return REDIS_OK;
 }
 
@@ -126,6 +307,7 @@ static int redisSetTcpNoDelay(redisContext *c, int fd) {
 #define __MAX_MSEC (((LONG_MAX) - 999) / 1000)
 
 static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *timeout) {
+#ifndef _WIN32
     struct pollfd   wfd[1];
     long msec;
 
@@ -169,6 +351,50 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
 
     __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
     close(fd);
+#else
+    fd_set fds;
+    long msec;
+
+    msec          = -1;
+    FD_ZERO(&fds);
+    FD_SET(fd, &fds);
+    if (timeout != NULL) {
+        if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
+            close(fd);
+            return REDIS_ERR;
+        }
+
+        msec = (timeout->tv_sec * 1000) + ((timeout->tv_usec + 999) / 1000);
+
+        if (msec < 0 || msec > INT_MAX) {
+            msec = INT_MAX;
+        }
+    }
+
+    if (errno == EINPROGRESS) {
+        int res;
+        struct timeval timeout;
+        timeout.tv_usec = msec * 1000;
+        if ((res = select(FD_SETSIZE, &fds, NULL, NULL, &timeout)) == -1) {
+            __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
+            close(fd);
+            return REDIS_ERR;
+        } else if (res == 0) {
+            errno = ETIMEDOUT;
+            __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
+            close(fd);
+            return REDIS_ERR;
+        }
+
+        if (redisCheckSocketError(c, fd) != REDIS_OK)
+            return REDIS_ERR;
+
+        return REDIS_OK;
+    }
+
+    __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
+    close(fd);
+#endif
     return REDIS_ERR;
 }
 
@@ -261,6 +487,7 @@ end:
 }
 
 int redisContextConnectUnix(redisContext *c, const char *path, struct timeval *timeout) {
+#ifndef _WIN32
     int s;
     int blocking = (c->flags & REDIS_BLOCK);
     struct sockaddr_un sa;
@@ -288,4 +515,7 @@ int redisContextConnectUnix(redisContext *c, const char *path, struct timeval *t
     c->fd = s;
     c->flags |= REDIS_CONNECTED;
     return REDIS_OK;
+#else
+    return REDIS_ERR;
+#endif
 }

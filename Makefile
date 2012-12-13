@@ -28,7 +28,19 @@ STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
 
 # Platform-specific overrides
+ifeq ($(OS),Windows_NT)
+  # On win32, -l flags should be end of arguments.
+  REAL_LDFLAGS+= -lwsock32
+  DYLIB_MAKE_LDFLAGS= -lwsock32
+  DYLIB_MAKE_CMD=$(CC) -shared -o $(DYLIBNAME) $(LDFLAGS)
+  INSTALL= cp -r
+else
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+ifeq ($(uname_S),SunOS)
+  REAL_LDFLAGS+= -ldl -lnsl -lsocket
+  DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
+  INSTALL= cp -r
+endif
 ifeq ($(uname_S),SunOS)
   REAL_LDFLAGS+= -ldl -lnsl -lsocket
   DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
@@ -39,6 +51,7 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MINOR_NAME=$(LIBNAME).$(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(DYLIBSUFFIX)
   DYLIB_MAJOR_NAME=$(LIBNAME).$(HIREDIS_MAJOR).$(DYLIBSUFFIX)
   DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
+endif
 endif
 
 all: $(DYLIBNAME) $(BINS)
@@ -52,7 +65,7 @@ sds.o: sds.c sds.h
 test.o: test.c hiredis.h
 
 $(DYLIBNAME): $(OBJ)
-	$(DYLIB_MAKE_CMD) $(OBJ)
+	$(DYLIB_MAKE_CMD) $(OBJ) $(DYLIB_MAKE_LDFLAGS)
 
 $(STLIBNAME): $(OBJ)
 	$(STLIB_MAKE_CMD) $(OBJ)
@@ -77,7 +90,7 @@ hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
 endif
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
+	$(CC) -o $@ $< $(STLIBNAME) $(REAL_LDFLAGS)
 
 test: hiredis-test
 	./hiredis-test

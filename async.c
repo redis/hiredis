@@ -40,6 +40,10 @@
 #include "net.h"
 #include "dict.c"
 #include "sds.h"
+#ifdef _WIN32
+#include <ws2tcpip.h>
+#define EINPROGRESS WSAEINPROGRESS
+#endif
 
 #define _EL_ADD_READ(ctx) do { \
         if ((ctx)->ev.addRead) (ctx)->ev.addRead((ctx)->ev.data); \
