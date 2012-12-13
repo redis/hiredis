@@ -153,6 +153,16 @@ malloc_ai(int port, u_long addr) {
     return(ai);
 }
 
+void
+freeaddrinfo(struct addrinfo *ai) {
+    struct addrinfo *next;
+
+    do {
+        next = ai->ai_next;
+        free(ai);
+    } while (NULL != (ai = next));
+}
+
 int
 getaddrinfo(const char *hostname, const char *servname,
                 const struct addrinfo *hints, struct addrinfo **res) {
@@ -208,15 +218,6 @@ getaddrinfo(const char *hostname, const char *servname,
     }
 
     return EAI_NODATA;
-}
-void
-freeaddrinfo(struct addrinfo *ai) {
-    struct addrinfo *next;
-
-    do {
-        next = ai->ai_next;
-        free(ai);
-    } while (NULL != (ai = next));
 }
 #define close(x) closesocket(x)
 #define EINPROGRESS WSAEINPROGRESS
@@ -288,8 +289,8 @@ static int redisSetBlocking(redisContext *c, int fd, int blocking) {
         return REDIS_ERR;
     }
 #else
-    DWORD b = (DWORD) blocking;
-    //ioctlsocket(fd, FIONBIO, &b);
+    DWORD b = (DWORD) !blocking;
+    ioctlsocket(fd, FIONBIO, &b);
 #endif
     return REDIS_OK;
 }
