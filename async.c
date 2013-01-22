@@ -102,7 +102,12 @@ static dictType callbackDict = {
 };
 
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
-    redisAsyncContext *ac = realloc(c,sizeof(redisAsyncContext));
+    redisAsyncContext *ac;
+
+    ac = realloc(c,sizeof(redisAsyncContext));
+    if (ac == NULL)
+        return NULL;
+
     c = &(ac->c);
 
     /* The regular connect functions will always set the flag REDIS_CONNECTED.
@@ -150,6 +155,11 @@ redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
         return NULL;
 
     ac = redisAsyncInitialize(c);
+    if (ac == NULL) {
+        redisFree(c);
+        return NULL;
+    }
+
     __redisAsyncCopyError(ac);
     return ac;
 }
@@ -194,6 +204,9 @@ static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
 
     /* Copy callback from stack to heap */
     cb = malloc(sizeof(*cb));
+    if (cb == NULL)
+        return REDIS_ERR_OOM;
+
     if (source != NULL) {
         memcpy(cb,source,sizeof(*cb));
         cb->next = NULL;
