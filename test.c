@@ -88,7 +88,10 @@ static redisContext *connect(struct config config) {
         assert(NULL);
     }
 
-    if (c->err) {
+    if (c == NULL) {
+        printf("Connection error: can't allocate redis context\n");
+        exit(1);
+    } else if (c->err) {
         printf("Connection error: %s\n", c->errstr);
         exit(1);
     }
