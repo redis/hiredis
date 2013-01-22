@@ -347,9 +347,11 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
     /* Custom reply functions are not supported for pub/sub. This will fail
      * very hard when they are used... */
     if (reply->type == REDIS_REPLY_ARRAY) {
-        assert(reply->elements >= 2);
-        assert(reply->element[0]->type == REDIS_REPLY_STRING);
-        stype = reply->element[0]->str;
+        redisReply *elm = reply->reply_array.element[0];
+
+        assert(reply->reply_array.elements >= 2);
+        assert(elm->type == REDIS_REPLY_STRING);
+        stype = elm->reply_string.str;
         pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;
 
         if (pvariant)
@@ -358,8 +360,10 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
             callbacks = ac->sub.channels;
 
         /* Locate the right callback */
-        assert(reply->element[1]->type == REDIS_REPLY_STRING);
-        sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len);
+        elm = reply->reply_array.element[1];
+
+        assert(elm->type == REDIS_REPLY_STRING);
+        sname = sdsnewlen(elm->reply_string.str,elm->reply_string.len);
         de = dictFind(callbacks,sname);
         if (de != NULL) {
             memcpy(dstcb,dictGetEntryVal(de),sizeof(*dstcb));
@@ -370,8 +374,9 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
 
                 /* If this was the last unsubscribe message, revert to
                  * non-subscribe mode. */
-                assert(reply->element[2]->type == REDIS_REPLY_INTEGER);
-                if (reply->element[2]->integer == 0)
+                elm = reply->reply_array.element[2];
+                assert(elm->type == REDIS_REPLY_INTEGER);
+                if (elm->reply_integer == 0)
                     c->flags &= ~REDIS_SUBSCRIBED;
             }
         }
@@ -411,6 +416,8 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
         /* Even if the context is subscribed, pending regular callbacks will
          * get a reply before pub/sub messages arrive. */
         if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
+            redisReply *pReply = (redisReply *)reply;
+
             /*
              * A spontaneous reply in a not-subscribed context can be the error
              * reply that is sent when a new connection exceeds the maximum
@@ -426,9 +433,9 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
              * In this case we also want to close the connection, and have the
              * user wait until the server is ready to take our request.
              */
-            if (((redisReply*)reply)->type == REDIS_REPLY_ERROR) {
+            if (pReply->type == REDIS_REPLY_ERROR) {
                 c->err = REDIS_ERR_OTHER;
-                snprintf(c->errstr,sizeof(c->errstr),"%s",((redisReply*)reply)->str);
+                snprintf(c->errstr,sizeof(c->errstr),"%s",pReply->reply_error.str);
                 __redisAsyncDisconnect(ac);
                 return;
             }
