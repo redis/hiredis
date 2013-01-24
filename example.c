@@ -64,5 +64,8 @@ int main(void) {
     }
     freeReplyObject(reply);
 
+    /* Disconnects and frees the contex */
+    redisFree(c);
+
     return 0;
 }
