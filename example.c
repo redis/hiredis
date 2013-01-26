@@ -11,8 +11,13 @@ int main(void) {
 
     struct timeval timeout = { 1, 500000 }; // 1.5 seconds
     c = redisConnectWithTimeout((char*)"127.0.0.1", 6379, timeout);
-    if (c->err) {
-        printf("Connection error: %s\n", c->errstr);
+    if (c == NULL || c->err) {
+        if (c) {
+            printf("Connection error: %s\n", c->errstr);
+            redisFree(c);
+        } else {
+            printf("Connection error: can't allocate redis context\n");
+        }
         exit(1);
     }
 
