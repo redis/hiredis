@@ -1,6 +1,6 @@
 ### 0.11.0
 
-* Increase the maximum multi-bulk reply depth to 8.
+* Increase the maximum multi-bulk reply depth to 7.
 
 * Increase the read buffer size from 2k to 16k.
 
