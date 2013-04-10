@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
+#include <limits.h>
 
 #include "hiredis.h"
 
@@ -22,6 +23,7 @@ struct config {
     struct {
         const char *host;
         int port;
+        struct timeval timeout;
     } tcp;
 
     struct {
@@ -433,6 +435,30 @@ static void test_blocking_io_errors(struct config config) {
     redisFree(c);
 }
 
+static void test_invalid_timeout_errors(struct config config) {
+    redisContext *c;
+
+    test("Set error when an invalid timeout usec value is given to redisConnectWithTimeout: ");
+
+    config.tcp.timeout.tv_sec = 0;
+    config.tcp.timeout.tv_usec = 10000001;
+
+    c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
+
+    test_cond(c->err == REDIS_ERR_IO);
+
+    test("Set error when an invalid timeout sec value is given to redisConnectWithTimeout: ");
+
+    config.tcp.timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
+    config.tcp.timeout.tv_usec = 0;
+
+    c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
+
+    test_cond(c->err == REDIS_ERR_IO);
+
+    redisFree(c);
+}
+
 static void test_throughput(struct config config) {
     redisContext *c = connect(config);
     redisReply **replies;
@@ -641,6 +667,7 @@ int main(int argc, char **argv) {
     cfg.type = CONN_TCP;
     test_blocking_connection(cfg);
     test_blocking_io_errors(cfg);
+    test_invalid_timeout_errors(cfg);
     if (throughput) test_throughput(cfg);
 
     printf("\nTesting against Unix socket connection (%s):\n", cfg.unix.path);
