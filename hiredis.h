@@ -88,6 +88,8 @@
 
 #define REDIS_READER_MAX_BUF (1024*16)  /* Default max unused reader buffer. */
 
+#define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
