@@ -4,7 +4,8 @@
 # This file is released under the BSD license, see the COPYING file
 
 OBJ=net.o hiredis.o sds.o async.o
-BINS=hiredis-example hiredis-test
+EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev
+TESTS=hiredis-test
 LIBNAME=libhiredis
 
 HIREDIS_MAJOR=0
@@ -46,7 +47,6 @@ all: $(DYLIBNAME) $(BINS)
 # Deps (use make dep to generate this)
 net.o: net.c fmacros.h net.h hiredis.h
 async.o: async.c async.h hiredis.h sds.h dict.c dict.h
-example.o: example.c hiredis.h
 hiredis.o: hiredis.c fmacros.h hiredis.h net.h sds.h
 sds.o: sds.c sds.h
 test.o: test.c hiredis.h
@@ -61,22 +61,27 @@ dynamic: $(DYLIBNAME)
 static: $(STLIBNAME)
 
 # Binaries:
-hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -levent example-libevent.c $(STLIBNAME)
+hiredis-example: examples/example.c $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) $< $(STLIBNAME)
 
-hiredis-example-libev: example-libev.c adapters/libev.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -lev example-libev.c $(STLIBNAME)
+hiredis-example-libevent: examples/example-libevent.c adapters/libevent.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -levent examples/example-libevent.c $(STLIBNAME)
+
+hiredis-example-libev: examples/example-libev.c adapters/libev.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -lev examples/example-libev.c $(STLIBNAME)
 
 ifndef AE_DIR
 hiredis-example-ae:
 	@echo "Please specify AE_DIR (e.g. <redis repository>/src)"
 	@false
 else
-hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I$(AE_DIR) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
+hiredis-example-ae: examples/example-ae.c adapters/ae.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I$(AE_DIR) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o examples/example-ae.c $(STLIBNAME)
 endif
 
-hiredis-%: %.o $(STLIBNAME)
+examples: $(EXAMPLES)
+
+hiredis-test: test.o $(STLIBNAME)
 	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
@@ -98,7 +103,7 @@ check: hiredis-test
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
 clean:
-	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
+	rm -rf $(DYLIBNAME) $(STLIBNAME) $(TESTS) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
