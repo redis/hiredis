@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include "hiredis.h"
-#include "async.h"
-#include "adapters/libuv.h"
+
+#include <hiredis.h>
+#include <async.h>
+#include <adapters/libuv.h>
 
 void getCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = r;

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hiredis.h"
+#include <hiredis.h>
 
 int main(void) {
     unsigned int j;

@@ -4,7 +4,8 @@
 # This file is released under the BSD license, see the COPYING file
 
 OBJ=net.o hiredis.o sds.o async.o
-BINS=hiredis-example hiredis-test
+EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev
+TESTS=hiredis-test
 LIBNAME=libhiredis
 
 HIREDIS_MAJOR=0
@@ -41,12 +42,11 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
 endif
 
-all: $(DYLIBNAME) $(BINS)
+all: $(DYLIBNAME)
 
 # Deps (use make dep to generate this)
 net.o: net.c fmacros.h net.h hiredis.h
 async.o: async.c async.h hiredis.h sds.h dict.c dict.h
-example.o: example.c hiredis.h
 hiredis.o: hiredis.c fmacros.h hiredis.h net.h sds.h
 sds.o: sds.c sds.h
 test.o: test.c hiredis.h
@@ -61,19 +61,19 @@ dynamic: $(DYLIBNAME)
 static: $(STLIBNAME)
 
 # Binaries:
-hiredis-example-libevent: example-libevent.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -levent example-libevent.c $(STLIBNAME)
+hiredis-example-libevent: examples/example-libevent.c adapters/libevent.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -levent $(STLIBNAME)
 
-hiredis-example-libev: example-libev.c adapters/libev.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -lev example-libev.c $(STLIBNAME)
+hiredis-example-libev: examples/example-libev.c adapters/libev.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -lev $(STLIBNAME)
 
 ifndef AE_DIR
 hiredis-example-ae:
 	@echo "Please specify AE_DIR (e.g. <redis repository>/src)"
 	@false
 else
-hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I$(AE_DIR) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o $(AE_DIR)/../deps/jemalloc/lib/libjemalloc.a -pthread example-ae.c $(STLIBNAME)
+hiredis-example-ae: examples/example-ae.c adapters/ae.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. -I$(AE_DIR) $< $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o $(AE_DIR)/../deps/jemalloc/lib/libjemalloc.a -pthread $(STLIBNAME)
 endif
 
 ifndef LIBUV_DIR
@@ -81,11 +81,16 @@ hiredis-example-libuv:
 	@echo "Please specify LIBUV_DIR (e.g. ../libuv/)"
 	@false
 else
-hiredis-example-libuv: example-libuv.c adapters/libuv.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I$(LIBUV_DIR)/include example-libuv.c $(LIBUV_DIR)/.libs/libuv.a -lpthread $(STLIBNAME)
+hiredis-example-libuv: examples/example-libuv.c adapters/libuv.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. -I$(LIBUV_DIR)/include $< $(LIBUV_DIR)/.libs/libuv.a -lpthread $(STLIBNAME)
 endif
 
-hiredis-%: %.o $(STLIBNAME)
+hiredis-example: examples/example.c $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< $(STLIBNAME)
+
+examples: $(EXAMPLES)
+
+hiredis-test: test.o $(STLIBNAME)
 	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
@@ -107,7 +112,7 @@ check: hiredis-test
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
 clean:
-	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
+	rm -rf $(DYLIBNAME) $(STLIBNAME) $(TESTS) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c

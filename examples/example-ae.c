@@ -2,9 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include "hiredis.h"
-#include "async.h"
-#include "adapters/libev.h"
+
+#include <hiredis.h>
+#include <async.h>
+#include <adapters/ae.h>
+
+/* Put event loop in the global scope, so it can be explicitly stopped */
+static aeEventLoop *loop;
 
 void getCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = r;
@@ -18,17 +22,22 @@ void getCallback(redisAsyncContext *c, void *r, void *privdata) {
 void connectCallback(const redisAsyncContext *c, int status) {
     if (status != REDIS_OK) {
         printf("Error: %s\n", c->errstr);
+        aeStop(loop);
         return;
     }
+
     printf("Connected...\n");
 }
 
 void disconnectCallback(const redisAsyncContext *c, int status) {
     if (status != REDIS_OK) {
         printf("Error: %s\n", c->errstr);
+        aeStop(loop);
         return;
     }
+
     printf("Disconnected...\n");
+    aeStop(loop);
 }
 
 int main (int argc, char **argv) {
@@ -41,11 +50,13 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    redisLibevAttach(EV_DEFAULT_ c);
+    loop = aeCreateEventLoop(64);
+    redisAeAttach(loop, c);
     redisAsyncSetConnectCallback(c,connectCallback);
     redisAsyncSetDisconnectCallback(c,disconnectCallback);
     redisAsyncCommand(c, NULL, NULL, "SET key %b", argv[argc-1], strlen(argv[argc-1]));
     redisAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
-    ev_loop(EV_DEFAULT_ 0);
+    aeMain(loop);
     return 0;
 }
+
