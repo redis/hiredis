@@ -179,6 +179,7 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 int redisSetTimeout(redisContext *c, struct timeval tv);
+int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
