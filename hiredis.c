@@ -1092,6 +1092,13 @@ int redisSetTimeout(redisContext *c, struct timeval tv) {
     return REDIS_ERR;
 }
 
+/* Enable connection KeepAlive. */
+int redisEnableKeepAlive(redisContext *c) {
+    if (redisKeepAlive(c, REDIS_KEEPALIVE_INTERVAL) != REDIS_OK)
+        return REDIS_ERR;
+    return REDIS_OK;
+}
+
 /* Use this function to handle a read event on the descriptor. It will try
  * and read some bytes from the socket and feed them to the reply parser.
  *
