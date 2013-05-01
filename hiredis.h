@@ -88,6 +88,8 @@
 
 #define REDIS_READER_MAX_BUF (1024*16)  /* Default max unused reader buffer. */
 
+#define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -177,6 +179,7 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 int redisSetTimeout(redisContext *c, struct timeval tv);
+int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
