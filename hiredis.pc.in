@@ -1,0 +1,11 @@
+prefix=@@PREFIX@@
+exec_prefix=${prefix}
+libdir=@@LIBDIR@@
+includedir=@@INCLUDEDIR@@
+
+Name: Hiredis
+Description: Minimalistic C client library for the Redis database.
+Version: @@VERSION@@
+Libs: -L${libdir} -lhiredis
+Cflags: -I${includedir}
+
