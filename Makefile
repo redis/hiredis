@@ -98,17 +98,23 @@ check: hiredis-test
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
 clean:
-	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
+	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov hiredis.pc
 
 dep:
 	$(CC) -MM *.c
 
 # Installation related variables and target
+SED?=sed
 PREFIX?=/usr/local
 INCLUDE_PATH?=include/hiredis
 LIBRARY_PATH?=lib
+CMAKE_MODULES_PATH?=share/cmake/Modules
+PKGCONFIG_PATH?=$(LIBRARY_PATH)/pkgconfig
 INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
 INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
+INSTALL_PKGCONFIG_PATH= $(PREFIX)/$(PKGCONFIG_PATH)
+INSTALL_CMAKE_MODULES_PATH= $(PREFIX)/$(CMAKE_MODULES_PATH)
+PKG_CONFIG_CFLAGS?= -D_FILE_OFFSET_BITS=64
 
 ifeq ($(uname_S),SunOS)
   INSTALL?= cp -r
@@ -116,13 +122,24 @@ endif
 
 INSTALL?= cp -a
 
-install: $(DYLIBNAME) $(STLIBNAME)
+hiredis.pc: hiredis.pc.in
+	test -d $(INSTALL_PKGCONFIG_PATH) && \
+		$(SED) -e 's,@PREFIX@,$(PREFIX),g' \
+				-e 's,@LIBRARY_PATH@,$(INSTALL_LIBRARY_PATH),g' \
+				-e 's,@CFLAGS@,$(PKG_CONFIG_CFLAGS),g' $< >$@ || true
+
+install: $(DYLIBNAME) $(STLIBNAME) hiredis.pc
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
 	$(INSTALL) hiredis.h async.h adapters $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MAJOR_NAME) $(DYLIBNAME)
 	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
+	test -f hiredis.pc && \
+	test -d $(INSTALL_PKGCONFIG_PATH) && \
+		$(INSTALL) hiredis.pc $(INSTALL_PKGCONFIG_PATH) && \
+	test -d "$(INSTALL_CMAKE_MODULES_PATH)" && \
+		$(INSTALL) FindHiredis.cmake $(INSTALL_CMAKE_MODULES_PATH) || true
 
 32bit:
 	@echo ""
@@ -145,4 +162,4 @@ coverage: gcov
 noopt:
 	$(MAKE) OPTIMIZATION=""
 
-.PHONY: all test check clean dep install 32bit gprof gcov noopt
+.PHONY: all test check clean dep install 32bit gprof gcov noopt hiredis.pc
