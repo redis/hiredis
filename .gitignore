@@ -1,6 +1,28 @@
 /hiredis-test
 /hiredis-example*
+/*.lo
 /*.o
 /*.so
 /*.dylib
 /*.a
+/libhiredis-*.la
+
+# hiredis.pc is generated from hiredis.pc.in
+/hiredis.pc
+
+# these are all related to autoconf/automake/libtool
+.deps/
+.libs/
+/autom4te.cache/
+/m4/
+/config.guess
+/config.log
+/config.status
+/config.sub
+/aclocal.m4
+/depcomp
+/install-sh
+/ltmain.sh
+/missing
+/libtool
+/Makefile.in
