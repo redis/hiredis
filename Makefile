@@ -6,9 +6,10 @@
 OBJ=net.o hiredis.o sds.o async.o
 BINS=hiredis-example hiredis-test
 LIBNAME=libhiredis
+PKGNAME=hiredis
 
-HIREDIS_MAJOR=0
-HIREDIS_MINOR=10
+HIREDIS_MAJOR := $(shell sed -n -s 's/^.* HIREDIS_MAJOR //; T; p; q' < hiredis.h)
+HIREDIS_MINOR := $(shell sed -n -s 's/^.* HIREDIS_MINOR //; T; p; q' < hiredis.h)
 
 # Fallback to gcc when $CC is not in $PATH.
 CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
@@ -27,6 +28,11 @@ DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(L
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
 
+PKGCONFSUFFIX=pc
+PKGCONF_SRCSUFFIX=pc.in
+PKGCONFNAME=${PKGNAME}.${PKGCONFSUFFIX}
+PKGCONF_SRCNAME=${PKGNAME}.${PKGCONF_SRCSUFFIX}
+
 # Platform-specific overrides
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 ifeq ($(uname_S),SunOS)
@@ -41,7 +47,7 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
 endif
 
-all: $(DYLIBNAME) $(BINS)
+all: $(DYLIBNAME) $(BINS) $(PKGCONFNAME)
 
 # Deps (use make dep to generate this)
 net.o: net.c fmacros.h net.h hiredis.h
@@ -98,7 +104,7 @@ check: hiredis-test
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
 clean:
-	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) hiredis-example* *.o *.gcda *.gcno *.gcov
+	rm -rf $(DYLIBNAME) $(STLIBNAME) $(BINS) $(PKGCONFNAME) hiredis-example* *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
@@ -107,14 +113,23 @@ dep:
 PREFIX?=/usr/local
 INCLUDE_PATH?=include/hiredis
 LIBRARY_PATH?=lib
+PKGCONF_PATH?=pkgconfig
 INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
 INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
+INSTALL_PKGCONF_PATH= $(PREFIX)/$(PKGCONF_PATH)
 
 ifeq ($(uname_S),SunOS)
   INSTALL?= cp -r
 endif
 
 INSTALL?= cp -a
+
+$(PKGCONFNAME): $(PKGCONF_SRCNAME)
+	sed < $< > $@ \
+		-e 's#@@PREFIX@@#$(PREFIX)#' \
+		-e 's#@@LIBDIR@@#$(INSTALL_LIBRARY_PATH)#' \
+		-e 's#@@INCLUDEDIR@@#$(INSTALL_INCLUDE_PATH)#' \
+		-e 's#@@VERSION@@#$(HIREDIS_MAJOR).$(HIREDIS_MINOR).0#'
 
 install: $(DYLIBNAME) $(STLIBNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
@@ -123,6 +138,8 @@ install: $(DYLIBNAME) $(STLIBNAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MAJOR_NAME) $(DYLIBNAME)
 	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
+	mkdir -p $(INSTALL_PKGCONF_PATH)
+	$(INSTALL) $(PKGCONFNAME) $(INSTALL_PKGCONF_PATH)
 
 32bit:
 	@echo ""
