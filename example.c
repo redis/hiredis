@@ -69,5 +69,8 @@ int main(void) {
     }
     freeReplyObject(reply);
 
+    /* Disconnects and frees the context */
+    redisFree(c);
+
     return 0;
 }
