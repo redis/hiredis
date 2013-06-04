@@ -76,6 +76,15 @@ hiredis-example-ae: example-ae.c adapters/ae.h $(STLIBNAME)
 	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I$(AE_DIR) $(AE_DIR)/ae.o $(AE_DIR)/zmalloc.o example-ae.c $(STLIBNAME)
 endif
 
+ifndef LIBUV_DIR
+hiredis-example-libuv:
+	@echo "Please specify LIBUV_DIR (e.g. ../libuv/)"
+	@false
+else
+hiredis-example-libuv: example-libuv.c adapters/libuv.h $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I${LIBUV_DIR}/include/ example-libuv.c ${LIBUV_DIR}/libuv.a -lrt $(STLIBNAME)
+endif
+
 hiredis-%: %.o $(STLIBNAME)
 	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
 
