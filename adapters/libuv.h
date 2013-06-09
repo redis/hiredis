@@ -3,9 +3,6 @@
 #include <uv.h>
 #include "../hiredis.h"
 #include "../async.h"
-//#include <stdlib.h>  // malloc(), free()
-//#include <string.h>  // memset()
-//#include <assert.h>  // assert()
 
 
 typedef struct redisLibuvEvents {
