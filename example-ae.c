@@ -32,6 +32,8 @@ void disconnectCallback(const redisAsyncContext *c, int status) {
         return;
     }
     printf("Disconnected...\n");
+
+    aeStop(loop);
 }
 
 int main (int argc, char **argv) {
@@ -44,7 +46,7 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    loop = aeCreateEventLoop();
+    loop = aeCreateEventLoop(64);
     redisAeAttach(loop, c);
     redisAsyncSetConnectCallback(c,connectCallback);
     redisAsyncSetDisconnectCallback(c,disconnectCallback);
