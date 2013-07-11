@@ -917,7 +917,7 @@ err:
  * %b represents a binary safe string
  *
  * When using %b you need to provide both the pointer to the string
- * and the length in bytes. Examples:
+ * and the length in bytes as a size_t. Examples:
  *
  * len = redisFormatCommand(target, "GET %s", mykey);
  * len = redisFormatCommand(target, "SET %s %b", mykey, myval, myvallen);
