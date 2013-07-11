@@ -4,13 +4,15 @@
 
 #include <hiredis.h>
 
-int main(void) {
+int main(int argc, char **argv) {
     unsigned int j;
     redisContext *c;
     redisReply *reply;
+    const char *hostname = (argc > 1) ? argv[1] : "127.0.0.1";
+    int port = (argc > 2) ? atoi(argv[2]) : 6379;
 
     struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-    c = redisConnectWithTimeout((char*)"127.0.0.1", 6379, timeout);
+    c = redisConnectWithTimeout(hostname, port, timeout);
     if (c == NULL || c->err) {
         if (c) {
             printf("Connection error: %s\n", c->errstr);
