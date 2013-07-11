@@ -23,30 +23,30 @@ int main(void) {
 
     /* PING server */
     reply = redisCommand(c,"PING");
-    printf("PING: %s\n", reply->str);
+    printf("PING: %s\n", reply->reply_string.str);
     freeReplyObject(reply);
 
     /* Set a key */
     reply = redisCommand(c,"SET %s %s", "foo", "hello world");
-    printf("SET: %s\n", reply->str);
+    printf("SET: %s\n", reply->reply_string.str);
     freeReplyObject(reply);
 
     /* Set a key using binary safe API */
     reply = redisCommand(c,"SET %b %b", "bar", 3, "hello", 5);
-    printf("SET (binary API): %s\n", reply->str);
+    printf("SET (binary API): %s\n", reply->reply_string.str);
     freeReplyObject(reply);
 
     /* Try a GET and two INCR */
     reply = redisCommand(c,"GET foo");
-    printf("GET foo: %s\n", reply->str);
+    printf("GET foo: %s\n", reply->reply_string.str);
     freeReplyObject(reply);
 
     reply = redisCommand(c,"INCR counter");
-    printf("INCR counter: %lld\n", reply->integer);
+    printf("INCR counter: %lld\n", reply->reply_integer);
     freeReplyObject(reply);
     /* again ... */
     reply = redisCommand(c,"INCR counter");
-    printf("INCR counter: %lld\n", reply->integer);
+    printf("INCR counter: %lld\n", reply->reply_integer);
     freeReplyObject(reply);
 
     /* Create a list of numbers, from 0 to 9 */
@@ -63,8 +63,11 @@ int main(void) {
     /* Let's check what we have inside the list */
     reply = redisCommand(c,"LRANGE mylist 0 -1");
     if (reply->type == REDIS_REPLY_ARRAY) {
-        for (j = 0; j < reply->elements; j++) {
-            printf("%u) %s\n", j, reply->element[j]->str);
+        for (j = 0; j < reply->reply_array.elements; j++) {
+            redisReply *elm;
+
+            elm = reply->reply_array.element[j];
+            printf("%u) %s\n", j, elm->reply_string.str);
         }
     }
     freeReplyObject(reply);

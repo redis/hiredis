@@ -11,8 +11,11 @@ static aeEventLoop *loop;
 
 void getCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = r;
-    if (reply == NULL) return;
-    printf("argv[%s]: %s\n", (char*)privdata, reply->str);
+
+    if (reply == NULL || reply->type != REDIS_REPLY_STRING)
+        return;
+
+    printf("argv[%s]: %s\n", (char*)privdata, reply->string.str);
 
     /* Disconnect after receiving the reply to GET */
     redisAsyncDisconnect(c);

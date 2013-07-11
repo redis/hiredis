@@ -53,7 +53,7 @@ static redisContext *select_database(redisContext *c) {
     /* Make sure the DB is emtpy */
     reply = redisCommand(c,"DBSIZE");
     assert(reply != NULL);
-    if (reply->type == REDIS_REPLY_INTEGER && reply->integer == 0) {
+    if (reply->type == REDIS_REPLY_INTEGER && reply->reply_integer == 0) {
         /* Awesome, DB 9 is empty and we can continue. */
         freeReplyObject(reply);
     } else {
@@ -279,7 +279,7 @@ static void test_reply_reader(void) {
     ret = redisReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_OK &&
         ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
-        ((redisReply*)reply)->elements == 0);
+        ((redisReply*)reply)->reply_array.elements == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
 }
@@ -317,13 +317,13 @@ static void test_blocking_connection(struct config config) {
     test("Is able to deliver commands: ");
     reply = redisCommand(c,"PING");
     test_cond(reply->type == REDIS_REPLY_STATUS &&
-        strcasecmp(reply->str,"pong") == 0)
+        strcasecmp(reply->reply_string.str,"pong") == 0)
     freeReplyObject(reply);
 
     test("Is a able to send commands verbatim: ");
     reply = redisCommand(c,"SET foo bar");
     test_cond (reply->type == REDIS_REPLY_STATUS &&
-        strcasecmp(reply->str,"ok") == 0)
+        strcasecmp(reply->reply_string.str,"ok") == 0)
     freeReplyObject(reply);
 
     test("%%s String interpolation works: ");
@@ -331,7 +331,7 @@ static void test_blocking_connection(struct config config) {
     freeReplyObject(reply);
     reply = redisCommand(c,"GET foo");
     test_cond(reply->type == REDIS_REPLY_STRING &&
-        strcmp(reply->str,"hello world") == 0);
+        strcmp(reply->reply_string.str,"hello world") == 0);
     freeReplyObject(reply);
 
     test("%%b String interpolation works: ");
@@ -339,10 +339,10 @@ static void test_blocking_connection(struct config config) {
     freeReplyObject(reply);
     reply = redisCommand(c,"GET foo");
     test_cond(reply->type == REDIS_REPLY_STRING &&
-        memcmp(reply->str,"hello\x00world",11) == 0)
+        memcmp(reply->reply_string.str,"hello\x00world",11) == 0)
 
     test("Binary reply length is correct: ");
-    test_cond(reply->len == 11)
+    test_cond(reply->reply_string.len == 11)
     freeReplyObject(reply);
 
     test("Can parse nil replies: ");
@@ -353,7 +353,7 @@ static void test_blocking_connection(struct config config) {
     /* test 7 */
     test("Can parse integer replies: ");
     reply = redisCommand(c,"INCR mycounter");
-    test_cond(reply->type == REDIS_REPLY_INTEGER && reply->integer == 1)
+    test_cond(reply->type == REDIS_REPLY_INTEGER && reply->reply_integer == 1)
     freeReplyObject(reply);
 
     test("Can parse multi bulk replies: ");
@@ -361,9 +361,9 @@ static void test_blocking_connection(struct config config) {
     freeReplyObject(redisCommand(c,"LPUSH mylist bar"));
     reply = redisCommand(c,"LRANGE mylist 0 -1");
     test_cond(reply->type == REDIS_REPLY_ARRAY &&
-              reply->elements == 2 &&
-              !memcmp(reply->element[0]->str,"bar",3) &&
-              !memcmp(reply->element[1]->str,"foo",3))
+              reply->reply_array.elements == 2 &&
+              !memcmp(reply->reply_array.element[0]->reply_string.str,"bar",3) &&
+              !memcmp(reply->reply_array.element[1]->reply_string.str,"foo",3))
     freeReplyObject(reply);
 
     /* m/e with multi bulk reply *before* other reply.
@@ -374,13 +374,13 @@ static void test_blocking_connection(struct config config) {
     freeReplyObject(redisCommand(c,"PING"));
     reply = (redisCommand(c,"EXEC"));
     test_cond(reply->type == REDIS_REPLY_ARRAY &&
-              reply->elements == 2 &&
-              reply->element[0]->type == REDIS_REPLY_ARRAY &&
-              reply->element[0]->elements == 2 &&
-              !memcmp(reply->element[0]->element[0]->str,"bar",3) &&
-              !memcmp(reply->element[0]->element[1]->str,"foo",3) &&
-              reply->element[1]->type == REDIS_REPLY_STATUS &&
-              strcasecmp(reply->element[1]->str,"pong") == 0);
+              reply->reply_array.elements == 2 &&
+              reply->reply_array.element[0]->type == REDIS_REPLY_ARRAY &&
+              reply->reply_array.element[0]->reply_array.elements == 2 &&
+              !memcmp(reply->reply_array.element[0]->reply_array.element[0]->reply_string.str,"bar",3) &&
+              !memcmp(reply->reply_array.element[0]->reply_array.element[1]->reply_string.str,"foo",3) &&
+              reply->reply_array.element[1]->type == REDIS_REPLY_STATUS &&
+              strcasecmp(reply->reply_array.element[1]->reply_string.str,"pong") == 0);
     freeReplyObject(reply);
 
     disconnect(c);
@@ -400,7 +400,7 @@ static void test_blocking_io_errors(struct config config) {
         char *p, *eptr;
 
         reply = redisCommand(c,"INFO");
-        p = strstr(reply->str,field);
+        p = strstr(reply->reply_string.str,field);
         major = strtol(p+strlen(field),&eptr,10);
         p = eptr+1; /* char next to the first "." */
         minor = strtol(p,&eptr,10);
@@ -412,7 +412,7 @@ static void test_blocking_io_errors(struct config config) {
     if (major >= 2 && minor > 0) {
         /* > 2.0 returns OK on QUIT and read() should be issued once more
          * to know the descriptor is at EOF. */
-        test_cond(strcasecmp(reply->str,"OK") == 0 &&
+        test_cond(strcasecmp(reply->reply_string.str,"OK") == 0 &&
             redisGetReply(c,&_reply) == REDIS_ERR);
         freeReplyObject(reply);
     } else {
@@ -488,7 +488,7 @@ static void test_throughput(struct config config) {
     for (i = 0; i < num; i++) {
         replies[i] = redisCommand(c,"LRANGE mylist 0 499");
         assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_ARRAY);
-        assert(replies[i] != NULL && replies[i]->elements == 500);
+        assert(replies[i] != NULL && replies[i]->reply_array.elements == 500);
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
@@ -516,7 +516,7 @@ static void test_throughput(struct config config) {
     for (i = 0; i < num; i++) {
         assert(redisGetReply(c, (void*)&replies[i]) == REDIS_OK);
         assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_ARRAY);
-        assert(replies[i] != NULL && replies[i]->elements == 500);
+        assert(replies[i] != NULL && replies[i]->reply_array.elements == 500);
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
@@ -582,7 +582,7 @@ static void test_throughput(struct config config) {
 //     c = __connect_nonblock();
 //     redisCommand(c,"PING");
 //     test_cond(redisBufferWrite(c,NULL) == REDIS_ERR &&
-//               strncmp(c->error,"write:",6) == 0);
+//               strncmp(c->reply_error,"write:",6) == 0);
 //     redisFree(c);
 //
 //     test("redisBufferWrite against closed fd: ");
@@ -590,7 +590,7 @@ static void test_throughput(struct config config) {
 //     redisCommand(c,"PING");
 //     redisDisconnect(c);
 //     test_cond(redisBufferWrite(c,NULL) == REDIS_ERR &&
-//               strncmp(c->error,"write:",6) == 0);
+//               strncmp(c->reply_error,"write:",6) == 0);
 //     redisFree(c);
 //
 //     test("Process callbacks in the right sequence: ");

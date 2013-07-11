@@ -79,12 +79,14 @@
 /* Flag that is set when monitor mode is active */
 #define REDIS_MONITORING 0x40
 
-#define REDIS_REPLY_STRING 1
-#define REDIS_REPLY_ARRAY 2
-#define REDIS_REPLY_INTEGER 3
-#define REDIS_REPLY_NIL 4
-#define REDIS_REPLY_STATUS 5
-#define REDIS_REPLY_ERROR 6
+typedef enum {
+    REDIS_REPLY_NIL,
+    REDIS_REPLY_STRING,
+    REDIS_REPLY_ARRAY,
+    REDIS_REPLY_INTEGER,
+    REDIS_REPLY_STATUS,
+    REDIS_REPLY_ERROR
+} redis_type_t;
 
 #define REDIS_READER_MAX_BUF (1024*16)  /* Default max unused reader buffer. */
 
@@ -96,13 +98,30 @@ extern "C" {
 
 /* This is the reply object returned by redisCommand() */
 typedef struct redisReply {
-    int type; /* REDIS_REPLY_* */
-    long long integer; /* The integer when type is REDIS_REPLY_INTEGER */
-    int len; /* Length of string */
-    char *str; /* Used for both REDIS_REPLY_ERROR and REDIS_REPLY_STRING */
-    size_t elements; /* number of elements, for REDIS_REPLY_ARRAY */
-    struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
+    redis_type_t type;
+
+    union {
+        /* REDIS_REPLY_INTEGER */
+        long long __integer;
+
+        struct {
+            /* REDIS_REPLY_STRING, REDIS_REPLY_STATUS, REDIS_REPLY_ERROR */
+            size_t len; /* Length of string */
+            char *str;
+        } __string;
+
+        struct {
+            /* REDIS_REPLY_ARRAY */
+            size_t elements;             /* number of elements, for REDIS_REPLY_ARRAY */
+            struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
+        } __array;
+    } __reply_un;
 } redisReply;
+#define reply_integer  __reply_un.__integer
+#define reply_string   __reply_un.__string
+#define reply_status   __reply_un.__string
+#define reply_error    __reply_un.__string
+#define reply_array    __reply_un.__array
 
 typedef struct redisReadTask {
     int type;

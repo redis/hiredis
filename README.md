@@ -90,27 +90,28 @@ The standard replies that `redisCommand` are of the type `redisReply`. The
 was received:
 
 * **`REDIS_REPLY_STATUS`**:
-    * The command replied with a status reply. The status string can be accessed using `reply->str`.
-      The length of this string can be accessed using `reply->len`.
+    * The command replied with a status reply. The status string can be accessed using `reply->reply_status.str`.
+      The length of this string can be accessed using `reply->reply_status.len`.
 
 * **`REDIS_REPLY_ERROR`**:
-    *  The command replied with an error. The error string can be accessed identical to `REDIS_REPLY_STATUS`.
+    *  The command replied with an error. The error string can be accessed using `reply->reply_error.str`.
+      The length of this string can be accessed using `reply->reply_error.len`.
 
 * **`REDIS_REPLY_INTEGER`**:
     * The command replied with an integer. The integer value can be accessed using the
-      `reply->integer` field of type `long long`.
+      `reply->reply_integer.integer` field of type `long long`.
 
 * **`REDIS_REPLY_NIL`**:
     * The command replied with a **nil** object. There is no data to access.
 
 * **`REDIS_REPLY_STRING`**:
-    * A bulk (string) reply. The value of the reply can be accessed using `reply->str`.
-      The length of this string can be accessed using `reply->len`.
+    * A bulk (string) reply. The value of the reply can be accessed using `reply->reply_string.str`.
+      The length of this string can be accessed using `reply->reply_string.len`.
 
 * **`REDIS_REPLY_ARRAY`**:
     * A multi bulk reply. The number of elements in the multi bulk reply is stored in
-      `reply->elements`. Every element in the multi bulk reply is a `redisReply` object as well
-      and can be accessed via `reply->element[..index..]`.
+      `reply->reply_array.elements`. Every element in the multi bulk reply is a `redisReply`
+      object as well and can be accessed via `reply->reply_array.element[..index..]`.
       Redis may reply with nested arrays but this is fully supported.
 
 Replies should be freed using the `freeReplyObject()` function.
@@ -343,11 +344,11 @@ wrong (either a protocol error, or an out of memory error).
 
 The function `redisReaderGetReply` creates `redisReply` and makes the function
 argument `reply` point to the created `redisReply` variable. For instance, if
-the response of type `REDIS_REPLY_STATUS` then the `str` field of `redisReply`
-will hold the status as a vanilla C string. However, the functions that are
-responsible for creating instances of the `redisReply` can be customized by
-setting the `fn` field on the `redisReader` struct. This should be done
-immediately after creating the `redisReader`.
+the response of type `REDIS_REPLY_STATUS` then the `reply_string.str` field
+of `redisReply` will hold the status as a vanilla C string. However, the
+functions that are responsible for creating instances of the `redisReply` can
+be customized by setting the `fn` field on the `redisReader` struct. This should
+be done immediately after creating the `redisReader`.
 
 For example, [hiredis-rb](https://github.com/pietern/hiredis-rb/blob/master/ext/hiredis_ext/reader.c)
 uses customized reply object functions to create Ruby objects.

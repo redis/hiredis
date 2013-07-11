@@ -77,18 +77,27 @@ void freeReplyObject(void *reply) {
     case REDIS_REPLY_INTEGER:
         break; /* Nothing to free */
     case REDIS_REPLY_ARRAY:
-        if (r->element != NULL) {
-            for (j = 0; j < r->elements; j++)
-                if (r->element[j] != NULL)
-                    freeReplyObject(r->element[j]);
-            free(r->element);
+        if (r->reply_array.element != NULL) {
+            for (j = 0; j < r->reply_array.elements; j++)
+                if (r->reply_array.element[j] != NULL)
+                    freeReplyObject(r->reply_array.element[j]);
+            free(r->reply_array.element);
         }
         break;
     case REDIS_REPLY_ERROR:
+        if (r->reply_error.str != NULL)
+            free(r->reply_error.str);
+        break;
     case REDIS_REPLY_STATUS:
+        if (r->reply_status.str != NULL)
+            free(r->reply_status.str);
+        break;
     case REDIS_REPLY_STRING:
-        if (r->str != NULL)
-            free(r->str);
+        if (r->reply_string.str != NULL)
+            free(r->reply_string.str);
+        break;
+    default:
+        /* Nothing to do */
         break;
     }
     free(r);
@@ -108,20 +117,32 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
         return NULL;
     }
 
-    assert(task->type == REDIS_REPLY_ERROR  ||
-           task->type == REDIS_REPLY_STATUS ||
-           task->type == REDIS_REPLY_STRING);
-
     /* Copy string value */
     memcpy(buf,str,len);
     buf[len] = '\0';
-    r->str = buf;
-    r->len = len;
+
+    switch(task->type) {
+    case REDIS_REPLY_ERROR:
+        r->reply_error.str = buf;
+        r->reply_error.len = len;
+        break;
+    case REDIS_REPLY_STATUS:
+        r->reply_status.str = buf;
+        r->reply_status.len = len;
+        break;
+    case REDIS_REPLY_STRING:
+        r->reply_string.str = buf;
+        r->reply_string.len = len;
+        break;
+    default:
+        freeReplyObject(r);
+        return NULL;
+    }
 
     if (task->parent) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
-        parent->element[task->idx] = r;
+        parent->reply_array.element[task->idx] = r;
     }
     return r;
 }
@@ -134,19 +155,19 @@ static void *createArrayObject(const redisReadTask *task, int elements) {
         return NULL;
 
     if (elements > 0) {
-        r->element = calloc(elements,sizeof(redisReply*));
-        if (r->element == NULL) {
+        r->reply_array.element = calloc(elements,sizeof(redisReply*));
+        if (r->reply_array.element == NULL) {
             freeReplyObject(r);
             return NULL;
         }
     }
 
-    r->elements = elements;
+    r->reply_array.elements = elements;
 
     if (task->parent) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
-        parent->element[task->idx] = r;
+        parent->reply_array.element[task->idx] = r;
     }
     return r;
 }
@@ -158,12 +179,12 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
     if (r == NULL)
         return NULL;
 
-    r->integer = value;
+    r->reply_integer = value;
 
     if (task->parent) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
-        parent->element[task->idx] = r;
+        parent->reply_array.element[task->idx] = r;
     }
     return r;
 }
@@ -178,7 +199,7 @@ static void *createNilObject(const redisReadTask *task) {
     if (task->parent) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY);
-        parent->element[task->idx] = r;
+        parent->reply_array.element[task->idx] = r;
     }
     return r;
 }
