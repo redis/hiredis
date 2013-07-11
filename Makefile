@@ -82,7 +82,7 @@ hiredis-example-libuv:
 	@false
 else
 hiredis-example-libuv: example-libuv.c adapters/libuv.h $(STLIBNAME)
-	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I${LIBUV_DIR}/include/ example-libuv.c ${LIBUV_DIR}/libuv.a -lrt $(STLIBNAME)
+	$(CC) -o $@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I$(LIBUV_DIR)/include example-libuv.c $(LIBUV_DIR)/.libs/libuv.a -lpthread $(STLIBNAME)
 endif
 
 hiredis-%: %.o $(STLIBNAME)
