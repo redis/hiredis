@@ -62,8 +62,8 @@ void __redisAppendCommand(redisContext *c, char *cmd, size_t len);
 
 /* Functions managing dictionary of callbacks for pub/sub. */
 static unsigned int callbackHash(const void *key) {
-    return dictGenHashFunction((const unsigned char*)key
-                               , sdslen((const char*)key));
+    return dictGenHashFunction((const unsigned char *)key,
+                               sdslen((const sds)key));
 }
 
 static void *callbackValDup(void *privdata, const void *src) {
@@ -74,11 +74,11 @@ static void *callbackValDup(void *privdata, const void *src) {
 }
 
 static int callbackKeyCompare(void *privdata, const void *key1, const void *key2) {
-    const int l1, l2;
+    int l1, l2;
     ((void) privdata);
 
-    l1 = sdslen((sds)key1);
-    l2 = sdslen((sds)key2);
+    l1 = sdslen((const sds)key1);
+    l2 = sdslen((const sds)key2);
     if (l1 != l2) return 0;
     return memcmp(key1,key2,l1) == 0;
 }
