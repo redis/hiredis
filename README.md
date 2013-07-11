@@ -339,6 +339,9 @@ and a reply object (as described above) via `void **reply`. The returned status
 can be either `REDIS_OK` or `REDIS_ERR`, where the latter means something went
 wrong (either a protocol error, or an out of memory error).
 
+The parser limits the level of nesting for multi bulk payloads to 7. If the
+multi bulk nesting level is higher than this, the parser returns an error.
+
 ### Customizing replies
 
 The function `redisReaderGetReply` creates `redisReply` and makes the function
