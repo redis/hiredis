@@ -21,17 +21,22 @@ void getCallback(redisAsyncContext *c, void *r, void *privdata) {
 void connectCallback(const redisAsyncContext *c, int status) {
     if (status != REDIS_OK) {
         printf("Error: %s\n", c->errstr);
+        aeStop(loop);
         return;
     }
+
     printf("Connected...\n");
 }
 
 void disconnectCallback(const redisAsyncContext *c, int status) {
     if (status != REDIS_OK) {
         printf("Error: %s\n", c->errstr);
+        aeStop(loop);
         return;
     }
+
     printf("Disconnected...\n");
+    aeStop(loop);
 }
 
 int main (int argc, char **argv) {
@@ -44,7 +49,7 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    loop = aeCreateEventLoop();
+    loop = aeCreateEventLoop(64);
     redisAeAttach(loop, c);
     redisAsyncSetConnectCallback(c,connectCallback);
     redisAsyncSetDisconnectCallback(c,disconnectCallback);
