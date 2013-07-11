@@ -105,10 +105,8 @@ dep:
 
 # Installation related variables and target
 PREFIX?=/usr/local
-INCLUDE_PATH?=include/hiredis
-LIBRARY_PATH?=lib
-INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
-INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
+INSTALL_INCLUDE_PATH= $(PREFIX)/include/hiredis
+INSTALL_LIBRARY_PATH= $(PREFIX)/lib
 
 ifeq ($(uname_S),SunOS)
   INSTALL?= cp -r
