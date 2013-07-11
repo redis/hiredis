@@ -175,7 +175,7 @@ static int redisContextWaitReady(redisContext *c, int fd, const struct timeval *
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
         if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
-	     __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
+            __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
             close(fd);
             return REDIS_ERR;
         }
