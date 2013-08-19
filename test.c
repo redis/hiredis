@@ -28,7 +28,7 @@ struct config {
 
     struct {
         const char *path;
-    } unix;
+    } unix_sock;
 };
 
 /* The following lines make up our testing "framework" :) */
@@ -85,7 +85,7 @@ static redisContext *connect(struct config config) {
     if (config.type == CONN_TCP) {
         c = redisConnect(config.tcp.host, config.tcp.port);
     } else if (config.type == CONN_UNIX) {
-        c = redisConnectUnix(config.unix.path);
+        c = redisConnectUnix(config.unix_sock.path);
     } else {
         assert(NULL);
     }
@@ -631,7 +631,7 @@ int main(int argc, char **argv) {
             .host = "127.0.0.1",
             .port = 6379
         },
-        .unix = {
+        .unix_sock = {
             .path = "/tmp/redis.sock"
         }
     };
@@ -651,7 +651,7 @@ int main(int argc, char **argv) {
             cfg.tcp.port = atoi(argv[0]);
         } else if (argc >= 2 && !strcmp(argv[0],"-s")) {
             argv++; argc--;
-            cfg.unix.path = argv[0];
+            cfg.unix_sock.path = argv[0];
         } else if (argc >= 1 && !strcmp(argv[0],"--skip-throughput")) {
             throughput = 0;
         } else {
@@ -672,7 +672,7 @@ int main(int argc, char **argv) {
     test_invalid_timeout_errors(cfg);
     if (throughput) test_throughput(cfg);
 
-    printf("\nTesting against Unix socket connection (%s):\n", cfg.unix.path);
+    printf("\nTesting against Unix socket connection (%s):\n", cfg.unix_sock.path);
     cfg.type = CONN_UNIX;
     test_blocking_connection(cfg);
     test_blocking_io_errors(cfg);
