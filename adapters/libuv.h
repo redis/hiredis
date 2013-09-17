@@ -3,7 +3,7 @@
 #include <uv.h>
 #include "../hiredis.h"
 #include "../async.h"
-
+#include <string.h>
 
 typedef struct redisLibuvEvents {
   redisAsyncContext* context;
