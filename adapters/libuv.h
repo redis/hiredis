@@ -11,6 +11,7 @@ typedef struct redisLibuvEvents {
   int                events;
 } redisLibuvEvents;
 
+int redisLibuvAttach(redisAsyncContext*, uv_loop_t*);
 
 static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
