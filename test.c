@@ -205,6 +205,28 @@ static void test_format_commands(void) {
     free(cmd);
 }
 
+static void test_append_formated_commands(struct config config) {
+    redisContext *c;
+    redisReply *reply;
+    char *cmd;
+    int len;
+
+    c = connect(config);
+
+    test("Append format command: ");
+
+    len = redisFormatCommand(&cmd, "SET foo bar");
+
+    test_cond(redisAppendFormatedCommand(c, cmd, len) == REDIS_OK);
+
+    assert(redisGetReply(c, (void*)&reply) == REDIS_OK);
+
+    free(cmd);
+    freeReplyObject(reply);
+
+    disconnect(c);
+}
+
 static void test_reply_reader(void) {
     redisReader *reader;
     void *reply;
@@ -670,6 +692,7 @@ int main(int argc, char **argv) {
     test_blocking_connection(cfg);
     test_blocking_io_errors(cfg);
     test_invalid_timeout_errors(cfg);
+    test_append_formated_commands(cfg);
     if (throughput) test_throughput(cfg);
 
     printf("\nTesting against Unix socket connection (%s):\n", cfg.unix.path);
