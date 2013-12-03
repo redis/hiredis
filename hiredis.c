@@ -1230,7 +1230,7 @@ int __redisAppendCommand(redisContext *c, char *cmd, size_t len) {
     return REDIS_OK;
 }
 
-int redisAppendFormatedCommand(redisContext *c, char *format, size_t len) {
+int redisAppendFormattedCommand(redisContext *c, char *format, size_t len) {
 
     if (__redisAppendCommand(c, format, len) != REDIS_OK) {
         return REDIS_ERR;
