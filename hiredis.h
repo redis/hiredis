@@ -191,7 +191,7 @@ int redisBufferWrite(redisContext *c, int *done);
 int redisGetReply(redisContext *c, void **reply);
 int redisGetReplyFromReader(redisContext *c, void **reply);
 
-/* Write a command formatted to the output buffer. Use these functions in blocking mode
+/* Write a formatted command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
 int redisAppendFormattedCommand(redisContext *c, char *format, size_t len);
 
