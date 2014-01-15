@@ -174,6 +174,11 @@ redisAsyncContext *redisAsyncConnectUnix(const char *path) {
         return NULL;
 
     ac = redisAsyncInitialize(c);
+    if (ac == NULL) {
+        redisFree(c);
+        return NULL;
+    }
+
     __redisAsyncCopyError(ac);
     return ac;
 }
@@ -398,7 +403,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
                 __redisAsyncDisconnect(ac);
                 return;
             }
-            
+
             /* If monitor mode, repush callback */
             if(c->flags & REDIS_MONITORING) {
                 __redisPushCallback(&ac->replies,&cb);
