@@ -97,7 +97,7 @@ test: hiredis-test
 	./hiredis-test
 
 check: hiredis-test
-	echo \
+	echo -e \
 		"daemonize yes\n" \
 		"pidfile /tmp/hiredis-test-redis.pid\n" \
 		"port 56379\n" \
