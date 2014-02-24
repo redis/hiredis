@@ -11,6 +11,18 @@ LIBNAME=libhiredis
 HIREDIS_MAJOR=0
 HIREDIS_MINOR=10
 
+# redis-server configuration used for testing
+REDIS_PORT=56379
+REDIS_SERVER=redis-server
+define REDIS_TEST_CONFIG
+	daemonize yes
+	pidfile /tmp/hiredis-test-redis.pid
+	port $(REDIS_PORT)
+	bind 127.0.0.1
+	unixsocket /tmp/hiredis-test-redis.sock
+endef
+export REDIS_TEST_CONFIG
+
 # Fallback to gcc when $CC is not in $PATH.
 CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
 OPTIMIZATION?=-O3
@@ -97,14 +109,8 @@ test: hiredis-test
 	./hiredis-test
 
 check: hiredis-test
-	echo \
-		"daemonize yes\n" \
-		"pidfile /tmp/hiredis-test-redis.pid\n" \
-		"port 56379\n" \
-		"bind 127.0.0.1\n" \
-		"unixsocket /tmp/hiredis-test-redis.sock" \
-			| redis-server -
-	./hiredis-test -h 127.0.0.1 -p 56379 -s /tmp/hiredis-test-redis.sock || \
+	@echo "$$REDIS_TEST_CONFIG" | $(REDIS_SERVER) -
+	./hiredis-test -h 127.0.0.1 -p $(REDIS_PORT) -s /tmp/hiredis-test-redis.sock || \
 			( kill `cat /tmp/hiredis-test-redis.pid` && false )
 	kill `cat /tmp/hiredis-test-redis.pid`
 
