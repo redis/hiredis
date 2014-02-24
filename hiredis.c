@@ -1010,6 +1010,13 @@ void redisFree(redisContext *c) {
     free(c);
 }
 
+int redisFreeKeepFd(redisContext *c) {
+	int fd = c->fd;
+	c->fd = 0;
+	redisFree(c);
+	return fd;
+}
+
 /* Connect to a Redis instance. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
@@ -1082,6 +1089,18 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
 
     c->flags &= ~REDIS_BLOCK;
     redisContextConnectUnix(c,path,NULL);
+    return c;
+}
+
+redisContext *redisConnectFd(int fd) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+        return NULL;
+    
+    c->fd = fd;
+    c->flags |= REDIS_BLOCK | REDIS_CONNECTED;
     return c;
 }
 
