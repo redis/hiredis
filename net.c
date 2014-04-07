@@ -226,14 +226,12 @@ int redisCheckSocketError(redisContext *c) {
 
     if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"getsockopt(SO_ERROR)");
-        redisContextCloseFd(c);
         return REDIS_ERR;
     }
 
     if (err) {
         errno = err;
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-        redisContextCloseFd(c);
         return REDIS_ERR;
     }
 
