@@ -250,10 +250,12 @@ int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
     return REDIS_OK;
 }
 
-int redisContextConnectTcp(redisContext *c, const char *addr, int port, const struct timeval *timeout) {
+static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
+                                   const struct timeval *timeout,
+                                   char *source_addr) {
     int s, rv;
     char _port[6];  /* strlen("65535"); */
-    struct addrinfo hints, *servinfo, *p;
+    struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
     int blocking = (c->flags & REDIS_BLOCK);
 
     snprintf(_port, 6, "%d", port);
@@ -280,6 +282,28 @@ int redisContextConnectTcp(redisContext *c, const char *addr, int port, const st
         c->fd = s;
         if (redisSetBlocking(c,0) != REDIS_OK)
             goto error;
+        if (source_addr) {
+            int bound = 0;
+            /* Using getaddrinfo saves us from self-determining IPv4 vs IPv6 */
+            if ((rv = getaddrinfo(source_addr, NULL, &hints, &bservinfo)) != 0) {
+                char buf[128];
+                snprintf(buf,sizeof(buf),"Can't get addr: %s",gai_strerror(rv));
+                __redisSetError(c,REDIS_ERR_OTHER,buf);
+                goto error;
+            }
+            for (b = bservinfo; b != NULL; b = b->ai_next) {
+                if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
+                    bound = 1;
+                    break;
+                }
+            }
+            if (!bound) {
+                char buf[128];
+                snprintf(buf,sizeof(buf),"Can't bind socket: %s",strerror(errno));
+                __redisSetError(c,REDIS_ERR_OTHER,buf);
+                goto error;
+            }
+        }
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
                 redisContextCloseFd(c);
@@ -312,6 +336,16 @@ error:
 end:
     freeaddrinfo(servinfo);
     return rv;  // Need to return REDIS_OK if alright
+}
+
+int redisContextConnectTcp(redisContext *c, const char *addr, int port,
+                           const struct timeval *timeout) {
+    return _redisContextConnectTcp(c, addr, port, timeout, NULL);
+}
+
+int redisContextConnectBindTcp(redisContext *c, const char *addr, int port,
+                               const struct timeval *timeout, char *source_addr) {
+    return _redisContextConnectTcp(c, addr, port, timeout, source_addr);
 }
 
 int redisContextConnectUnix(redisContext *c, const char *path, const struct timeval *timeout) {
