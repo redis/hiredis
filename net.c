@@ -130,13 +130,15 @@ int redisKeepAlive(redisContext *c, int interval) {
         return REDIS_ERR;
     }
 
-#ifdef _OSX
     val = interval;
+
+#ifdef _OSX
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val)) < 0) {
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
         return REDIS_ERR;
     }
 #else
+#ifndef __sun
     val = interval;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
@@ -155,6 +157,7 @@ int redisKeepAlive(redisContext *c, int interval) {
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
         return REDIS_ERR;
     }
+#endif
 #endif
 
     return REDIS_OK;
