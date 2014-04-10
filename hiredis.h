@@ -175,7 +175,7 @@ typedef struct redisContext {
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
-redisContext *redisConnectBindNonBlock(const char *ip, int port, char *source);
+redisContext *redisConnectBindNonBlock(const char *ip, int port, const char *source_addr);
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
@@ -196,7 +196,7 @@ int redisGetReplyFromReader(redisContext *c, void **reply);
 
 /* Write a formatted command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
-int redisAppendFormattedCommand(redisContext *c, char *format, size_t len);
+int redisAppendFormattedCommand(redisContext *c, const char *cmd, size_t len);
 
 /* Write a command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */

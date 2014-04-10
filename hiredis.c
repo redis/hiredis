@@ -1057,7 +1057,7 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
 }
 
 redisContext *redisConnectBindNonBlock(const char *ip, int port,
-                                   char *source_addr) {
+                                       const char *source_addr) {
     redisContext *c = redisContextInit();
     c->flags &= ~REDIS_BLOCK;
     redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
@@ -1244,7 +1244,7 @@ int redisGetReply(redisContext *c, void **reply) {
  * is used, you need to call redisGetReply yourself to retrieve
  * the reply (or replies in pub/sub).
  */
-int __redisAppendCommand(redisContext *c, char *cmd, size_t len) {
+int __redisAppendCommand(redisContext *c, const char *cmd, size_t len) {
     sds newbuf;
 
     newbuf = sdscatlen(c->obuf,cmd,len);
@@ -1257,9 +1257,9 @@ int __redisAppendCommand(redisContext *c, char *cmd, size_t len) {
     return REDIS_OK;
 }
 
-int redisAppendFormattedCommand(redisContext *c, char *format, size_t len) {
+int redisAppendFormattedCommand(redisContext *c, const char *cmd, size_t len) {
 
-    if (__redisAppendCommand(c, format, len) != REDIS_OK) {
+    if (__redisAppendCommand(c, cmd, len) != REDIS_OK) {
         return REDIS_ERR;
     }
 

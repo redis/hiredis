@@ -255,7 +255,7 @@ int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
 
 static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
                                    const struct timeval *timeout,
-                                   char *source_addr) {
+                                   const char *source_addr) {
     int s, rv;
     char _port[6];  /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
@@ -347,7 +347,8 @@ int redisContextConnectTcp(redisContext *c, const char *addr, int port,
 }
 
 int redisContextConnectBindTcp(redisContext *c, const char *addr, int port,
-                               const struct timeval *timeout, char *source_addr) {
+                               const struct timeval *timeout,
+                               const char *source_addr) {
     return _redisContextConnectTcp(c, addr, port, timeout, source_addr);
 }
 
