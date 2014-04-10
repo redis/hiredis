@@ -14,7 +14,8 @@
 
 enum connection_type {
     CONN_TCP,
-    CONN_UNIX
+    CONN_UNIX,
+    CONN_FD
 };
 
 struct config {
@@ -64,7 +65,7 @@ static redisContext *select_database(redisContext *c) {
     return c;
 }
 
-static void disconnect(redisContext *c) {
+static int disconnect(redisContext *c, int keep_fd) {
     redisReply *reply;
 
     /* Make sure we're on DB 9. */
@@ -75,8 +76,11 @@ static void disconnect(redisContext *c) {
     assert(reply != NULL);
     freeReplyObject(reply);
 
-    /* Free the context as well. */
+    /* Free the context as well, but keep the fd if requested. */
+    if (keep_fd)
+        return redisFreeKeepFd(c);
     redisFree(c);
+    return -1;
 }
 
 static redisContext *connect(struct config config) {
@@ -86,6 +90,14 @@ static redisContext *connect(struct config config) {
         c = redisConnect(config.tcp.host, config.tcp.port);
     } else if (config.type == CONN_UNIX) {
         c = redisConnectUnix(config.unix.path);
+    } else if (config.type == CONN_FD) {
+        /* Create a dummy connection just to get an fd to inherit */
+        redisContext *dummy_ctx = redisConnectUnix(config.unix.path);
+        if (dummy_ctx) {
+            int fd = disconnect(dummy_ctx, 1);
+            printf("Connecting to inherited fd %d\n", fd);
+            c = redisConnectFd(fd);
+        }
     } else {
         assert(NULL);
     }
@@ -205,6 +217,28 @@ static void test_format_commands(void) {
     free(cmd);
 }
 
+static void test_append_formatted_commands(struct config config) {
+    redisContext *c;
+    redisReply *reply;
+    char *cmd;
+    int len;
+
+    c = connect(config);
+
+    test("Append format command: ");
+
+    len = redisFormatCommand(&cmd, "SET foo bar");
+
+    test_cond(redisAppendFormattedCommand(c, cmd, len) == REDIS_OK);
+
+    assert(redisGetReply(c, (void*)&reply) == REDIS_OK);
+
+    free(cmd);
+    freeReplyObject(reply);
+
+    disconnect(c, 0);
+}
+
 static void test_reply_reader(void) {
     redisReader *reader;
     void *reply;
@@ -293,6 +327,7 @@ static void test_blocking_connection_errors(void) {
         (strcmp(c->errstr,"Name or service not known") == 0 ||
          strcmp(c->errstr,"Can't resolve: idontexist.local") == 0 ||
          strcmp(c->errstr,"nodename nor servname provided, or not known") == 0 ||
+         strcmp(c->errstr,"No address associated with hostname") == 0 ||
          strcmp(c->errstr,"no address associated with name") == 0));
     redisFree(c);
 
@@ -383,7 +418,7 @@ static void test_blocking_connection(struct config config) {
               strcasecmp(reply->element[1]->str,"pong") == 0);
     freeReplyObject(reply);
 
-    disconnect(c);
+    disconnect(c, 0);
 }
 
 static void test_blocking_io_errors(struct config config) {
@@ -523,7 +558,7 @@ static void test_throughput(struct config config) {
     free(replies);
     printf("\t(%dx LRANGE with 500 elements (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
 
-    disconnect(c);
+    disconnect(c, 0);
 }
 
 // static long __test_callback_flags = 0;
@@ -636,6 +671,7 @@ int main(int argc, char **argv) {
         }
     };
     int throughput = 1;
+    int test_inherit_fd = 1;
 
     /* Ignore broken pipe signal (for I/O error tests). */
     signal(SIGPIPE, SIG_IGN);
@@ -654,6 +690,8 @@ int main(int argc, char **argv) {
             cfg.unix.path = argv[0];
         } else if (argc >= 1 && !strcmp(argv[0],"--skip-throughput")) {
             throughput = 0;
+        } else if (argc >= 1 && !strcmp(argv[0],"--skip-inherit-fd")) {
+            test_inherit_fd = 0;
         } else {
             fprintf(stderr, "Invalid argument: %s\n", argv[0]);
             exit(1);
@@ -670,6 +708,7 @@ int main(int argc, char **argv) {
     test_blocking_connection(cfg);
     test_blocking_io_errors(cfg);
     test_invalid_timeout_errors(cfg);
+    test_append_formatted_commands(cfg);
     if (throughput) test_throughput(cfg);
 
     printf("\nTesting against Unix socket connection (%s):\n", cfg.unix.path);
@@ -677,6 +716,12 @@ int main(int argc, char **argv) {
     test_blocking_connection(cfg);
     test_blocking_io_errors(cfg);
     if (throughput) test_throughput(cfg);
+
+    if (test_inherit_fd) {
+        printf("\nTesting against inherited fd (%s):\n", cfg.unix.path);
+        cfg.type = CONN_FD;
+        test_blocking_connection(cfg);
+    }
 
     if (fails) {
         printf("*** %d TESTS FAILED ***\n", fails);

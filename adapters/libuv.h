@@ -3,7 +3,7 @@
 #include <uv.h>
 #include "../hiredis.h"
 #include "../async.h"
-
+#include <string.h>
 
 typedef struct redisLibuvEvents {
   redisAsyncContext* context;
@@ -11,6 +11,7 @@ typedef struct redisLibuvEvents {
   int                events;
 } redisLibuvEvents;
 
+int redisLibuvAttach(redisAsyncContext*, uv_loop_t*);
 
 static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
@@ -86,7 +87,7 @@ static void redisLibuvCleanup(void *privdata) {
 }
 
 
-int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
+static int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
   redisContext *c = &(ac->c);
 
   if (ac->ev.data != NULL) {
@@ -99,7 +100,7 @@ int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
   ac->ev.delWrite = redisLibuvDelWrite;
   ac->ev.cleanup  = redisLibuvCleanup;
 
-  redisLibuvEvents* p = malloc(sizeof(*p));
+  redisLibuvEvents* p = (redisLibuvEvents*)malloc(sizeof(*p));
 
   if (!p) {
     return REDIS_ERR;

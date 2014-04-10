@@ -650,7 +650,7 @@ int redisReaderGetReply(redisReader *r, void **reply) {
     /* Discard part of the buffer when we've consumed at least 1k, to avoid
      * doing unnecessary calls to memmove() in sds.c. */
     if (r->pos >= 1024) {
-        r->buf = sdsrange(r->buf,r->pos,-1);
+        sdsrange(r->buf,r->pos,-1);
         r->pos = 0;
         r->len = sdslen(r->buf);
     }
@@ -1010,6 +1010,13 @@ void redisFree(redisContext *c) {
     free(c);
 }
 
+int redisFreeKeepFd(redisContext *c) {
+	int fd = c->fd;
+	c->fd = -1;
+	redisFree(c);
+	return fd;
+}
+
 /* Connect to a Redis instance. On error the field error in the returned
  * context will be set to the return value of the error function.
  * When no set of reply functions is given, the default set will be used. */
@@ -1049,6 +1056,14 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
     return c;
 }
 
+redisContext *redisConnectBindNonBlock(const char *ip, int port,
+                                   char *source_addr) {
+    redisContext *c = redisContextInit();
+    c->flags &= ~REDIS_BLOCK;
+    redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
+    return c;
+}
+
 redisContext *redisConnectUnix(const char *path) {
     redisContext *c;
 
@@ -1082,6 +1097,18 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
 
     c->flags &= ~REDIS_BLOCK;
     redisContextConnectUnix(c,path,NULL);
+    return c;
+}
+
+redisContext *redisConnectFd(int fd) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+        return NULL;
+
+    c->fd = fd;
+    c->flags |= REDIS_BLOCK | REDIS_CONNECTED;
     return c;
 }
 
@@ -1162,7 +1189,7 @@ int redisBufferWrite(redisContext *c, int *done) {
                 sdsfree(c->obuf);
                 c->obuf = sdsempty();
             } else {
-                c->obuf = sdsrange(c->obuf,nwritten,-1);
+                sdsrange(c->obuf,nwritten,-1);
             }
         }
     }
@@ -1227,6 +1254,15 @@ int __redisAppendCommand(redisContext *c, char *cmd, size_t len) {
     }
 
     c->obuf = newbuf;
+    return REDIS_OK;
+}
+
+int redisAppendFormattedCommand(redisContext *c, char *format, size_t len) {
+
+    if (__redisAppendCommand(c, format, len) != REDIS_OK) {
+        return REDIS_ERR;
+    }
+
     return REDIS_OK;
 }
 

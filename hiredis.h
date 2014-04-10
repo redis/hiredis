@@ -175,12 +175,15 @@ typedef struct redisContext {
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
+redisContext *redisConnectBindNonBlock(const char *ip, int port, char *source);
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
+redisContext *redisConnectFd(int fd);
 int redisSetTimeout(redisContext *c, const struct timeval tv);
 int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);
+int redisFreeKeepFd(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
 
@@ -190,6 +193,10 @@ int redisBufferWrite(redisContext *c, int *done);
  * context, it will return unconsumed replies until there are no more. */
 int redisGetReply(redisContext *c, void **reply);
 int redisGetReplyFromReader(redisContext *c, void **reply);
+
+/* Write a formatted command to the output buffer. Use these functions in blocking mode
+ * to get a pipeline of commands. */
+int redisAppendFormattedCommand(redisContext *c, char *format, size_t len);
 
 /* Write a command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
