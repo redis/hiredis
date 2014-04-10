@@ -55,7 +55,7 @@
 void __redisSetError(redisContext *c, int type, const char *str);
 
 static void redisContextCloseFd(redisContext *c) {
-    if (c && c->fd > 0) {
+    if (c && c->fd >= 0) {
         close(c->fd);
         c->fd = -1;
     }
