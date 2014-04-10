@@ -9,7 +9,7 @@ TESTS=hiredis-test
 LIBNAME=libhiredis
 
 HIREDIS_MAJOR=0
-HIREDIS_MINOR=10
+HIREDIS_MINOR=11
 
 # redis-server configuration used for testing
 REDIS_PORT=56379
