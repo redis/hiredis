@@ -439,12 +439,22 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
              * Another possibility is that the server is loading its dataset.
              * In this case we also want to close the connection, and have the
              * user wait until the server is ready to take our request.
+             *
+             * In subscribed context, a particular error can happen in
+             * case of an invalid command:
+             * "ERR only (P)SUBSCRIBE / (P)UNSUBSCRIBE / QUIT allowed in this context"
+             * This error needs to be passed to the callback.
              */
             if (((redisReply*)reply)->type == REDIS_REPLY_ERROR) {
-                c->err = REDIS_ERR_OTHER;
-                snprintf(c->errstr,sizeof(c->errstr),"%s",((redisReply*)reply)->str);
-                __redisAsyncDisconnect(ac);
-                return;
+                if(!(c->flags & REDIS_SUBSCRIBED) ||
+                   !(strlen(((redisReply*)reply)->str) > 21
+                   && strncasecmp(((redisReply*)reply)->str+9, "(p)subscribe", 12) == 0)) {
+
+                    c->err = REDIS_ERR_OTHER;
+                    snprintf(c->errstr,sizeof(c->errstr),"%s",((redisReply*)reply)->str);
+                    __redisAsyncDisconnect(ac);
+                    return;
+                }
             }
             /* No more regular callbacks and no errors, the context *must* be subscribed or monitoring. */
             assert((c->flags & REDIS_SUBSCRIBED || c->flags & REDIS_MONITORING));
