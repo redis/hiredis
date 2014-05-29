@@ -318,6 +318,19 @@ static void test_reply_reader(void) {
     redisReaderFree(reader);
 }
 
+static void test_free_null(void) {
+    void *redisContext = NULL;
+    void *reply = NULL;
+
+    test("Don't fail when redisFree is passed a NULL value: ");
+    redisFree(redisContext);
+    test_cond(redisContext == NULL);
+
+    test("Don't fail when freeReplyObject is passed a NULL value: ");
+    freeReplyObject(reply);
+    test_cond(reply == NULL);
+}
+
 static void test_blocking_connection_errors(void) {
     redisContext *c;
 
@@ -702,6 +715,7 @@ int main(int argc, char **argv) {
     test_format_commands();
     test_reply_reader();
     test_blocking_connection_errors();
+    test_free_null();
 
     printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     cfg.type = CONN_TCP;
@@ -722,6 +736,7 @@ int main(int argc, char **argv) {
         cfg.type = CONN_FD;
         test_blocking_connection(cfg);
     }
+
 
     if (fails) {
         printf("*** %d TESTS FAILED ***\n", fails);
