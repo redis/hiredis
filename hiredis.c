@@ -73,6 +73,9 @@ void freeReplyObject(void *reply) {
     redisReply *r = reply;
     size_t j;
 
+    if (r == NULL)
+        return;
+
     switch(r->type) {
     case REDIS_REPLY_INTEGER:
         break; /* Nothing to free */
@@ -1001,6 +1004,8 @@ static redisContext *redisContextInit(void) {
 }
 
 void redisFree(redisContext *c) {
+    if (c == NULL)
+        return;
     if (c->fd > 0)
         close(c->fd);
     if (c->obuf != NULL)
