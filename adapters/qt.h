@@ -87,7 +87,7 @@ class RedisQtAdapter : public QObject {
     private:
         void addRead() {
             if (m_read) return;
-            m_read = new QSocketNotifier(m_ctx->c.fd, QSocketNotifier::Read, 0),
+            m_read = new QSocketNotifier(m_ctx->c.fd, QSocketNotifier::Read, 0);
             connect(m_read, SIGNAL(activated(int)), this, SLOT(read()));
         }
 
