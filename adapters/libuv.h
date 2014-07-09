@@ -1,5 +1,6 @@
 #ifndef __HIREDIS_LIBUV_H__
 #define __HIREDIS_LIBUV_H__
+#include <stdlib.h>
 #include <uv.h>
 #include "../hiredis.h"
 #include "../async.h"
@@ -11,7 +12,6 @@ typedef struct redisLibuvEvents {
   int                events;
 } redisLibuvEvents;
 
-int redisLibuvAttach(redisAsyncContext*, uv_loop_t*);
 
 static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
