@@ -998,10 +998,10 @@ static redisContext *redisContextInit(void) {
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
 
-	if (c->obuf == NULL || c->reader == NULL) {
-		redisFree(c);
-		return NULL;
-	}
+    if (c->obuf == NULL || c->reader == NULL) {
+	redisFree(c);
+	return NULL;
+    }
     return c;
 }
 
