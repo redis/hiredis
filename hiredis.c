@@ -997,6 +997,11 @@ static redisContext *redisContextInit(void) {
     c->errstr[0] = '\0';
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
+
+	if (c->obuf == NULL || c->reader == NULL) {
+		redisFree(c);
+		return NULL;
+	}
     return c;
 }
 
