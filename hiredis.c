@@ -895,10 +895,11 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     return totlen;
 
 err:
-    while(argc--)
-        sdsfree(curargv[argc]);
-    free(curargv);
-
+    if (curargv != NULL) {	
+        while(argc--)
+            sdsfree(curargv[argc]);
+        free(curargv);
+    }
     if (curarg != NULL)
         sdsfree(curarg);
 
@@ -999,9 +1000,10 @@ static redisContext *redisContextInit(void) {
     c->reader = redisReaderCreate();
 
     if (c->obuf == NULL || c->reader == NULL) {
-	redisFree(c);
-	return NULL;
-    }
+		redisFree(c);
+		return NULL;
+	}
+
     return c;
 }
 
