@@ -895,12 +895,13 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     return totlen;
 
 err:
-    while(argc--)
-        sdsfree(curargv[argc]);
-    free(curargv);
+    if (curargv) {
+        while(argc--)
+            sdsfree(curargv[argc]);
+        free(curargv);
+    }
 
-    if (curarg != NULL)
-        sdsfree(curarg);
+    sdsfree(curarg);
 
     /* No need to check cmd since it is the last statement that can fail,
      * but do it anyway to be as defensive as possible. */
