@@ -73,6 +73,7 @@ sds sdscatprintf(sds s, const char *fmt, ...)
 sds sdscatprintf(sds s, const char *fmt, ...);
 #endif
 
+sds sdscatfmt(sds s, char const *fmt, ...);
 sds sdstrim(sds s, const char *cset);
 sds sdsrange(sds s, int start, int end);
 void sdsupdatelen(sds s);
@@ -85,4 +86,5 @@ sds sdsfromlonglong(long long value);
 sds sdscatrepr(sds s, char *p, size_t len);
 sds *sdssplitargs(char *line, int *argc);
 
+sds sdsMakeRoomFor(sds s, size_t addlen);
 #endif

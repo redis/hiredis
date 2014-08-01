@@ -34,6 +34,7 @@
 #include <stdio.h> /* for size_t */
 #include <stdarg.h> /* for va_list */
 #include <sys/time.h> /* for struct timeval */
+#include "sds.h" /* For sds */
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 11
@@ -160,7 +161,7 @@ void freeReplyObject(void *reply);
 /* Functions to format a command according to the protocol. */
 int redisvFormatCommand(char **target, const char *format, va_list ap);
 int redisFormatCommand(char **target, const char *format, ...);
-int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
+int redisFormatCommandArgv(sds *target, int argc, const char **argv, const size_t *argvlen);
 
 /* Context for a connection to Redis */
 typedef struct redisContext {
@@ -196,6 +197,7 @@ int redisGetReplyFromReader(redisContext *c, void **reply);
 int redisvAppendCommand(redisContext *c, const char *format, va_list ap);
 int redisAppendCommand(redisContext *c, const char *format, ...);
 int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+
 
 /* Issue a command to Redis. In a blocking context, it is identical to calling
  * redisAppendCommand, followed by redisGetReply. The function will return

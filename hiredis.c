@@ -936,35 +936,35 @@ int redisFormatCommand(char **target, const char *format, ...) {
  * lengths. If the latter is set to NULL, strlen will be used to compute the
  * argument lengths.
  */
-int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
-    char *cmd = NULL; /* final command */
-    int pos; /* position in final command */
+int redisFormatCommandArgv(sds *target, int argc, const char **argv, 
+                           const size_t *argvlen)
+{
+    sds cmd;
+    unsigned long long totlen;
+    int j;
     size_t len;
-    int totlen, j;
 
-    /* Calculate number of bytes needed for the command */
+    /* Calculate our total size */
     totlen = 1+intlen(argc)+2;
-    for (j = 0; j < argc; j++) {
+    for(j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
         totlen += bulklen(len);
     }
 
-    /* Build the command at protocol level */
-    cmd = malloc(totlen+1);
-    if (cmd == NULL)
-        return -1;
+    /* Use an SDS string for command construction */
+    cmd = sdsempty();
+    cmd = sdsMakeRoomFor(cmd, totlen);
 
-    pos = sprintf(cmd,"*%d\r\n",argc);
-    for (j = 0; j < argc; j++) {
+    /* Construct command */
+    cmd = sdscatfmt(cmd, "*%i\r\n", argc);
+    for(j=0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
-        pos += sprintf(cmd+pos,"$%zu\r\n",len);
-        memcpy(cmd+pos,argv[j],len);
-        pos += len;
-        cmd[pos++] = '\r';
-        cmd[pos++] = '\n';
+        cmd = sdscatfmt(cmd, "$%T\r\n", len);
+        cmd = sdscatlen(cmd, argv[j], len);
+        cmd = sdscatlen(cmd, "\r\n", sizeof("\r\n")-1);
     }
-    assert(pos == totlen);
-    cmd[pos] = '\0';
+    
+    assert(sdslen(cmd)==totlen);
 
     *target = cmd;
     return totlen;
@@ -1259,8 +1259,10 @@ int redisAppendCommand(redisContext *c, const char *format, ...) {
     return ret;
 }
 
-int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
-    char *cmd;
+int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, 
+                           const size_t *argvlen) 
+{
+    sds cmd;
     int len;
 
     len = redisFormatCommandArgv(&cmd,argc,argv,argvlen);
@@ -1270,11 +1272,11 @@ int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const s
     }
 
     if (__redisAppendCommand(c,cmd,len) != REDIS_OK) {
-        free(cmd);
+        sdsfree(cmd);
         return REDIS_ERR;
     }
 
-    free(cmd);
+    sdsfree(cmd);
     return REDIS_OK;
 }
 
