@@ -488,7 +488,7 @@ sds sdscatfmt(sds s, char const *fmt, ...) {
                     unum = va_arg(ap,unsigned int);
                 else if(next == 'U')
                     unum = va_arg(ap,unsigned long long);
-                else 
+                else
                     unum = (unsigned long long)va_arg(ap,size_t);
                 {
                     char buf[SDS_LLSTR_SIZE];

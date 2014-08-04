@@ -948,26 +948,30 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
     int j;
     size_t len;
 
+    /* Abort on a NULL target */
+    if (target == NULL)
+        return -1;
+
     /* Calculate our total size */
     totlen = 1+intlen(argc)+2;
-    for(j = 0; j < argc; j++) {
+    for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
         totlen += bulklen(len);
     }
 
     /* Use an SDS string for command construction */
     cmd = sdsempty();
-    if(cmd == NULL)
+    if (cmd == NULL)
         return -1;
-    
+
     /* We already know how much storage we need */
     cmd = sdsMakeRoomFor(cmd, totlen);
-    if(cmd == NULL) 
+    if (cmd == NULL)
         return -1;
-    
+
     /* Construct command */
     cmd = sdscatfmt(cmd, "*%i\r\n", argc);
-    for(j=0; j < argc; j++) {
+    for (j=0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
         cmd = sdscatfmt(cmd, "$%T\r\n", len);
         cmd = sdscatlen(cmd, argv[j], len);
@@ -990,6 +994,10 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     int pos; /* position in final command */
     size_t len;
     int totlen, j;
+
+    /* Abort on a NULL target */
+    if (target == NULL)
+        return -1;
 
     /* Calculate number of bytes needed for the command */
     totlen = 1+intlen(argc)+2;
