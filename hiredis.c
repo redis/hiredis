@@ -1069,6 +1069,15 @@ redisContext *redisConnectBindNonBlock(const char *ip, int port,
     return c;
 }
 
+redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
+                                                const char *source_addr) {
+    redisContext *c = redisContextInit();
+    c->flags &= ~REDIS_BLOCK;
+    c->flags |= REDIS_REUSEADDR;
+    redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
+    return c;
+}
+
 redisContext *redisConnectUnix(const char *path) {
     redisContext *c;
 
