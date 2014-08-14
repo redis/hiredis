@@ -256,10 +256,12 @@ int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
 static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
                                    const struct timeval *timeout,
                                    const char *source_addr) {
-    int s, rv;
+    int s, rv, n;
     char _port[6];  /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
     int blocking = (c->flags & REDIS_BLOCK);
+    int reuseaddr = (c->flags & REDIS_REUSEADDR);
+    int reuses = 0;
 
     snprintf(_port, 6, "%d", port);
     memset(&hints,0,sizeof(hints));
@@ -279,6 +281,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
         }
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
+addrretry:
         if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
             continue;
 
@@ -294,6 +297,15 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
                 __redisSetError(c,REDIS_ERR_OTHER,buf);
                 goto error;
             }
+
+            if (reuseaddr) {
+                n = 1;
+                if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*) &n,
+                               sizeof(n)) < 0) {
+                    goto error;
+                }
+            }
+
             for (b = bservinfo; b != NULL; b = b->ai_next) {
                 if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
                     bound = 1;
@@ -314,6 +326,12 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
                 continue;
             } else if (errno == EINPROGRESS && !blocking) {
                 /* This is ok. */
+            } else if (errno == EADDRNOTAVAIL && reuseaddr) {
+                if (++reuses >= REDIS_CONNECT_RETRIES) {
+                    goto error;
+                } else {
+                    goto addrretry;
+                }
             } else {
                 if (redisContextWaitReady(c,timeout) != REDIS_OK)
                     goto error;
