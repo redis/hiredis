@@ -58,7 +58,7 @@
     } while(0);
 
 /* Forward declaration of function in hiredis.c */
-void __redisAppendCommand(redisContext *c, char *cmd, size_t len);
+int __redisAppendCommand(redisContext *c, const char *cmd, size_t len);
 
 /* Functions managing dictionary of callbacks for pub/sub. */
 static unsigned int callbackHash(const void *key) {
@@ -550,8 +550,8 @@ void redisAsyncHandleWrite(redisAsyncContext *ac) {
 
 /* Sets a pointer to the first argument and its length starting at p. Returns
  * the number of bytes to skip to get to the following argument. */
-static char *nextArgument(char *start, char **str, size_t *len) {
-    char *p = start;
+static const char *nextArgument(const char *start, const char **str, size_t *len) {
+    const char *p = start;
     if (p[0] != '$') {
         p = strchr(p,'$');
         if (p == NULL) return NULL;
@@ -567,13 +567,13 @@ static char *nextArgument(char *start, char **str, size_t *len) {
 /* Helper function for the redisAsyncCommand* family of functions. Writes a
  * formatted command to the output buffer and registers the provided callback
  * function with the context. */
-static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, char *cmd, size_t len) {
+static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
     redisContext *c = &(ac->c);
     redisCallback cb;
     int pvariant, hasnext;
-    char *cstr, *astr;
+    const char *cstr, *astr;
     size_t clen, alen;
-    char *p;
+    const char *p;
     sds sname;
 
     /* Don't accept new commands when the connection is about to be closed. */
@@ -657,5 +657,10 @@ int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *priv
     len = redisFormatCommandArgv(&cmd,argc,argv,argvlen);
     status = __redisAsyncCommand(ac,fn,privdata,cmd,len);
     free(cmd);
+    return status;
+}
+
+int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
+    int status = __redisAsyncCommand(ac,fn,privdata,(char *)cmd,len);
     return status;
 }
