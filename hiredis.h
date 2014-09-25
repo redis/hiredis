@@ -79,6 +79,10 @@
 /* Flag that is set when monitor mode is active */
 #define REDIS_MONITORING 0x40
 
+/* Flag that is set when we should set SO_REUSEADDR before calling bind() */
+#define REDIS_REUSEADDR 0x80
+
+
 #define REDIS_REPLY_STRING 1
 #define REDIS_REPLY_ARRAY 2
 #define REDIS_REPLY_INTEGER 3
@@ -89,6 +93,10 @@
 #define REDIS_READER_MAX_BUF (1024*16)  /* Default max unused reader buffer. */
 
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
+
+/* number of times we retry to connect in the case of EADDRNOTAVAIL and
+ * SO_REUSEADDR is being used. */
+#define REDIS_CONNECT_RETRIES  10 
 
 #ifdef __cplusplus
 extern "C" {
@@ -175,7 +183,10 @@ typedef struct redisContext {
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
-redisContext *redisConnectBindNonBlock(const char *ip, int port, const char *source_addr);
+redisContext *redisConnectBindNonBlock(const char *ip, int port, 
+                                       const char *source_addr);
+redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port, 
+                                                const char *source_addr);
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
