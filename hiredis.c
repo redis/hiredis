@@ -934,6 +934,56 @@ int redisFormatCommand(char **target, const char *format, ...) {
     return len;
 }
 
+/* Format a command according to the Redis protocol using an sds string and
+ * sdscatfmt for the processing of arguments. This function takes the
+ * number of arguments, an array with arguments and an array with their
+ * lengths. If the latter is set to NULL, strlen will be used to compute the
+ * argument lengths.
+ */
+int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
+                              const size_t *argvlen)
+{
+    sds cmd;
+    unsigned long long totlen;
+    int j;
+    size_t len;
+
+    /* Abort on a NULL target */
+    if (target == NULL)
+        return -1;
+
+    /* Calculate our total size */
+    totlen = 1+intlen(argc)+2;
+    for (j = 0; j < argc; j++) {
+        len = argvlen ? argvlen[j] : strlen(argv[j]);
+        totlen += bulklen(len);
+    }
+
+    /* Use an SDS string for command construction */
+    cmd = sdsempty();
+    if (cmd == NULL)
+        return -1;
+
+    /* We already know how much storage we need */
+    cmd = sdsMakeRoomFor(cmd, totlen);
+    if (cmd == NULL)
+        return -1;
+
+    /* Construct command */
+    cmd = sdscatfmt(cmd, "*%i\r\n", argc);
+    for (j=0; j < argc; j++) {
+        len = argvlen ? argvlen[j] : strlen(argv[j]);
+        cmd = sdscatfmt(cmd, "$%T\r\n", len);
+        cmd = sdscatlen(cmd, argv[j], len);
+        cmd = sdscatlen(cmd, "\r\n", sizeof("\r\n")-1);
+    }
+
+    assert(sdslen(cmd)==totlen);
+
+    *target = cmd;
+    return totlen;
+}
+
 /* Format a command according to the Redis protocol. This function takes the
  * number of arguments, an array with arguments and an array with their
  * lengths. If the latter is set to NULL, strlen will be used to compute the
@@ -944,6 +994,10 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     int pos; /* position in final command */
     size_t len;
     int totlen, j;
+
+    /* Abort on a NULL target */
+    if (target == NULL)
+        return -1;
 
     /* Calculate number of bytes needed for the command */
     totlen = 1+intlen(argc)+2;
@@ -1301,21 +1355,21 @@ int redisAppendCommand(redisContext *c, const char *format, ...) {
 }
 
 int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
-    char *cmd;
+    sds cmd;
     int len;
 
-    len = redisFormatCommandArgv(&cmd,argc,argv,argvlen);
+    len = redisFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
     if (len == -1) {
         __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
         return REDIS_ERR;
     }
 
     if (__redisAppendCommand(c,cmd,len) != REDIS_OK) {
-        free(cmd);
+        sdsfree(cmd);
         return REDIS_ERR;
     }
 
-    free(cmd);
+    sdsfree(cmd);
     return REDIS_OK;
 }
 
