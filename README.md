@@ -39,7 +39,7 @@ To consume the synchronous API, there are only a few function calls that need to
 
 The function `redisConnect` is used to create a so-called `redisContext`. The
 context is where Hiredis holds state for a connection. The `redisContext`
-struct has an integer `err` field that is non-zero when an the connection is in
+struct has an integer `err` field that is non-zero when the connection is in
 an error state. The field `errstr` will contain a string with a description of
 the error. More information on errors can be found in the **Errors** section.
 After trying to connect to Redis using `redisConnect` you should
@@ -114,11 +114,11 @@ was received:
       Redis may reply with nested arrays but this is fully supported.
 
 Replies should be freed using the `freeReplyObject()` function.
-Note that this function will take care of freeing sub-replies objects
+Note that this function will take care of freeing sub-reply objects
 contained in arrays and nested arrays, so there is no need for the user to
 free the sub replies (it is actually harmful and will corrupt the memory).
 
-**Important:** the current version of hiredis (0.10.0) free's replies when the
+**Important:** the current version of hiredis (0.10.0) frees replies when the
 asynchronous API is used. This means you should not call `freeReplyObject` when
 you use this API. The reply is cleaned up by hiredis _after_ the callback
 returns. This behavior will probably change in future releases, so make sure to
@@ -130,7 +130,7 @@ To disconnect and free the context the following function can be used:
 
     void redisFree(redisContext *c);
 
-This function immediately closes the socket and then free's the allocations done in
+This function immediately closes the socket and then frees the allocations done in
 creating the context.
 
 ### Sending commands (cont'd)
@@ -253,7 +253,7 @@ On a disconnect, the `status` argument is set to `REDIS_OK` when disconnection w
 user, or `REDIS_ERR` when the disconnection was caused by an error. When it is `REDIS_ERR`, the `err`
 field in the context can be accessed to find out the cause of the error.
 
-The context object is always free'd after the disconnect callback fired. When a reconnect is needed,
+The context object is always freed after the disconnect callback fired. When a reconnect is needed,
 the disconnect callback is a good point to do so.
 
 Setting the disconnect callback can only be done once per context. For subsequent calls it will
@@ -287,8 +287,8 @@ was successfully added to the output buffer and `REDIS_ERR` otherwise. Example: 
 is being disconnected per user-request, no new commands may be added to the output buffer and `REDIS_ERR` is
 returned on calls to the `redisAsyncCommand` family.
 
-If the reply for a command with a `NULL` callback is read, it is immediately free'd. When the callback
-for a command is non-`NULL`, the memory is free'd immediately following the callback: the reply is only
+If the reply for a command with a `NULL` callback is read, it is immediately freed. When the callback
+for a command is non-`NULL`, the memory is freed immediately following the callback: the reply is only
 valid for the duration of the callback.
 
 All pending callbacks are called with a `NULL` reply when the context encountered an error.
@@ -303,7 +303,7 @@ When this function is called, the connection is **not** immediately terminated. 
 commands are no longer accepted and the connection is only terminated when all pending commands
 have been written to the socket, their respective replies have been read and their respective
 callbacks have been executed. After this, the disconnection callback is executed with the
-`REDIS_OK` status and the context object is free'd.
+`REDIS_OK` status and the context object is freed.
 
 ### Hooking it up to event library *X*
 
@@ -361,7 +361,7 @@ Both when using the Reader API directly or when using it indirectly via a
 normal Redis context, the redisReader structure uses a buffer in order to
 accumulate data from the server.
 Usually this buffer is destroyed when it is empty and is larger than 16
-kb in order to avoid wasting memory in unused buffers
+KiB in order to avoid wasting memory in unused buffers
 
 However when working with very big payloads destroying the buffer may slow
 down performances considerably, so it is possible to modify the max size of
