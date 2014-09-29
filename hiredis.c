@@ -973,6 +973,13 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     return totlen;
 }
 
+int freeRedisCommand(char **cmd) {
+    if (*cmd != NULL) {
+        free(*cmd);
+        *cmd = NULL;
+    }
+}
+
 void __redisSetError(redisContext *c, int type, const char *str) {
     size_t len;
 

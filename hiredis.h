@@ -161,6 +161,7 @@ void freeReplyObject(void *reply);
 int redisvFormatCommand(char **target, const char *format, va_list ap);
 int redisFormatCommand(char **target, const char *format, ...);
 int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
+int freeRedisCommand(char **cmd);
 
 /* Context for a connection to Redis */
 typedef struct redisContext {
