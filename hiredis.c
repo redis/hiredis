@@ -754,18 +754,15 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                 /* Try to detect printf format */
                 {
                     static const char intfmts[] = "diouxX";
+                    static const char flags[] = "#0-+ ";
                     char _format[16];
                     const char *_p = c+1;
                     size_t _l = 0;
                     va_list _cpy;
 
                     /* Flags */
-                    if (*_p != '\0' && *_p == '#') _p++;
-                    if (*_p != '\0' && *_p == '0') _p++;
-                    if (*_p != '\0' && *_p == '-') _p++;
-                    if (*_p != '\0' && *_p == ' ') _p++;
-                    if (*_p != '\0' && *_p == '+') _p++;
-
+                    while (*_p != '\0' && strchr(flags,*_p) != NULL) _p++;
+                    
                     /* Field width */
                     while (*_p != '\0' && isdigit(*_p)) _p++;
 
@@ -898,10 +895,11 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     return totlen;
 
 err:
-    while(argc--)
-        sdsfree(curargv[argc]);
-    free(curargv);
-
+    if (curargv != NULL) {	
+        while(argc--)
+            sdsfree(curargv[argc]);
+        free(curargv);
+    }
     if (curarg != NULL)
         sdsfree(curarg);
 
@@ -1000,6 +998,12 @@ static redisContext *redisContextInit(void) {
     c->errstr[0] = '\0';
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
+
+    if (c->obuf == NULL || c->reader == NULL) {
+		redisFree(c);
+		return NULL;
+	}
+
     return c;
 }
 
