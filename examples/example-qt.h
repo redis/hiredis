@@ -13,7 +13,7 @@ class ExampleQt : public QObject {
 
     signals:
         void finished();
-       
+
     public slots:
         void run();
 

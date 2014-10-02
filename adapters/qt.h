@@ -1,6 +1,6 @@
 /*-
  * Copyright (C) 2014 Pietro Cerutti <gahr@gahr.ch>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -9,7 +9,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -69,12 +69,19 @@ class RedisQtAdapter : public QObject {
     }
 
     public:
-        RedisQtAdapter(QObject * parent = 0) 
+        RedisQtAdapter(QObject * parent = 0)
             : QObject(parent), m_ctx(0), m_read(0), m_write(0) { }
 
-        ~RedisQtAdapter() { }
+        ~RedisQtAdapter() {
+            if (m_ctx != 0) {
+                m_ctx->ev.data = NULL;
+            }
+        }
 
-        void setContext(redisAsyncContext * ac) {
+        int setContext(redisAsyncContext * ac) {
+            if (ac->ev.data != NULL) {
+                return REDIS_ERR;
+            }
             m_ctx = ac;
             m_ctx->ev.data = this;
             m_ctx->ev.addRead = RedisQtAddRead;
@@ -82,6 +89,7 @@ class RedisQtAdapter : public QObject {
             m_ctx->ev.addWrite = RedisQtAddWrite;
             m_ctx->ev.delWrite = RedisQtDelWrite;
             m_ctx->ev.cleanup = RedisQtCleanup;
+            return REDIS_OK;
         }
 
     private:
