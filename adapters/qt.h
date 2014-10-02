@@ -72,9 +72,16 @@ class RedisQtAdapter : public QObject {
         RedisQtAdapter(QObject * parent = 0) 
             : QObject(parent), m_ctx(0), m_read(0), m_write(0) { }
 
-        ~RedisQtAdapter() { }
+        ~RedisQtAdapter() {
+            if (m_ctx != 0) {
+                m_ctx->ev.data = NULL;
+            }
+        }
 
-        void setContext(redisAsyncContext * ac) {
+        int setContext(redisAsyncContext * ac) {
+            if (ac->ev.data != NULL) {
+                return REDIS_ERR;
+            }
             m_ctx = ac;
             m_ctx->ev.data = this;
             m_ctx->ev.addRead = RedisQtAddRead;
@@ -82,6 +89,7 @@ class RedisQtAdapter : public QObject {
             m_ctx->ev.addWrite = RedisQtAddWrite;
             m_ctx->ev.delWrite = RedisQtDelWrite;
             m_ctx->ev.cleanup = RedisQtCleanup;
+            return REDIS_OK;
         }
 
     private:
