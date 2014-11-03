@@ -559,7 +559,7 @@ static int processItem(redisReader *r) {
 redisReader *redisReaderCreate(void) {
     redisReader *r;
 
-    r = calloc(sizeof(redisReader),1);
+    r = calloc(1,sizeof(redisReader));
     if (r == NULL)
         return NULL;
 
