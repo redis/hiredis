@@ -42,21 +42,36 @@ typedef struct _redis_socket {
 static void redisLibapenetworkAddRead(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
+    (void)socket;
+
+    /* Do Nothing, socket is always scheduled for read events */
 }
 
 static void redisLibapenetworkDelRead(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
+    (void)socket;
+
+    /* Do Nothing */
 }
 
 static void redisLibapenetworkAddWrite(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
+
+    /*
+        Always asume that a socket is writable.
+        If it's not writable, the lib will trigger another event
+    */
+    socket->on_io(socket->s.fd, EVENT_WRITE, socket->data, NULL);
 }
 
 static void redisLibapenetworkDelWrite(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
+    (void)socket;
+
+    /* Do Nothing */
 }
 
 static void redisLibapenetworkCleanup(void *privdata)
