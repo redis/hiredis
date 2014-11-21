@@ -61,7 +61,7 @@ static void redisLibapenetworkCleanup(void *privdata) {
 
 static void ape_redis_io(int fd, int ev, void *data, ape_global *ape)
 {
-    redisContext *c = (redisContext *)data;
+    redisAsyncContext *c = (redisAsyncContext *)data;
 
     if (ev & EVENT_READ) {
         redisAsyncHandleRead(c);
@@ -73,6 +73,8 @@ static void ape_redis_io(int fd, int ev, void *data, ape_global *ape)
 
 static int redisLibapenetworkAttach(redisAsyncContext *ac, ape_global *ape) {
 
+    redisContext *c = &(ac->c);
+    
     /* Nothing should be attached when something is already attached */
     if (ac->ev.data != NULL)
         return REDIS_ERR;
