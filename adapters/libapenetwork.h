@@ -34,29 +34,36 @@
 #include "../hiredis.h"
 #include "../async.h"
 
-struct _redis_socket {
+typedef struct _redis_socket {
     _APE_FD_DELEGATE_TPL
-};
+} redis_socket;
 
 
-static void redisLibapenetworkAddRead(void *privdata) {
-
+static void redisLibapenetworkAddRead(void *privdata)
+{
+    redis_socket *socket = (redis_socket *)privdata;
 }
 
-static void redisLibapenetworkDelRead(void *privdata) {
-
+static void redisLibapenetworkDelRead(void *privdata)
+{
+    redis_socket *socket = (redis_socket *)privdata;
 }
 
-static void redisLibapenetworkAddWrite(void *privdata) {
-
+static void redisLibapenetworkAddWrite(void *privdata)
+{
+    redis_socket *socket = (redis_socket *)privdata;
 }
 
-static void redisLibapenetworkDelWrite(void *privdata) {
-
+static void redisLibapenetworkDelWrite(void *privdata)
+{
+    redis_socket *socket = (redis_socket *)privdata;
 }
 
-static void redisLibapenetworkCleanup(void *privdata) {
+static void redisLibapenetworkCleanup(void *privdata)
+{
+    redis_socket *socket = (redis_socket *)privdata;
 
+    free(socket);
 }
 
 static void ape_redis_io(int fd, int ev, void *data, ape_global *ape)
@@ -74,12 +81,12 @@ static void ape_redis_io(int fd, int ev, void *data, ape_global *ape)
 static int redisLibapenetworkAttach(redisAsyncContext *ac, ape_global *ape) {
 
     redisContext *c = &(ac->c);
-    
+
     /* Nothing should be attached when something is already attached */
     if (ac->ev.data != NULL)
         return REDIS_ERR;
 
-    struct _redis_socket *socket = (struct _redis_socket *)malloc(sizeof(*socket));
+    redis_socket *socket = (redis_socket *)malloc(sizeof(*socket));
 
     socket->s.fd   = c->fd;
     socket->s.type = APE_DELEGATE;
@@ -87,11 +94,11 @@ static int redisLibapenetworkAttach(redisAsyncContext *ac, ape_global *ape) {
     socket->data   = ac;
 
     /* Register functions to start/stop listening for events */
-    ac->ev.addRead  = NULL;
-    ac->ev.delRead  = NULL;
-    ac->ev.addWrite = NULL;
-    ac->ev.delWrite = NULL;
-    ac->ev.cleanup = NULL;
+    ac->ev.addRead  = redisLibapenetworkAddRead;
+    ac->ev.delRead  = redisLibapenetworkDelRead;
+    ac->ev.addWrite = redisLibapenetworkAddWrite;
+    ac->ev.delWrite = redisLibapenetworkDelWrite;
+    ac->ev.cleanup  = redisLibapenetworkCleanup;
     ac->ev.data = socket;
 
     /* Initialize and install read/write events */
