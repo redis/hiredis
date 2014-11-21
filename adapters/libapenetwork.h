@@ -117,7 +117,7 @@ static int redisLibapenetworkAttach(redisAsyncContext *ac, ape_global *ape) {
     ac->ev.data = socket;
 
     /* Initialize and install read/write events */
-    events_add(c->fd, socket, EVENT_READ|EVENT_WRITE|EVENT_LEVEL, ape);
+    events_add(c->fd, socket, EVENT_READ|EVENT_WRITE, ape);
 
     return REDIS_OK;
 }
