@@ -13,6 +13,7 @@ script:
 
 - git clone https://github.com/redis/hiredis-rb && cd hiredis-rb
 - git submodule init && git submodule foreach git pull && git submodule update && git submodule status
+- gem install rake-compiler
 - rake
 - cd ../ && rm -rf hiredis-rb
 
