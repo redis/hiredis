@@ -5,13 +5,15 @@ compiler:
 
 script: 
 - make && make check
-- cp --parents -r ./ hiredis-py/vendor/hiredis && cd hiredis-py
-- git clone https://github.com/redis/hiredis-py .
+
+- git clone https://github.com/redis/hiredis-py && cd hiredis-py
+- git submodule init && git submodule pull && git submodule update
 - python setup.py build
 - python test.py
 - cd ../ && rm hiredis-py
-- cp --parents -r ./ hiredis-rb/vendor/hiredis && cd hiredis-rb
-- git clone https://github.com/redis/hiredis-rb .
+
+- git clone https://github.com/redis/hiredis-rb && cd hiredis-rb
+- git submodule init && git submodule pull && git submodule update
 - rake hiredis:clean
 - rake test
 
