@@ -7,14 +7,13 @@ script:
 - make && make check
 
 - git clone https://github.com/redis/hiredis-py && cd hiredis-py
-- git submodule init && git submodule pull && git submodule update
-- python setup.py build
-- python test.py
-- cd ../ && rm hiredis-py
+- git submodule init && git submodule foreach git pull && git submodule update
+- python setup.py build && python test.py
+- cd ../ && rm -r hiredis-py
 
 - git clone https://github.com/redis/hiredis-rb && cd hiredis-rb
-- git submodule init && git submodule pull && git submodule update
-- rake hiredis:clean
-- rake test
+- git submodule init && git submodule foreach git pull && git submodule update
+- rake hiredis:clean && rake test
+- cd ../ && rm -r hiredis-rb
 
 
