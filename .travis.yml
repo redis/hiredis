@@ -19,6 +19,7 @@ script:
 
 - git clone https://github.com/redis/hiredis-node && cd hiredis-node
 - git submodule init && git submodule foreach git pull && git submodule update && git submodule status
+- npm install -g node-gyp
 - make clean && make all && make check
 - cd ../ && rm -rf hiredis-node
 
