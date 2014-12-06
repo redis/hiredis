@@ -17,4 +17,9 @@ script:
 - rake
 - cd ../ && rm -rf hiredis-rb
 
+- git clone https://github.com/redis/hiredis-node && cd hiredis-node
+- git submodule init && git submodule foreach git pull && git submodule update && git submodule status
+- make clean && make all && make check
+- cd ../ && rm -rf hiredis-node
+
 
