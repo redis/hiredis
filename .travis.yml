@@ -3,4 +3,16 @@ compiler:
   - gcc
   - clang
 
-script: make && make check
+script: 
+- make && make check
+- cp --parents -r ./ hiredis-py/vendor/hiredis && cd hiredis-py
+- git clone https://github.com/redis/hiredis-py .
+- python setup.py build
+- python test.py
+- cd ../ && rm hiredis-py
+- cp --parents -r ./ hiredis-rb/vendor/hiredis && cd hiredis-rb
+- git clone https://github.com/redis/hiredis-rb .
+- rake hiredis:clean
+- rake test
+
+
