@@ -5,7 +5,7 @@
 Hiredis is a minimalistic C client library for the [Redis](http://redis.io/) database.
 
 It is minimalistic because it just adds minimal support for the protocol, but
-at the same time it uses an high level printf-alike API in order to make it
+at the same time it uses a high level printf-alike API in order to make it
 much higher level than otherwise suggested by its minimal code base and the
 lack of explicit bindings for every Redis command.
 
