@@ -575,6 +575,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     size_t clen, alen;
     char *p;
     sds sname;
+    int ret;
 
     /* Don't accept new commands when the connection is about to be closed. */
     if (c->flags & (REDIS_DISCONNECTING | REDIS_FREEING)) return REDIS_ERR;
@@ -598,9 +599,11 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
         while ((p = nextArgument(p,&astr,&alen)) != NULL) {
             sname = sdsnewlen(astr,alen);
             if (pvariant)
-                dictReplace(ac->sub.patterns,sname,&cb);
+                ret = dictReplace(ac->sub.patterns,sname,&cb);
             else
-                dictReplace(ac->sub.channels,sname,&cb);
+                ret = dictReplace(ac->sub.channels,sname,&cb);
+
+            if (ret == 0) sdsfree(sname);
         }
     } else if (strncasecmp(cstr,"unsubscribe\r\n",13) == 0) {
         /* It is only useful to call (P)UNSUBSCRIBE when the context is
