@@ -34,30 +34,35 @@
 #include "../hiredis.h"
 #include "../async.h"
 
+enum {
+    APE_REDIS_READ_EVENT = 1 << 0,
+    APE_REDIS_WRITE_EVENT = 1 << 1
+};
+
 typedef struct _redis_socket {
     _APE_FD_DELEGATE_TPL
+    int listenfor;
 } redis_socket;
 
 
 static void redisLibapenetworkAddRead(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
-    (void)socket;
 
-    /* Do Nothing, socket is always scheduled for read events */
+    socket->listenfor |= APE_REDIS_READ_EVENT;
 }
 
 static void redisLibapenetworkDelRead(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
-    (void)socket;
-
-    /* Do Nothing */
+    
+    socket->listenfor &= ~APE_REDIS_READ_EVENT;
 }
 
 static void redisLibapenetworkAddWrite(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
+    socket->listenfor |= APE_REDIS_WRITE_EVENT;
 
     /*
         Always asume that a socket is writable.
@@ -69,9 +74,7 @@ static void redisLibapenetworkAddWrite(void *privdata)
 static void redisLibapenetworkDelWrite(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
-    (void)socket;
-
-    /* Do Nothing */
+    socket->listenfor &= ~APE_REDIS_WRITE_EVENT;
 }
 
 static void redisLibapenetworkCleanup(void *privdata)
@@ -83,13 +86,14 @@ static void redisLibapenetworkCleanup(void *privdata)
 
 static void ape_redis_io(int fd, int ev, void *data, ape_global *ape)
 {
-    redisAsyncContext *c = (redisAsyncContext *)data;
+    redisAsyncContext *ac = (redisAsyncContext *)data;
+    redis_socket *socket = (redis_socket *)ac->ev.data;
 
-    if (ev & EVENT_READ) {
-        redisAsyncHandleRead(c);
+    if (ev & EVENT_READ && (socket->listenfor & APE_REDIS_READ_EVENT)) {
+        redisAsyncHandleRead(ac);
     }
-    if (ev & EVENT_WRITE) {
-        redisAsyncHandleWrite(c);
+    if (ev & EVENT_WRITE && (socket->listenfor & APE_REDIS_WRITE_EVENT)) {
+        redisAsyncHandleWrite(ac);
     }
 }
 
@@ -102,6 +106,7 @@ static int redisLibapenetworkAttach(redisAsyncContext *ac, ape_global *ape) {
         return REDIS_ERR;
 
     redis_socket *socket = (redis_socket *)malloc(sizeof(*socket));
+    socket->listenfor = 0;
 
     socket->s.fd   = c->fd;
     socket->s.type = APE_DELEGATE;
