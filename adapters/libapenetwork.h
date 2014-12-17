@@ -63,12 +63,15 @@ static void redisLibapenetworkAddWrite(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
     socket->listenfor |= APE_REDIS_WRITE_EVENT;
+    redisAsyncContext *ac = (redisAsyncContext *)socket->data;
 
-    /*
-        Always asume that a socket is writable.
-        If it's not writable, the lib will trigger another event
-    */
-    socket->on_io(socket->s.fd, EVENT_WRITE, socket->data, NULL);
+    if (ac->data) {
+        /*
+            Always asume that a socket is writable.
+            If it's not writable, the lib will trigger another event
+        */
+        socket->on_io(socket->s.fd, EVENT_WRITE, ac, NULL);
+    }
 }
 
 static void redisLibapenetworkDelWrite(void *privdata)
