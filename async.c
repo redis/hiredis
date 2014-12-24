@@ -147,15 +147,9 @@ static void __redisAsyncCopyError(redisAsyncContext *ac) {
     ac->errstr = c->errstr;
 }
 
-redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
-    redisContext *c;
-    redisAsyncContext *ac;
-
-    c = redisConnectNonBlock(ip,port);
-    if (c == NULL)
-        return NULL;
-
-    ac = redisAsyncInitialize(c);
+static redisAsyncContext *__redisAsyncConnectContextFinalize(redisContext *c) {
+    redisAsyncContext *ac = redisAsyncInitialize(c);
+    
     if (ac == NULL) {
         redisFree(c);
         return NULL;
@@ -163,6 +157,26 @@ redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
 
     __redisAsyncCopyError(ac);
     return ac;
+}
+
+redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
+    redisContext *c;
+
+    c = redisConnectNonBlock(ip,port);
+    if (c == NULL)
+        return NULL;
+
+    return __redisAsyncConnectContextFinalize(c);
+}
+
+redisAsyncContext *redisAsyncConnectWithTimeout(const char *ip, int port, const struct timeval timeout) {
+    redisContext *c;
+
+    c = redisConnectNonBlockWithTimeout(ip,port,timeout);
+    if (c == NULL)
+        return NULL;
+
+    return __redisAsyncConnectContextFinalize(c);
 }
 
 redisAsyncContext *redisAsyncConnectBind(const char *ip, int port,

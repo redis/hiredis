@@ -175,6 +175,7 @@ typedef struct redisContext {
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
+redisContext *redisConnectNonBlockWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectBindNonBlock(const char *ip, int port, const char *source_addr);
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
