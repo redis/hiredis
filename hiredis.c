@@ -1061,6 +1061,18 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
     return c;
 }
 
+redisContext *redisConnectNonBlockWithTimeout(const char *ip, int port, const struct timeval tv) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+        return NULL;
+
+    c->flags &= ~REDIS_BLOCK;
+    redisContextConnectTcp(c,ip,port,&tv);
+    return c;
+}
+
 redisContext *redisConnectBindNonBlock(const char *ip, int port,
                                        const char *source_addr) {
     redisContext *c = redisContextInit();
