@@ -31,9 +31,11 @@ the stateless 0.0.1 that only has a file descriptor to work with.
 
 To consume the synchronous API, there are only a few function calls that need to be introduced:
 
-    redisContext *redisConnect(const char *ip, int port);
-    void *redisCommand(redisContext *c, const char *format, ...);
-    void freeReplyObject(void *reply);
+```c
+redisContext *redisConnect(const char *ip, int port);
+void *redisCommand(redisContext *c, const char *format, ...);
+void freeReplyObject(void *reply);
+```
 
 ### Connecting
 
@@ -44,38 +46,41 @@ an error state. The field `errstr` will contain a string with a description of
 the error. More information on errors can be found in the **Errors** section.
 After trying to connect to Redis using `redisConnect` you should
 check the `err` field to see if establishing the connection was successful:
-
-    redisContext *c = redisConnect("127.0.0.1", 6379);
-    if (c != NULL && c->err) {
-        printf("Error: %s\n", c->errstr);
-        // handle error
-    }
+```c
+redisContext *c = redisConnect("127.0.0.1", 6379);
+if (c != NULL && c->err) {
+    printf("Error: %s\n", c->errstr);
+    // handle error
+}
+```
 
 ### Sending commands
 
 There are several ways to issue commands to Redis. The first that will be introduced is
 `redisCommand`. This function takes a format similar to printf. In the simplest form,
 it is used like this:
-
-    reply = redisCommand(context, "SET foo bar");
+```c
+reply = redisCommand(context, "SET foo bar");
+```
 
 The specifier `%s` interpolates a string in the command, and uses `strlen` to
 determine the length of the string:
-
-    reply = redisCommand(context, "SET foo %s", value);
-
+```c
+reply = redisCommand(context, "SET foo %s", value);
+```
 When you need to pass binary safe strings in a command, the `%b` specifier can be
 used. Together with a pointer to the string, it requires a `size_t` length argument
 of the string:
-
-    reply = redisCommand(context, "SET foo %b", value, (size_t) valuelen);
-
+```c
+reply = redisCommand(context, "SET foo %b", value, (size_t) valuelen);
+```
 Internally, Hiredis splits the command in different arguments and will
 convert it to the protocol used to communicate with Redis.
 One or more spaces separates arguments, so you can use the specifiers
 anywhere in an argument:
-
-    reply = redisCommand(context, "SET key:%s %s", myid, value);
+```c
+reply = redisCommand(context, "SET key:%s %s", myid, value);
+```
 
 ### Using replies
 
@@ -127,9 +132,9 @@ keep an eye on the changelog when upgrading (see issue #39).
 ### Cleaning up
 
 To disconnect and free the context the following function can be used:
-
-    void redisFree(redisContext *c);
-
+```c
+void redisFree(redisContext *c);
+```
 This function immediately closes the socket and then free's the allocations done in
 creating the context.
 
@@ -137,9 +142,9 @@ creating the context.
 
 Together with `redisCommand`, the function `redisCommandArgv` can be used to issue commands.
 It has the following prototype:
-
-    void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
-
+```c
+void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+```
 It takes the number of arguments `argc`, an array of strings `argv` and the lengths of the
 arguments `argvlen`. For convenience, `argvlen` may be set to `NULL` and the function will
 use `strlen(3)` on every argument to determine its length. Obviously, when any of the arguments
@@ -169,10 +174,10 @@ The function `redisGetReply` is exported as part of the Hiredis API and can be u
 is expected on the socket. To pipeline commands, the only things that needs to be done is
 filling up the output buffer. For this cause, two commands can be used that are identical
 to the `redisCommand` family, apart from not returning a reply:
-
-    void redisAppendCommand(redisContext *c, const char *format, ...);
-    void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
-
+```c
+void redisAppendCommand(redisContext *c, const char *format, ...);
+void redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
+```
 After calling either function one or more times, `redisGetReply` can be used to receive the
 subsequent replies. The return value for this function is either `REDIS_OK` or `REDIS_ERR`, where
 the latter means an error occurred while reading a reply. Just as with the other commands,
@@ -180,24 +185,24 @@ the `err` field in the context can be used to find out what the cause of this er
 
 The following examples shows a simple pipeline (resulting in only a single call to `write(2)` and
 a single call to `read(2)`):
-
-    redisReply *reply;
-    redisAppendCommand(context,"SET foo bar");
-    redisAppendCommand(context,"GET foo");
-    redisGetReply(context,&reply); // reply for SET
-    freeReplyObject(reply);
-    redisGetReply(context,&reply); // reply for GET
-    freeReplyObject(reply);
-
+```c
+redisReply *reply;
+redisAppendCommand(context,"SET foo bar");
+redisAppendCommand(context,"GET foo");
+redisGetReply(context,&reply); // reply for SET
+freeReplyObject(reply);
+redisGetReply(context,&reply); // reply for GET
+freeReplyObject(reply);
+```
 This API can also be used to implement a blocking subscriber:
-
-    reply = redisCommand(context,"SUBSCRIBE foo");
+```c
+reply = redisCommand(context,"SUBSCRIBE foo");
+freeReplyObject(reply);
+while(redisGetReply(context,&reply) == REDIS_OK) {
+    // consume message
     freeReplyObject(reply);
-    while(redisGetReply(context,&reply) == REDIS_OK) {
-        // consume message
-        freeReplyObject(reply);
-    }
-
+}
+```
 ### Errors
 
 When a function call is not successful, depending on the function either `NULL` or `REDIS_ERR` is
@@ -236,19 +241,20 @@ Redis. It returns a pointer to the newly created `redisAsyncContext` struct. The
 should be checked after creation to see if there were errors creating the connection.
 Because the connection that will be created is non-blocking, the kernel is not able to
 instantly return if the specified host and port is able to accept a connection.
-
-    redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
-    if (c->err) {
-        printf("Error: %s\n", c->errstr);
-        // handle error
-    }
+```c
+redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
+if (c->err) {
+    printf("Error: %s\n", c->errstr);
+    // handle error
+}
+```
 
 The asynchronous context can hold a disconnect callback function that is called when the
 connection is disconnected (either because of an error or per user request). This function should
 have the following prototype:
-
-    void(const redisAsyncContext *c, int status);
-
+```c
+void(const redisAsyncContext *c, int status);
+```
 On a disconnect, the `status` argument is set to `REDIS_OK` when disconnection was initiated by the
 user, or `REDIS_ERR` when the disconnection was caused by an error. When it is `REDIS_ERR`, the `err`
 field in the context can be accessed to find out the cause of the error.
@@ -258,30 +264,30 @@ the disconnect callback is a good point to do so.
 
 Setting the disconnect callback can only be done once per context. For subsequent calls it will
 return `REDIS_ERR`. The function to set the disconnect callback has the following prototype:
-
-    int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
-
+```c
+int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
+```
 ### Sending commands and their callbacks
 
 In an asynchronous context, commands are automatically pipelined due to the nature of an event loop.
 Therefore, unlike the synchronous API, there is only a single way to send commands.
 Because commands are sent to Redis asynchronously, issuing a command requires a callback function
 that is called when the reply is received. Reply callbacks should have the following prototype:
-
-    void(redisAsyncContext *c, void *reply, void *privdata);
-
+```c
+void(redisAsyncContext *c, void *reply, void *privdata);
+```
 The `privdata` argument can be used to curry arbitrary data to the callback from the point where
 the command is initially queued for execution.
 
 The functions that can be used to issue commands in an asynchronous context are:
-
-    int redisAsyncCommand(
-      redisAsyncContext *ac, redisCallbackFn *fn, void *privdata,
-      const char *format, ...);
-    int redisAsyncCommandArgv(
-      redisAsyncContext *ac, redisCallbackFn *fn, void *privdata,
-      int argc, const char **argv, const size_t *argvlen);
-
+```c
+int redisAsyncCommand(
+  redisAsyncContext *ac, redisCallbackFn *fn, void *privdata,
+  const char *format, ...);
+int redisAsyncCommandArgv(
+  redisAsyncContext *ac, redisCallbackFn *fn, void *privdata,
+  int argc, const char **argv, const size_t *argvlen);
+```
 Both functions work like their blocking counterparts. The return value is `REDIS_OK` when the command
 was successfully added to the output buffer and `REDIS_ERR` otherwise. Example: when the connection
 is being disconnected per user-request, no new commands may be added to the output buffer and `REDIS_ERR` is
@@ -296,9 +302,9 @@ All pending callbacks are called with a `NULL` reply when the context encountere
 ### Disconnecting
 
 An asynchronous connection can be terminated using:
-
-    void redisAsyncDisconnect(redisAsyncContext *ac);
-
+```c
+void redisAsyncDisconnect(redisAsyncContext *ac);
+```
 When this function is called, the connection is **not** immediately terminated. Instead, new
 commands are no longer accepted and the connection is only terminated when all pending commands
 have been written to the socket, their respective replies have been read and their respective
@@ -316,12 +322,12 @@ Hiredis comes with a reply parsing API that makes it easy for writing higher
 level language bindings.
 
 The reply parsing API consists of the following functions:
-
-    redisReader *redisReaderCreate(void);
-    void redisReaderFree(redisReader *reader);
-    int redisReaderFeed(redisReader *reader, const char *buf, size_t len);
-    int redisReaderGetReply(redisReader *reader, void **reply);
-
+```c
+redisReader *redisReaderCreate(void);
+void redisReaderFree(redisReader *reader);
+int redisReaderFeed(redisReader *reader, const char *buf, size_t len);
+int redisReaderGetReply(redisReader *reader, void **reply);
+```
 The same set of functions are used internally by hiredis when creating a
 normal Redis context, the above API just exposes it to the user for a direct
 usage.
@@ -371,9 +377,9 @@ value for an idle buffer, so the buffer will never get freed.
 
 For instance if you have a normal Redis context you can set the maximum idle
 buffer to zero (unlimited) just with:
-
-    context->reader->maxbuf = 0;
-
+```c
+context->reader->maxbuf = 0;
+```
 This should be done only in order to maximize performances when working with
 large payloads. The context should be set back to `REDIS_READER_MAX_BUF` again
 as soon as possible in order to prevent allocation of useless memory.
