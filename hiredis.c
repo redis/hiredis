@@ -620,10 +620,10 @@ void redisFree(redisContext *c) {
 }
 
 int redisFreeKeepFd(redisContext *c) {
-	int fd = c->fd;
-	c->fd = -1;
-	redisFree(c);
-	return fd;
+    int fd = c->fd;
+    c->fd = -1;
+    redisFree(c);
+    return fd;
 }
 
 /* Connect to a Redis instance. On error the field error in the returned
