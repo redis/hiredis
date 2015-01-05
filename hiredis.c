@@ -695,6 +695,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     char **curargv = NULL, **newargv = NULL;
     int argc = 0;
     int totlen = 0;
+    int error_type = 0; /* 0 = no error; -1 = memory error; -2 = format error */
     int j;
 
     /* Abort if there is not target to set */
@@ -711,19 +712,19 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
             if (*c == ' ') {
                 if (touched) {
                     newargv = realloc(curargv,sizeof(char*)*(argc+1));
-                    if (newargv == NULL) goto err;
+                    if (newargv == NULL) goto memory_err;
                     curargv = newargv;
                     curargv[argc++] = curarg;
                     totlen += bulklen(sdslen(curarg));
 
                     /* curarg is put in argv so it can be overwritten. */
                     curarg = sdsempty();
-                    if (curarg == NULL) goto err;
+                    if (curarg == NULL) goto memory_err;
                     touched = 0;
                 }
             } else {
                 newarg = sdscatlen(curarg,c,1);
-                if (newarg == NULL) goto err;
+                if (newarg == NULL) goto memory_err;
                 curarg = newarg;
                 touched = 1;
             }
@@ -829,7 +830,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
                 fmt_invalid:
                     va_end(_cpy);
-                    goto err;
+                    goto format_err;
 
                 fmt_valid:
                     _l = (_p+1)-c;
@@ -848,7 +849,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                 }
             }
 
-            if (newarg == NULL) goto err;
+            if (newarg == NULL) goto memory_err;
             curarg = newarg;
 
             touched = 1;
@@ -860,7 +861,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     /* Add the last argument if needed */
     if (touched) {
         newargv = realloc(curargv,sizeof(char*)*(argc+1));
-        if (newargv == NULL) goto err;
+        if (newargv == NULL) goto memory_err;
         curargv = newargv;
         curargv[argc++] = curarg;
         totlen += bulklen(sdslen(curarg));
@@ -876,7 +877,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     /* Build the command at protocol level */
     cmd = malloc(totlen+1);
-    if (cmd == NULL) goto err;
+    if (cmd == NULL) goto memory_err;
 
     pos = sprintf(cmd,"*%d\r\n",argc);
     for (j = 0; j < argc; j++) {
@@ -894,7 +895,15 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     *target = cmd;
     return totlen;
 
-err:
+format_err:
+    error_type = -2;
+    goto cleanup;
+
+memory_err:
+    error_type = -1;
+    goto cleanup;
+
+cleanup:
     if (curargv) {
         while(argc--)
             sdsfree(curargv[argc]);
@@ -908,7 +917,7 @@ err:
     if (cmd != NULL)
         free(cmd);
 
-    return -1;
+    return error_type;
 }
 
 /* Format a command according to the Redis protocol. This function
@@ -929,6 +938,12 @@ int redisFormatCommand(char **target, const char *format, ...) {
     va_start(ap,format);
     len = redisvFormatCommand(target,format,ap);
     va_end(ap);
+
+    /* The API says "-1" means bad result, but we now also return "-2" in some
+     * cases.  Force the return value to always be -1. */
+    if (len < 0)
+        len = -1;
+
     return len;
 }
 
@@ -1353,6 +1368,9 @@ int redisvAppendCommand(redisContext *c, const char *format, va_list ap) {
     len = redisvFormatCommand(&cmd,format,ap);
     if (len == -1) {
         __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
+        return REDIS_ERR;
+    } else if (len == -2) {
+        __redisSetError(c,REDIS_ERR_OTHER,"Invalid format string");
         return REDIS_ERR;
     }
 
