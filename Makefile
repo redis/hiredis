@@ -7,9 +7,20 @@ OBJ=net.o hiredis.o sds.o async.o read.o
 EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
 TESTS=hiredis-test
 LIBNAME=libhiredis
+PKGCONFNAME=hiredis.pc
 
-HIREDIS_MAJOR=0
-HIREDIS_MINOR=11
+HIREDIS_MAJOR=$(shell grep HIREDIS_MAJOR hiredis.h | awk '{print $$3}')
+HIREDIS_MINOR=$(shell grep HIREDIS_MINOR hiredis.h | awk '{print $$3}')
+HIREDIS_PATCH=$(shell grep HIREDIS_PATCH hiredis.h | awk '{print $$3}')
+
+# Installation related variables and target
+PREFIX?=/usr/local
+INCLUDE_PATH?=include/hiredis
+LIBRARY_PATH?=lib
+PKGCONF_PATH?=pkgconfig
+INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
+INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
+INSTALL_PKGCONF_PATH= $(LIBRARY_PATH)/$(PKGCONF_PATH)
 
 # redis-server configuration used for testing
 REDIS_PORT=56379
@@ -54,7 +65,7 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
 endif
 
-all: $(DYLIBNAME)
+all: $(DYLIBNAME) $(PKGCONFNAME)
 
 # Deps (use make dep to generate this)
 net.o: net.c fmacros.h net.h hiredis.h
@@ -124,21 +135,29 @@ check: hiredis-test
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
 
 clean:
-	rm -rf $(DYLIBNAME) $(STLIBNAME) $(TESTS) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
+	rm -rf $(DYLIBNAME) $(STLIBNAME) $(TESTS) $(PKGCONFNAME) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
 
 dep:
 	$(CC) -MM *.c
-
-# Installation related variables and target
-PREFIX?=/usr/local
-INSTALL_INCLUDE_PATH= $(PREFIX)/include/hiredis
-INSTALL_LIBRARY_PATH= $(PREFIX)/lib
 
 ifeq ($(uname_S),SunOS)
   INSTALL?= cp -r
 endif
 
 INSTALL?= cp -a
+
+$(PKGCONFNAME): $(PKGCONF_SRCNAME)
+	@echo "Generating $@ for pkgconfig..."
+	@echo prefix=$(PREFIX) > $@
+	@echo exec_prefix=$${prefix} >> $@
+	@echo libdir=$(INSTALL_LIBRARY_PATH) >> $@
+	@echo includedir=$(INSTALL_INCLUDE_PATH) >> $@
+	@echo >> $@
+	@echo Name: hiredis >> $@
+	@echo Description: Minimalistic C client library for the Redis database. >> $@
+	@echo Version: $(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(HIREDIS_PATCH) >> $@
+	@echo Libs: -L$${libdir} -lhiredis >> $@
+	@echo Cflags: -I$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
 
 install: $(DYLIBNAME) $(STLIBNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
@@ -147,6 +166,8 @@ install: $(DYLIBNAME) $(STLIBNAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MAJOR_NAME) $(DYLIBNAME)
 	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
+	mkdir -p $(INSTALL_PKGCONF_PATH)
+	$(INSTALL) $(PKGCONFNAME) $(INSTALL_PKGCONF_PATH)
 
 32bit:
 	@echo ""
