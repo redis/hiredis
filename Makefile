@@ -68,12 +68,13 @@ endif
 all: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
 
 # Deps (use make dep to generate this)
-net.o: net.c fmacros.h net.h hiredis.h
-async.o: async.c async.h hiredis.h sds.h dict.c dict.h
-read.o: read.c read.h
-hiredis.o: hiredis.c fmacros.h hiredis.h net.h sds.h
+async.o: async.c fmacros.h async.h hiredis.h read.h sds.h net.h dict.c dict.h
+dict.o: dict.c fmacros.h dict.h
+hiredis.o: hiredis.c fmacros.h hiredis.h read.h sds.h net.h
+net.o: net.c fmacros.h net.h hiredis.h read.h sds.h
+read.o: read.c fmacros.h read.h sds.h
 sds.o: sds.c sds.h
-test.o: test.c hiredis.h
+test.o: test.c fmacros.h hiredis.h read.h sds.h
 
 $(DYLIBNAME): $(OBJ)
 	$(DYLIB_MAKE_CMD) $(OBJ)
