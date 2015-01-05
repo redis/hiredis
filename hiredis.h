@@ -76,6 +76,30 @@
  * SO_REUSEADDR is being used. */
 #define REDIS_CONNECT_RETRIES  10
 
+/* strerror_r has two completely different prototypes and behaviors
+ * depending on system issues, so we need to operate on the error buffer
+ * differently depending on which strerror_r we're using. */
+#ifndef _GNU_SOURCE
+/* "regular" POSIX strerror_r that does the right thing. */
+#define __redis_strerror_r(errno, buf, len)                                    \
+    do {                                                                       \
+        strerror_r((errno), (buf), (len));                                     \
+    } while (0)
+#else
+/* "bad" GNU strerror_r we need to clean up after. */
+#define __redis_strerror_r(errno, buf, len)                                    \
+    do {                                                                       \
+        char *err_str = strerror_r((errno), (buf), (len));                     \
+        /* If return value _isn't_ the start of the buffer we passed in,       \
+         * then GNU strerror_r returned an internal static buffer and we       \
+         * need to copy the result into our private buffer. */                 \
+        if (err_str != (buf)) {                                                \
+            buf[(len)] = '\0';                                                 \
+            strncat((buf), err_str, ((len) - 1));                              \
+        }                                                                      \
+    } while (0)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
