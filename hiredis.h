@@ -171,6 +171,7 @@ int redisFormatCommand(char **target, const char *format, ...);
 int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
 int redisFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const size_t *argvlen);
 void redisFreeCommand(char *cmd);
+void redisFreeSdsCommand(sds cmd);
 
 /* Context for a connection to Redis */
 typedef struct redisContext {
