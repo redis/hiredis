@@ -341,6 +341,7 @@ static void test_blocking_connection_errors(void) {
          strcmp(c->errstr,"Can't resolve: idontexist.local") == 0 ||
          strcmp(c->errstr,"nodename nor servname provided, or not known") == 0 ||
          strcmp(c->errstr,"No address associated with hostname") == 0 ||
+         strcmp(c->errstr,"Temporary failure in name resolution") == 0 ||
          strcmp(c->errstr,"no address associated with name") == 0));
     redisFree(c);
 
