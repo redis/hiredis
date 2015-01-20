@@ -186,23 +186,23 @@ static void *createNilObject(const redisReadTask *task) {
     return r;
 }
 
-/* Calculate the number of bytes needed to represent an integer as string. */
-static int intlen(int i) {
-    int len = 0;
-    if (i < 0) {
-        len++;
-        i = -i;
-    }
-    do {
-        len++;
-        i /= 10;
-    } while(i);
-    return len;
+/* Return the number of digits of 'v' when converted to string in radix 10.
+ * Implementation borrowed from link in redis/src/util.c:string2ll(). */
+static uint32_t countDigits(uint64_t v) {
+  uint32_t result = 1;
+  for (;;) {
+    if (v < 10) return result;
+    if (v < 100) return result + 1;
+    if (v < 1000) return result + 2;
+    if (v < 10000) return result + 3;
+    v /= 10000U;
+    result += 4;
+  }
 }
 
 /* Helper that calculates the bulk length given a certain string length. */
 static size_t bulklen(size_t len) {
-    return 1+intlen(len)+2+len+2;
+    return 1+countDigits(len)+2+len+2;
 }
 
 int redisvFormatCommand(char **target, const char *format, va_list ap) {
@@ -392,7 +392,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     curarg = NULL;
 
     /* Add bytes needed to hold multi bulk count */
-    totlen += 1+intlen(argc)+2;
+    totlen += 1+countDigits(argc)+2;
 
     /* Build the command at protocol level */
     cmd = malloc(totlen+1);
@@ -485,7 +485,7 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
         return -1;
 
     /* Calculate our total size */
-    totlen = 1+intlen(argc)+2;
+    totlen = 1+countDigits(argc)+2;
     for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
         totlen += bulklen(len);
@@ -536,7 +536,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
         return -1;
 
     /* Calculate number of bytes needed for the command */
-    totlen = 1+intlen(argc)+2;
+    totlen = 1+countDigits(argc)+2;
     for (j = 0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
         totlen += bulklen(len);
