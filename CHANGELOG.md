@@ -1,3 +1,42 @@
+### 0.12.0 - January 22, 2015
+
+* Add optional KeepAlive support
+
+* Try again on EINTR errors
+
+* Add libuv adapter
+
+* Add IPv6 support
+
+* Remove possiblity of multiple close on same fd
+
+* Add ability to bind source address on connect
+
+* Add redisConnectFd() and redisFreeKeepFd()
+
+* Fix getaddrinfo() memory leak
+
+* Free string if it is unused (fixes memory leak)
+
+* Improve redisAppendCommandArgv performance 2.5x
+
+* Add support for SO_REUSEADDR
+
+* Fix redisvFormatCommand format parsing
+
+* Add GLib 2.0 adapter
+
+* Refactor reading code into read.c
+
+* Fix errno error buffers to not clobber errors
+
+* Generate pkgconf during build
+
+* Silence _BSD_SOURCE warnings
+
+* Improve digit counting for multibulk creation
+
+
 ### 0.11.0
 
 * Increase the maximum multi-bulk reply depth to 7.
