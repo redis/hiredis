@@ -38,7 +38,7 @@
 #include "sds.h" /* for sds */
 
 #define HIREDIS_MAJOR 0
-#define HIREDIS_MINOR 11
+#define HIREDIS_MINOR 12
 #define HIREDIS_PATCH 0
 
 /* Connection type can be blocking or non-blocking and is set in the
