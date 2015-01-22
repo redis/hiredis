@@ -107,6 +107,7 @@ static redisContext *connect(struct config config) {
         exit(1);
     } else if (c->err) {
         printf("Connection error: %s\n", c->errstr);
+        redisFree(c);
         exit(1);
     }
 
@@ -497,6 +498,7 @@ static void test_invalid_timeout_errors(struct config config) {
     c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
 
     test_cond(c->err == REDIS_ERR_IO);
+    redisFree(c);
 
     test("Set error when an invalid timeout sec value is given to redisConnectWithTimeout: ");
 
@@ -506,7 +508,6 @@ static void test_invalid_timeout_errors(struct config config) {
     c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
 
     test_cond(c->err == REDIS_ERR_IO);
-
     redisFree(c);
 }
 
