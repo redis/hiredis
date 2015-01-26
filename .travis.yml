@@ -4,10 +4,12 @@ compiler:
   - clang
 
 env:
-    - PRE=""
+    - CFLAGS="-Werror"
     - PRE="valgrind --track-origins=yes --leak-check=full"
+    - TARGET="32bit" CFLAGS="-Werror"
+    - TARGET="32bit" PRE="valgrind --track-origins=yes --leak-check=full"
 
 install:
     - sudo apt-get install libc6-dbg libc6-dev libc6-i686:i386 libc6-dev-i386 libc6-dbg:i386 valgrind -y
 
-script: make && make check PRE="$PRE"
+script: make $TARGET CFLAGS="$CFLAGS" && make check PRE="$PRE"
