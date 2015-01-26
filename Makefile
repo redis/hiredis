@@ -147,7 +147,7 @@ endif
 
 INSTALL?= cp -a
 
-$(PKGCONFNAME): $(PKGCONF_SRCNAME)
+$(PKGCONFNAME): hiredis.h
 	@echo "Generating $@ for pkgconfig..."
 	@echo prefix=$(PREFIX) > $@
 	@echo exec_prefix=$${prefix} >> $@
@@ -155,7 +155,7 @@ $(PKGCONFNAME): $(PKGCONF_SRCNAME)
 	@echo includedir=$(INSTALL_INCLUDE_PATH) >> $@
 	@echo >> $@
 	@echo Name: hiredis >> $@
-	@echo Description: Minimalistic C client library for the Redis database. >> $@
+	@echo Description: Minimalistic C client library for Redis. >> $@
 	@echo Version: $(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(HIREDIS_PATCH) >> $@
 	@echo Libs: -L$${libdir} -lhiredis >> $@
 	@echo Cflags: -I$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
