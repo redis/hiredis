@@ -1,3 +1,8 @@
+### 0.12.1 - January 26, 2015
+
+* Fix `make install`: DESTDIR support, install all required files, install PKGCONF in proper location
+* Fix `make test` as 32 bit build on 64 bit platform
+
 ### 0.12.0 - January 22, 2015
 
 * Add optional KeepAlive support

@@ -39,7 +39,7 @@
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 12
-#define HIREDIS_PATCH 0
+#define HIREDIS_PATCH 1
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
