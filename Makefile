@@ -65,7 +65,7 @@ ifeq ($(uname_S),Darwin)
   DYLIB_MAKE_CMD=$(CC) -shared -Wl,-install_name,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
 endif
 
-all: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
+all: $(DYLIBNAME) $(STLIBNAME) hiredis-test $(PKGCONFNAME)
 
 # Deps (use make dep to generate this)
 async.o: async.c fmacros.h async.h hiredis.h read.h sds.h net.h dict.c dict.h
@@ -121,7 +121,7 @@ examples: $(EXAMPLES)
 hiredis-test: test.o $(STLIBNAME)
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
+	$(CC) $(REAL_CFLAGS) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
 
 test: hiredis-test
 	./hiredis-test
