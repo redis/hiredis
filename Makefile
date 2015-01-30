@@ -18,8 +18,8 @@ PREFIX?=/usr/local
 INCLUDE_PATH?=include/hiredis
 LIBRARY_PATH?=lib
 PKGCONF_PATH?=pkgconfig
-INSTALL_INCLUDE_PATH= $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
-INSTALL_LIBRARY_PATH= $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
+INSTALL_INCLUDE_PATH= $(PREFIX)/$(INCLUDE_PATH)
+INSTALL_LIBRARY_PATH= $(PREFIX)/$(LIBRARY_PATH)
 INSTALL_PKGCONF_PATH= $(INSTALL_LIBRARY_PATH)/$(PKGCONF_PATH)
 
 # redis-server configuration used for testing
@@ -150,25 +150,25 @@ INSTALL?= cp -a
 $(PKGCONFNAME): hiredis.h
 	@echo "Generating $@ for pkgconfig..."
 	@echo prefix=$(PREFIX) > $@
-	@echo exec_prefix=$${prefix} >> $@
+	@echo exec_prefix=\$${prefix} >> $@
 	@echo libdir=$(INSTALL_LIBRARY_PATH) >> $@
 	@echo includedir=$(INSTALL_INCLUDE_PATH) >> $@
 	@echo >> $@
 	@echo Name: hiredis >> $@
 	@echo Description: Minimalistic C client library for Redis. >> $@
 	@echo Version: $(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(HIREDIS_PATCH) >> $@
-	@echo Libs: -L$${libdir} -lhiredis >> $@
-	@echo Cflags: -I$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
+	@echo Libs: -L\$${libdir} -lhiredis >> $@
+	@echo Cflags: -I\$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
 
-install: $(DYLIBNAME) $(STLIBNAME)
-	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
-	$(INSTALL) hiredis.h async.h read.h sds.h adapters $(INSTALL_INCLUDE_PATH)
-	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
-	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
-	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MAJOR_NAME) $(DYLIBNAME)
-	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
-	mkdir -p $(INSTALL_PKGCONF_PATH)
-	$(INSTALL) $(PKGCONFNAME) $(INSTALL_PKGCONF_PATH)
+install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
+	mkdir -p $(DESTDIR)$(INSTALL_INCLUDE_PATH) $(DESTDIR)$(INSTALL_LIBRARY_PATH)
+	$(INSTALL) hiredis.h async.h read.h sds.h adapters $(DESTDIR)$(INSTALL_INCLUDE_PATH)
+	$(INSTALL) $(DYLIBNAME) $(DESTDIR)$(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
+	cd $(DESTDIR)$(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIB_MAJOR_NAME)
+	cd $(DESTDIR)$(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MAJOR_NAME) $(DYLIBNAME)
+	$(INSTALL) $(STLIBNAME) $(DESTDIR)$(INSTALL_LIBRARY_PATH)
+	mkdir -p $(DESTDIR)$(INSTALL_PKGCONF_PATH)
+	$(INSTALL) $(PKGCONFNAME) $(DESTDIR)$(INSTALL_PKGCONF_PATH)
 
 32bit:
 	@echo ""
