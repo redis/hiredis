@@ -36,6 +36,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
+#include <poll.h>
 
 #include "hiredis.h"
 #include "net.h"
@@ -750,6 +751,39 @@ int redisEnableKeepAlive(redisContext *c) {
  * After this function is called, you may use redisContextReadReply to
  * see if there is a reply available. */
 int redisBufferRead(redisContext *c) {
+  char buf[1024*16];
+  int nread;
+
+  /* Return early when the context has seen an error. */
+  if (c->err)
+    return REDIS_ERR;
+
+  nread = read(c->fd,buf,sizeof(buf));
+  if (nread == -1) {
+    if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+      /* Try again later */
+    } else {
+      __redisSetError(c,REDIS_ERR_IO,NULL);
+      return REDIS_ERR;
+    }
+  } else if (nread == 0) {
+    __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
+    return REDIS_ERR;
+  } else {
+    if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
+      __redisSetError(c,c->reader->err,c->reader->errstr);
+      return REDIS_ERR;
+    }
+  }
+  return REDIS_OK;
+}
+
+/* Use this function to handle a read event on the descriptor. It will try
+ * and read some bytes from the socket and feed them to the reply parser.
+ *
+ * After this function is called, you may use redisContextReadReply to
+ * see if there is a reply available. */
+int redisBufferReadWithTimeout(redisContext *c, int timeout) {
     char buf[1024*16];
     int nread;
 
@@ -757,23 +791,34 @@ int redisBufferRead(redisContext *c) {
     if (c->err)
         return REDIS_ERR;
 
-    nread = read(c->fd,buf,sizeof(buf));
-    if (nread == -1) {
+    struct pollfd fds[1];
+    fds[0].fd = c->fd;
+    fds[0].events = POLLIN;
+
+    if (poll(fds, 1, timeout) == 1) {
+      nread = read(c->fd,buf,sizeof(buf));
+      if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
-            /* Try again later */
+	  /* Try again later */
         } else {
-            __redisSetError(c,REDIS_ERR_IO,NULL);
-            return REDIS_ERR;
+	  __redisSetError(c,REDIS_ERR_IO,NULL);
+	  return REDIS_ERR;
         }
-    } else if (nread == 0) {
+      } else if (nread == 0) {
         __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
         return REDIS_ERR;
-    } else {
+      } else {
         if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
-            __redisSetError(c,c->reader->err,c->reader->errstr);
-            return REDIS_ERR;
+	  __redisSetError(c,c->reader->err,c->reader->errstr);
+	  return REDIS_ERR;
         }
+      }
+    } else {
+      /* timeout reached */
+      __redisSetError(c,REDIS_ERR_OTHER,"Read timed out");
+      return REDIS_ERR;
     }
+
     return REDIS_OK;
 }
 
@@ -855,6 +900,35 @@ int redisGetReply(redisContext *c, void **reply) {
     return REDIS_OK;
 }
 
+int redisGetReplyWithTimeout(redisContext *c, void **reply, int timeout) {
+    int wdone = 0;
+    void *aux = NULL;
+
+    /* Try to read pending replies */
+    if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
+        return REDIS_ERR;
+
+    /* For the blocking context, flush output buffer and read reply */
+    if (aux == NULL && c->flags & REDIS_BLOCK) {
+        /* Write until done */
+        do {
+            if (redisBufferWrite(c,&wdone) == REDIS_ERR)
+                return REDIS_ERR;
+        } while (!wdone);
+
+        /* Read until there is a reply */
+        do {
+	  if (redisBufferReadWithTimeout(c, timeout) == REDIS_ERR)
+                return REDIS_ERR;
+            if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
+                return REDIS_ERR;
+        } while (aux == NULL);
+    }
+
+    /* Set reply object */
+    if (reply != NULL) *reply = aux;
+    return REDIS_OK;
+}
 
 /* Helper function for the redisAppendCommand* family of functions.
  *
@@ -957,10 +1031,27 @@ static void *__redisBlockForReply(redisContext *c) {
     return NULL;
 }
 
+static void *__redisBlockForReplyWithTimeout(redisContext *c, int timeout) {
+    void *reply;
+
+    if (c->flags & REDIS_BLOCK) {
+        if (redisGetReplyWithTimeout(c,&reply,timeout) != REDIS_OK)
+            return NULL;
+        return reply;
+    }
+    return NULL;
+}
+
 void *redisvCommand(redisContext *c, const char *format, va_list ap) {
     if (redisvAppendCommand(c,format,ap) != REDIS_OK)
         return NULL;
     return __redisBlockForReply(c);
+}
+
+void *redisvCommandWithTimeout(redisContext *c, int timeout, const char *format, va_list ap) {
+    if (redisvAppendCommand(c,format,ap) != REDIS_OK)
+        return NULL;
+    return __redisBlockForReplyWithTimeout(c, timeout);
 }
 
 void *redisCommand(redisContext *c, const char *format, ...) {
@@ -968,6 +1059,15 @@ void *redisCommand(redisContext *c, const char *format, ...) {
     void *reply = NULL;
     va_start(ap,format);
     reply = redisvCommand(c,format,ap);
+    va_end(ap);
+    return reply;
+}
+
+void *redisCommandWithTimeout(redisContext *c, int timeout, const char *format, ...) {
+    va_list ap;
+    void *reply = NULL;
+    va_start(ap,format);
+    reply = redisvCommandWithTimeout(c,timeout,format,ap);
     va_end(ap);
     return reply;
 }
