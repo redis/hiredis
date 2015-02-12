@@ -151,8 +151,8 @@ $(PKGCONFNAME): hiredis.h
 	@echo "Generating $@ for pkgconfig..."
 	@echo prefix=$(PREFIX) > $@
 	@echo exec_prefix=$${prefix} >> $@
-	@echo libdir=$(INSTALL_LIBRARY_PATH) >> $@
-	@echo includedir=$(INSTALL_INCLUDE_PATH) >> $@
+	@echo libdir=$(PREFIX)/$(INCLUDE_PATH) >> $@
+	@echo includedir=$(PREFIX)/$(LIBRARY_PATH) >> $@
 	@echo >> $@
 	@echo Name: hiredis >> $@
 	@echo Description: Minimalistic C client library for Redis. >> $@
