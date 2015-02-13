@@ -745,37 +745,29 @@ int redisEnableKeepAlive(redisContext *c) {
     return REDIS_OK;
 }
 
-/* Use this function to handle a read event on the descriptor. It will try
- * and read some bytes from the socket and feed them to the reply parser.
- *
- * After this function is called, you may use redisContextReadReply to
- * see if there is a reply available. */
-int redisBufferRead(redisContext *c) {
-  char buf[1024*16];
-  int nread;
+int __redisBufferRead(redisContext *c) {
+    char buf[1024*16];
+	int nread;
 
-  /* Return early when the context has seen an error. */
-  if (c->err)
-    return REDIS_ERR;
+	nread = read(c->fd,buf,sizeof(buf));
+	if (nread == -1) {
+	    if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+		  /* Try again later */
+		} else {
+		  __redisSetError(c,REDIS_ERR_IO,NULL);
+		  return REDIS_ERR;
+		}
+	} else if (nread == 0) {
+	    __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
+		return REDIS_ERR;
+	} else {
+	    if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
+		  __redisSetError(c,c->reader->err,c->reader->errstr);
+		  return REDIS_ERR;
+		}
+	}
 
-  nread = read(c->fd,buf,sizeof(buf));
-  if (nread == -1) {
-    if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
-      /* Try again later */
-    } else {
-      __redisSetError(c,REDIS_ERR_IO,NULL);
-      return REDIS_ERR;
-    }
-  } else if (nread == 0) {
-    __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
-    return REDIS_ERR;
-  } else {
-    if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
-      __redisSetError(c,c->reader->err,c->reader->errstr);
-      return REDIS_ERR;
-    }
-  }
-  return REDIS_OK;
+	return REDIS_OK;
 }
 
 /* Use this function to handle a read event on the descriptor. It will try
@@ -783,43 +775,39 @@ int redisBufferRead(redisContext *c) {
  *
  * After this function is called, you may use redisContextReadReply to
  * see if there is a reply available. */
+int redisBufferRead(redisContext *c) {
+  /* Return early when the context has seen an error. */
+  if (c->err)
+    return REDIS_ERR;
+
+  return __redisBufferRead(c);
+}
+
 int redisBufferReadWithTimeout(redisContext *c, int timeout) {
-    char buf[1024*16];
-    int nread;
+     /* Return early when the context has seen an error. */
+     if (c->err)
+	   return REDIS_ERR;
 
-    /* Return early when the context has seen an error. */
-    if (c->err)
-        return REDIS_ERR;
+	 struct pollfd fds[1];
+	 fds[0].fd = c->fd;
+	 fds[0].events = POLLIN;
 
-    struct pollfd fds[1];
-    fds[0].fd = c->fd;
-    fds[0].events = POLLIN;
+	 int pollres = poll(fds, 1, timeout);
 
-    if (poll(fds, 1, timeout) == 1) {
-      nread = read(c->fd,buf,sizeof(buf));
-      if (nread == -1) {
-        if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
-	  /* Try again later */
-        } else {
-	  __redisSetError(c,REDIS_ERR_IO,NULL);
-	  return REDIS_ERR;
-        }
-      } else if (nread == 0) {
-        __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
-        return REDIS_ERR;
-      } else {
-        if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
-	  __redisSetError(c,c->reader->err,c->reader->errstr);
-	  return REDIS_ERR;
-        }
-      }
-    } else {
-      /* timeout reached */
-      __redisSetError(c,REDIS_ERR_OTHER,"Read timed out");
-      return REDIS_ERR;
-    }
-
-    return REDIS_OK;
+	 if (pollres == 1) {
+	     return __redisBufferRead(c);
+	 } else if (pollres == 0) {
+	     /* timeout reached */
+	     return REDIS_ERR;
+	 } else if (pollres == -1) {
+	     __redisSetError(c,REDIS_ERR_IO,NULL);
+	     return REDIS_ERR;
+	 } else {
+	     /* There should only ever be one fd to read, so we shouldn't
+	        get here, but just in case, do something about it */
+	     __redisSetError(c,REDIS_ERR_OTHER,"Wrong number of file descriptors");
+	     return REDIS_ERR;
+	 }
 }
 
 /* Write the output buffer to the socket.
@@ -870,64 +858,48 @@ int redisGetReplyFromReader(redisContext *c, void **reply) {
     return REDIS_OK;
 }
 
-int redisGetReply(redisContext *c, void **reply) {
+int __redisGetReply(redisContext *c, void **reply, int timeout) {
     int wdone = 0;
-    void *aux = NULL;
+	void *aux = NULL;
 
-    /* Try to read pending replies */
-    if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
-        return REDIS_ERR;
+	/* Try to read pending replies */
+	if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
+	  return REDIS_ERR;
 
-    /* For the blocking context, flush output buffer and read reply */
-    if (aux == NULL && c->flags & REDIS_BLOCK) {
-        /* Write until done */
-        do {
-            if (redisBufferWrite(c,&wdone) == REDIS_ERR)
-                return REDIS_ERR;
-        } while (!wdone);
+	/* For the blocking context, flush output buffer and read reply */
+	if (aux == NULL && c->flags & REDIS_BLOCK) {
+	  /* Write until done */
+	  do {
+		if (redisBufferWrite(c,&wdone) == REDIS_ERR)
+		  return REDIS_ERR;
+	  } while (!wdone);
 
-        /* Read until there is a reply */
-        do {
-            if (redisBufferRead(c) == REDIS_ERR)
-                return REDIS_ERR;
-            if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
-                return REDIS_ERR;
-        } while (aux == NULL);
-    }
+	  /* Read until there is a reply */
+	  do {
+		if (timeout == 0) {
+		  if (redisBufferRead(c) == REDIS_ERR)
+			return REDIS_ERR;
+		} else {
+		  if (redisBufferReadWithTimeout(c, timeout) == REDIS_ERR)
+			return REDIS_ERR;
+		}
+		if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
+		  return REDIS_ERR;
+	  } while (aux == NULL);
+	}
 
-    /* Set reply object */
-    if (reply != NULL) *reply = aux;
-    return REDIS_OK;
+	/* Set reply object */
+	if (reply != NULL) *reply = aux;
+	return REDIS_OK;
+}
+
+
+int redisGetReply(redisContext *c, void **reply) {
+  return __redisGetReply(c, reply, 0);
 }
 
 int redisGetReplyWithTimeout(redisContext *c, void **reply, int timeout) {
-    int wdone = 0;
-    void *aux = NULL;
-
-    /* Try to read pending replies */
-    if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
-        return REDIS_ERR;
-
-    /* For the blocking context, flush output buffer and read reply */
-    if (aux == NULL && c->flags & REDIS_BLOCK) {
-        /* Write until done */
-        do {
-            if (redisBufferWrite(c,&wdone) == REDIS_ERR)
-                return REDIS_ERR;
-        } while (!wdone);
-
-        /* Read until there is a reply */
-        do {
-	  if (redisBufferReadWithTimeout(c, timeout) == REDIS_ERR)
-                return REDIS_ERR;
-            if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
-                return REDIS_ERR;
-        } while (aux == NULL);
-    }
-
-    /* Set reply object */
-    if (reply != NULL) *reply = aux;
-    return REDIS_OK;
+  return __redisGetReply(c, reply, timeout);
 }
 
 /* Helper function for the redisAppendCommand* family of functions.
