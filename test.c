@@ -43,17 +43,23 @@ static long long usec(void) {
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
+#ifdef NDEBUG
+#define ASSERT(statement) (void)(statement)
+#else
+#define ASSERT(statement) assert(statement)
+#endif
+
 static redisContext *select_database(redisContext *c) {
     redisReply *reply;
 
     /* Switch to DB 9 for testing, now that we know we can chat. */
     reply = redisCommand(c,"SELECT 9");
-    assert(reply != NULL);
+    ASSERT(reply != NULL);
     freeReplyObject(reply);
 
     /* Make sure the DB is emtpy */
     reply = redisCommand(c,"DBSIZE");
-    assert(reply != NULL);
+    ASSERT(reply != NULL);
     if (reply->type == REDIS_REPLY_INTEGER && reply->integer == 0) {
         /* Awesome, DB 9 is empty and we can continue. */
         freeReplyObject(reply);
@@ -70,10 +76,10 @@ static int disconnect(redisContext *c, int keep_fd) {
 
     /* Make sure we're on DB 9. */
     reply = redisCommand(c,"SELECT 9");
-    assert(reply != NULL);
+    ASSERT(reply != NULL);
     freeReplyObject(reply);
     reply = redisCommand(c,"FLUSHDB");
-    assert(reply != NULL);
+    ASSERT(reply != NULL);
     freeReplyObject(reply);
 
     /* Free the context as well, but keep the fd if requested. */
@@ -99,7 +105,7 @@ static redisContext *connect(struct config config) {
             c = redisConnectFd(fd);
         }
     } else {
-        assert(NULL);
+        ASSERT(NULL);
     }
 
     if (c == NULL) {
@@ -232,7 +238,7 @@ static void test_append_formatted_commands(struct config config) {
 
     test_cond(redisAppendFormattedCommand(c, cmd, len) == REDIS_OK);
 
-    assert(redisGetReply(c, (void*)&reply) == REDIS_OK);
+    ASSERT(redisGetReply(c, (void*)&reply) == REDIS_OK);
 
     free(cmd);
     freeReplyObject(reply);
@@ -291,7 +297,7 @@ static void test_reply_reader(void) {
     reader->fn = NULL;
     redisReaderFeed(reader,(char*)"+OK\r",4);
     ret = redisReaderGetReply(reader,&reply);
-    assert(ret == REDIS_OK && reply == NULL);
+    ASSERT(ret == REDIS_OK && reply == NULL);
     redisReaderFeed(reader,(char*)"\n",1);
     ret = redisReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_OK && reply == (void*)REDIS_REPLY_STATUS);
@@ -302,7 +308,7 @@ static void test_reply_reader(void) {
     reader->fn = NULL;
     redisReaderFeed(reader,(char*)"x",1);
     ret = redisReaderGetReply(reader,&reply);
-    assert(ret == REDIS_ERR);
+    ASSERT(ret == REDIS_ERR);
     ret = redisReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_ERR && reply == NULL);
     redisReaderFree(reader);
@@ -474,14 +480,14 @@ static void test_blocking_io_errors(struct config config) {
      * On >2.0, QUIT will return with OK and another read(2) needed to be
      * issued to find out the socket was closed by the server. In both
      * conditions, the error will be set to EOF. */
-    assert(c->err == REDIS_ERR_EOF &&
+    ASSERT(c->err == REDIS_ERR_EOF &&
         strcmp(c->errstr,"Server closed the connection") == 0);
     redisFree(c);
 
     c = connect(config);
     test("Returns I/O error on socket timeout: ");
     struct timeval tv = { 0, 1000 };
-    assert(redisSetTimeout(c,tv) == REDIS_OK);
+    ASSERT(redisSetTimeout(c,tv) == REDIS_OK);
     test_cond(redisGetReply(c,&_reply) == REDIS_ERR &&
         c->err == REDIS_ERR_IO && errno == EAGAIN);
     redisFree(c);
@@ -526,7 +532,7 @@ static void test_throughput(struct config config) {
     t1 = usec();
     for (i = 0; i < num; i++) {
         replies[i] = redisCommand(c,"PING");
-        assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_STATUS);
+        ASSERT(replies[i] != NULL && replies[i]->type == REDIS_REPLY_STATUS);
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
@@ -537,8 +543,8 @@ static void test_throughput(struct config config) {
     t1 = usec();
     for (i = 0; i < num; i++) {
         replies[i] = redisCommand(c,"LRANGE mylist 0 499");
-        assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_ARRAY);
-        assert(replies[i] != NULL && replies[i]->elements == 500);
+        ASSERT(replies[i] != NULL && replies[i]->type == REDIS_REPLY_ARRAY);
+        ASSERT(replies[i] != NULL && replies[i]->elements == 500);
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
@@ -551,8 +557,8 @@ static void test_throughput(struct config config) {
         redisAppendCommand(c,"PING");
     t1 = usec();
     for (i = 0; i < num; i++) {
-        assert(redisGetReply(c, (void*)&replies[i]) == REDIS_OK);
-        assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_STATUS);
+        ASSERT(redisGetReply(c, (void*)&replies[i]) == REDIS_OK);
+        ASSERT(replies[i] != NULL && replies[i]->type == REDIS_REPLY_STATUS);
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
@@ -564,9 +570,9 @@ static void test_throughput(struct config config) {
         redisAppendCommand(c,"LRANGE mylist 0 499");
     t1 = usec();
     for (i = 0; i < num; i++) {
-        assert(redisGetReply(c, (void*)&replies[i]) == REDIS_OK);
-        assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_ARRAY);
-        assert(replies[i] != NULL && replies[i]->elements == 500);
+        ASSERT(redisGetReply(c, (void*)&replies[i]) == REDIS_OK);
+        ASSERT(replies[i] != NULL && replies[i]->type == REDIS_REPLY_ARRAY);
+        ASSERT(replies[i] != NULL && replies[i]->elements == 500);
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
@@ -660,7 +666,7 @@ static void test_throughput(struct config config) {
 //      * arrive in a single packet, causing all callbacks to be executed in
 //      * a single pass). */
 //     while(__test_callback_flags == 0) {
-//         assert(redisBufferRead(c) == REDIS_OK);
+//         ASSERT(redisBufferRead(c) == REDIS_OK);
 //         redisProcessCallbacks(c);
 //     }
 //     test_cond(__test_callback_flags == 0x010203);
