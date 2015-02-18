@@ -43,6 +43,13 @@ static long long usec(void) {
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
 }
 
+/* The assert() calls below have side effects, so we need assert()
+ * even if we are compiling without asserts (-DNDEBUG). */
+#ifdef NDEBUG
+#undef assert
+#define assert(e) (void)(e)
+#endif
+
 static redisContext *select_database(redisContext *c) {
     redisReply *reply;
 
