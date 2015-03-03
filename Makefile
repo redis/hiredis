@@ -157,8 +157,8 @@ $(PKGCONFNAME): hiredis.h
 	@echo Name: hiredis >> $@
 	@echo Description: Minimalistic C client library for Redis. >> $@
 	@echo Version: $(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(HIREDIS_PATCH) >> $@
-	@echo Libs: -L$${libdir} -lhiredis >> $@
-	@echo Cflags: -I$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
+	@echo Libs: -L\$${libdir} -lhiredis >> $@
+	@echo Cflags: -I\$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
 
 install: $(DYLIBNAME) $(STLIBNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
