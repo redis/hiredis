@@ -10,6 +10,7 @@ env:
     - TARGET="32bit" PRE="valgrind --track-origins=yes --leak-check=full"
 
 install:
+    - sudo apt-get update -qq
     - sudo apt-get install libc6-dbg libc6-dev libc6-i686:i386 libc6-dev-i386 libc6-dbg:i386 valgrind -y
 
 script: make $TARGET CFLAGS="$CFLAGS" && make check PRE="$PRE"
