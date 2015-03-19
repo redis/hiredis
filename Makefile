@@ -150,7 +150,7 @@ INSTALL?= cp -a
 $(PKGCONFNAME): hiredis.h
 	@echo "Generating $@ for pkgconfig..."
 	@echo prefix=$(PREFIX) > $@
-	@echo exec_prefix=$${prefix} >> $@
+	@echo exec_prefix=\$${prefix} >> $@
 	@echo libdir=$(PREFIX)/$(LIBRARY_PATH) >> $@
 	@echo includedir=$(PREFIX)/$(INCLUDE_PATH) >> $@
 	@echo >> $@
