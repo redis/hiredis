@@ -35,13 +35,14 @@
 #include "../async.h"
 
 enum {
-    APE_REDIS_READ_EVENT = 1 << 0,
-    APE_REDIS_WRITE_EVENT = 1 << 1
+    APE_REDIS_READ_EVENT = EVENT_READ,
+    APE_REDIS_WRITE_EVENT = EVENT_WRITE
 };
 
 typedef struct _redis_socket {
     _APE_FD_DELEGATE_TPL
     int listenfor;
+    ape_global *ape;
 } redis_socket;
 
 
@@ -50,6 +51,9 @@ static void redisLibapenetworkAddRead(void *privdata)
     redis_socket *socket = (redis_socket *)privdata;
 
     socket->listenfor |= APE_REDIS_READ_EVENT;
+
+    events_mod((ape_event_descriptor *)socket,
+        socket->listenfor | EVENT_LEVEL, socket->ape);
 }
 
 static void redisLibapenetworkDelRead(void *privdata)
@@ -57,12 +61,19 @@ static void redisLibapenetworkDelRead(void *privdata)
     redis_socket *socket = (redis_socket *)privdata;
     
     socket->listenfor &= ~APE_REDIS_READ_EVENT;
+
+    events_mod((ape_event_descriptor *)socket,
+        socket->listenfor | EVENT_LEVEL, socket->ape);
 }
 
 static void redisLibapenetworkAddWrite(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
     socket->listenfor |= APE_REDIS_WRITE_EVENT;
+
+    events_mod((ape_event_descriptor *)socket,
+        socket->listenfor | EVENT_LEVEL, socket->ape);
+
     redisAsyncContext *ac = (redisAsyncContext *)socket->data;
 
     if (ac->data) {
@@ -78,6 +89,9 @@ static void redisLibapenetworkDelWrite(void *privdata)
 {
     redis_socket *socket = (redis_socket *)privdata;
     socket->listenfor &= ~APE_REDIS_WRITE_EVENT;
+
+    events_mod((ape_event_descriptor *)socket,
+        socket->listenfor | EVENT_LEVEL, socket->ape);
 }
 
 static void redisLibapenetworkCleanup(void *privdata)
@@ -112,9 +126,10 @@ static int redisLibapenetworkAttach(redisAsyncContext *ac, ape_global *ape) {
     socket->listenfor = 0;
 
     socket->s.fd   = c->fd;
-    socket->s.type = APE_DELEGATE;
+    socket->s.type = APE_EVENT_DELEGATE;
     socket->on_io  = ape_redis_io;
     socket->data   = ac;
+    socket->ape    = ape;
 
     /* Register functions to start/stop listening for events */
     ac->ev.addRead  = redisLibapenetworkAddRead;
@@ -125,7 +140,7 @@ static int redisLibapenetworkAttach(redisAsyncContext *ac, ape_global *ape) {
     ac->ev.data = socket;
 
     /* Initialize and install read/write events */
-    events_add(c->fd, socket, EVENT_READ|EVENT_WRITE, ape);
+    events_add((ape_event_descriptor *)socket, EVENT_READ|EVENT_LEVEL, ape);
 
     return REDIS_OK;
 }
