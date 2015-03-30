@@ -599,6 +599,8 @@ static redisContext *redisContextInit(void) {
     c->errstr[0] = '\0';
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
+    c->ip = sdsempty();
+    c->port = 6379;
 
     if (c->obuf == NULL || c->reader == NULL) {
         redisFree(c);
@@ -637,9 +639,29 @@ redisContext *redisConnect(const char *ip, int port) {
     if (c == NULL)
         return NULL;
 
+    c->ip = ip;
+    c->port = port;
+
     c->flags |= REDIS_BLOCK;
     redisContextConnectTcp(c,ip,port,NULL);
     return c;
+}
+
+void redisReconnect(redisContext *c) {
+  c->err = 0;
+  memset(c->errstr, '\0', strlen(c->errstr));
+  if (c->fd > 0)
+    close(c->fd);
+  c->obuf = sdsempty();
+  c->reader = redisReaderCreate();
+
+  if (c->timeout == NULL) {
+    redisContextConnectTcp(c, c->ip, c->port, NULL);
+  } else {
+    redisContextConnectTcp(c, c->ip, c->port, c->timeout);
+  }
+
+  return;
 }
 
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv) {
@@ -648,6 +670,10 @@ redisContext *redisConnectWithTimeout(const char *ip, int port, const struct tim
     c = redisContextInit();
     if (c == NULL)
         return NULL;
+
+    c->ip = ip;
+    c->port = port;
+    c->timeout = &tv;
 
     c->flags |= REDIS_BLOCK;
     redisContextConnectTcp(c,ip,port,&tv);
@@ -784,30 +810,31 @@ int redisBufferRead(redisContext *c) {
 }
 
 int redisBufferReadWithTimeout(redisContext *c, int timeout) {
-     /* Return early when the context has seen an error. */
-     if (c->err)
-	   return REDIS_ERR;
+    /* Return early when the context has seen an error. */
+    if (c->err)
+      return REDIS_ERR;
 
-	 struct pollfd fds[1];
-	 fds[0].fd = c->fd;
-	 fds[0].events = POLLIN;
+    struct pollfd fds[1];
+    fds[0].fd = c->fd;
+    fds[0].events = POLLIN;
 
-	 int pollres = poll(fds, 1, timeout);
+    int pollres = poll(fds, 1, timeout);
 
-	 if (pollres == 1) {
-	     return __redisBufferRead(c);
-	 } else if (pollres == 0) {
-	     /* timeout reached */
-	     return REDIS_ERR;
-	 } else if (pollres == -1) {
-	     __redisSetError(c,REDIS_ERR_IO,NULL);
-	     return REDIS_ERR;
-	 } else {
-	     /* There should only ever be one fd to read, so we shouldn't
-	        get here, but just in case, do something about it */
-	     __redisSetError(c,REDIS_ERR_OTHER,"Wrong number of file descriptors");
-	     return REDIS_ERR;
-	 }
+    if (pollres == 1) {
+        return __redisBufferRead(c);
+    } else if (pollres == 0) {
+        /* timeout reached */
+        __redisSetError(c,REDIS_ERR_TIMEOUT,"Read timed out");
+        return REDIS_ERR;
+    } else if (pollres == -1) {
+        __redisSetError(c,REDIS_ERR_IO,NULL);
+        return REDIS_ERR;
+    } else {
+        /* There should only ever be one fd to read, so we shouldn't
+            get here, but just in case, do something about it */
+        __redisSetError(c,REDIS_ERR_OTHER,"Wrong number of file descriptors");
+        return REDIS_ERR;
+    }
 }
 
 /* Write the output buffer to the socket.

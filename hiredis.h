@@ -136,8 +136,12 @@ typedef struct redisContext {
     int flags;
     char *obuf; /* Write buffer */
     redisReader *reader; /* Protocol reader */
+    const char *ip;
+    int port;
+    const struct timeval *timeout;
 } redisContext;
 
+void redisReconnect(redisContext *c);
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);

@@ -439,32 +439,30 @@ static void test_blocking_connection(struct config config) {
 static void test_blocking_connection_timeouts(struct config config) {
     redisContext *c;
     redisReply *reply;
+    ssize_t s;
+    const char *cmd = "DEBUG SLEEP 3\r\n";
 
     c = connect(config);
-
     test("Successfully completes a command when the timeout is not exceeded: ");
     redisCommand(c,"SET foo fast");
     reply = redisCommandWithTimeout(c, 10, "GET foo");
     test_cond(reply->type == REDIS_REPLY_STRING && memcmp(reply->str, "fast", 4) == 0);
     freeReplyObject(reply);
+    disconnect(c, 0);
 
-    /* This test should ultimately be in the test suite, but getting
-       the sleep to work in coordination with the timeout call has
-       proven to be a challenge. It is commented until it can be
-       sorted out. It has been manually verified to work properly. */
-
-    /*
+    c = connect(config);
     test("Does not return a reply when the command times out: ");
-    redisContext *n;
-    n = redisConnectNonBlock(config.tcp.host, config.tcp.port);
-    redisCommand(c,"SET foo fast");
-    redisCommand(n, "DEBUG SLEEP 10");
-    sleep(2);
-    reply = redisCommandWithTimeout(c, 10, "GET foo");
-    test_cond(reply == NULL);
-    redisFree(n);
-    */
+    s = write(c->fd, cmd, strlen(cmd));
+    reply = redisCommandWithTimeout(c, 2000, "GET foo");
+    test_cond(s > 0 && reply == NULL && c->err == REDIS_ERR_TIMEOUT && strcmp(c->errstr, "Read timed out") == 0);
+    freeReplyObject(reply);
 
+    test("Reconnect properly reconnects after a timeout: ");
+    redisReconnect(c);
+    reply = redisCommand(c, "PING");
+    if (reply == NULL) { printf("NULL\n"); }
+    test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+    freeReplyObject(reply);
     disconnect(c, 0);
 }
 
