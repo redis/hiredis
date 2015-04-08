@@ -136,8 +136,14 @@ typedef struct redisContext {
     int flags;
     char *obuf; /* Write buffer */
     redisReader *reader; /* Protocol reader */
+    const char *ip;
+    int port;
+    const struct timeval *timeout;
+    const char *source_addr;
+    const char *path;
 } redisContext;
 
+void redisReconnect(redisContext *c);
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
@@ -154,6 +160,7 @@ int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);
 int redisFreeKeepFd(redisContext *c);
 int redisBufferRead(redisContext *c);
+int redisBufferReadWithTimeout(redisContext *c, int timeout);
 int redisBufferWrite(redisContext *c, int *done);
 
 /* In a blocking context, this function first checks if there are unconsumed
@@ -161,6 +168,7 @@ int redisBufferWrite(redisContext *c, int *done);
  * buffer to the socket and reads until it has a reply. In a non-blocking
  * context, it will return unconsumed replies until there are no more. */
 int redisGetReply(redisContext *c, void **reply);
+int redisGetReplyWithTimeout(redisContext *c, void **reply, int timeout);
 int redisGetReplyFromReader(redisContext *c, void **reply);
 
 /* Write a formatted command to the output buffer. Use these functions in blocking mode
@@ -179,7 +187,9 @@ int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const s
  * return the reply. In a non-blocking context, it is identical to calling
  * only redisAppendCommand and will always return NULL. */
 void *redisvCommand(redisContext *c, const char *format, va_list ap);
+void *redisvCommandWithTimeout(redisContext *c, int timeout, const char *format, va_list ap);
 void *redisCommand(redisContext *c, const char *format, ...);
+void *redisCommandWithTimeout(redisContext *c, int timeout, const char *format, ...);
 void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen);
 
 #ifdef __cplusplus

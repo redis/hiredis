@@ -443,6 +443,36 @@ static void test_blocking_connection(struct config config) {
     disconnect(c, 0);
 }
 
+static void test_blocking_connection_timeouts(struct config config) {
+    redisContext *c;
+    redisReply *reply;
+    ssize_t s;
+    const char *cmd = "DEBUG SLEEP 3\r\n";
+
+    c = connect(config);
+    test("Successfully completes a command when the timeout is not exceeded: ");
+    redisCommand(c,"SET foo fast");
+    reply = redisCommandWithTimeout(c, 10, "GET foo");
+    test_cond(reply->type == REDIS_REPLY_STRING && memcmp(reply->str, "fast", 4) == 0);
+    freeReplyObject(reply);
+    disconnect(c, 0);
+
+    c = connect(config);
+    test("Does not return a reply when the command times out: ");
+    s = write(c->fd, cmd, strlen(cmd));
+    reply = redisCommandWithTimeout(c, 2000, "GET foo");
+    test_cond(s > 0 && reply == NULL && c->err == REDIS_ERR_TIMEOUT && strcmp(c->errstr, "Read timed out") == 0);
+    freeReplyObject(reply);
+
+    test("Reconnect properly reconnects after a timeout: ");
+    redisReconnect(c);
+    reply = redisCommand(c, "PING");
+    if (reply == NULL) { printf("NULL\n"); }
+    test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+    freeReplyObject(reply);
+    disconnect(c, 0);
+}
+
 static void test_blocking_io_errors(struct config config) {
     redisContext *c;
     redisReply *reply;
@@ -729,6 +759,7 @@ int main(int argc, char **argv) {
     printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     cfg.type = CONN_TCP;
     test_blocking_connection(cfg);
+    test_blocking_connection_timeouts(cfg);
     test_blocking_io_errors(cfg);
     test_invalid_timeout_errors(cfg);
     test_append_formatted_commands(cfg);
