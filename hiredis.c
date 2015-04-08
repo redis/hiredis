@@ -648,20 +648,37 @@ redisContext *redisConnect(const char *ip, int port) {
 }
 
 void redisReconnect(redisContext *c) {
-  c->err = 0;
-  memset(c->errstr, '\0', strlen(c->errstr));
-  if (c->fd > 0)
-    close(c->fd);
-  c->obuf = sdsempty();
-  c->reader = redisReaderCreate();
+    c->err = 0;
+    memset(c->errstr, '\0', strlen(c->errstr));
 
-  if (c->timeout == NULL) {
-    redisContextConnectTcp(c, c->ip, c->port, NULL);
-  } else {
-    redisContextConnectTcp(c, c->ip, c->port, c->timeout);
-  }
+    if (c->fd > 0) {
+	close(c->fd);
+    }
 
-  return;
+    c->obuf = sdsempty();
+    c->reader = redisReaderCreate();
+
+    if (c->ip != NULL) {
+	if (c->timeout == NULL) {
+	    redisContextConnectTcp(c, c->ip, c->port, NULL);
+	} else {
+	    redisContextConnectTcp(c, c->ip, c->port, c->timeout);
+	}
+    } else if (c->path != NULL) {
+	if (c->timeout == NULL) {
+	    redisContextConnectUnix(c, c->path, NULL);
+	} else {
+	    redisContextConnectUnix(c, c->path, c->timeout);
+	}
+    } else if (c->source_addr != NULL && c->ip != NULL) {
+	redisContextConnectBindTcp(c,c->ip,c->port,NULL,c->source_addr);
+    } else {
+	/* Something bad happened here and shouldn't have. There isn't
+	   enough information in the context to reconnect. */
+	__redisSetError(c,REDIS_ERR_OTHER,"Not enough information to reconnect");
+    }
+
+    return;
 }
 
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv) {
@@ -687,6 +704,9 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
     if (c == NULL)
         return NULL;
 
+    c->ip = ip;
+    c->port = port;
+
     c->flags &= ~REDIS_BLOCK;
     redisContextConnectTcp(c,ip,port,NULL);
     return c;
@@ -694,7 +714,16 @@ redisContext *redisConnectNonBlock(const char *ip, int port) {
 
 redisContext *redisConnectBindNonBlock(const char *ip, int port,
                                        const char *source_addr) {
-    redisContext *c = redisContextInit();
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+	return NULL;
+
+    c->ip = ip;
+    c->port = port;
+    c->source_addr = source_addr;
+
     c->flags &= ~REDIS_BLOCK;
     redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
     return c;
@@ -702,7 +731,16 @@ redisContext *redisConnectBindNonBlock(const char *ip, int port,
 
 redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
                                                 const char *source_addr) {
-    redisContext *c = redisContextInit();
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+	return NULL;
+
+    c->ip = ip;
+    c->port = port;
+    c->source_addr = source_addr;
+
     c->flags &= ~REDIS_BLOCK;
     c->flags |= REDIS_REUSEADDR;
     redisContextConnectBindTcp(c,ip,port,NULL,source_addr);
@@ -716,6 +754,8 @@ redisContext *redisConnectUnix(const char *path) {
     if (c == NULL)
         return NULL;
 
+    c->path = path;
+
     c->flags |= REDIS_BLOCK;
     redisContextConnectUnix(c,path,NULL);
     return c;
@@ -728,6 +768,9 @@ redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval
     if (c == NULL)
         return NULL;
 
+    c->path = path;
+    c->timeout = &tv;
+
     c->flags |= REDIS_BLOCK;
     redisContextConnectUnix(c,path,&tv);
     return c;
@@ -739,6 +782,8 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
     c = redisContextInit();
     if (c == NULL)
         return NULL;
+
+    c->path = path;
 
     c->flags &= ~REDIS_BLOCK;
     redisContextConnectUnix(c,path,NULL);
@@ -773,27 +818,27 @@ int redisEnableKeepAlive(redisContext *c) {
 
 int __redisBufferRead(redisContext *c) {
     char buf[1024*16];
-	int nread;
+    int nread;
 
-	nread = read(c->fd,buf,sizeof(buf));
-	if (nread == -1) {
-	    if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
-		  /* Try again later */
-		} else {
-		  __redisSetError(c,REDIS_ERR_IO,NULL);
-		  return REDIS_ERR;
-		}
-	} else if (nread == 0) {
-	    __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
-		return REDIS_ERR;
+    nread = read(c->fd,buf,sizeof(buf));
+    if (nread == -1) {
+	if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+	    /* Try again later */
 	} else {
-	    if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
-		  __redisSetError(c,c->reader->err,c->reader->errstr);
-		  return REDIS_ERR;
-		}
+	    __redisSetError(c,REDIS_ERR_IO,NULL);
+	    return REDIS_ERR;
 	}
+    } else if (nread == 0) {
+	__redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
+	return REDIS_ERR;
+    } else {
+	if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
+	    __redisSetError(c,c->reader->err,c->reader->errstr);
+	    return REDIS_ERR;
+	}
+    }
 
-	return REDIS_OK;
+    return REDIS_OK;
 }
 
 /* Use this function to handle a read event on the descriptor. It will try
@@ -802,17 +847,17 @@ int __redisBufferRead(redisContext *c) {
  * After this function is called, you may use redisContextReadReply to
  * see if there is a reply available. */
 int redisBufferRead(redisContext *c) {
-  /* Return early when the context has seen an error. */
-  if (c->err)
-    return REDIS_ERR;
+    /* Return early when the context has seen an error. */
+    if (c->err)
+	return REDIS_ERR;
 
-  return __redisBufferRead(c);
+    return __redisBufferRead(c);
 }
 
 int redisBufferReadWithTimeout(redisContext *c, int timeout) {
     /* Return early when the context has seen an error. */
     if (c->err)
-      return REDIS_ERR;
+	return REDIS_ERR;
 
     struct pollfd fds[1];
     fds[0].fd = c->fd;
@@ -831,7 +876,7 @@ int redisBufferReadWithTimeout(redisContext *c, int timeout) {
         return REDIS_ERR;
     } else {
         /* There should only ever be one fd to read, so we shouldn't
-            get here, but just in case, do something about it */
+	   get here, but just in case, do something about it */
         __redisSetError(c,REDIS_ERR_OTHER,"Wrong number of file descriptors");
         return REDIS_ERR;
     }

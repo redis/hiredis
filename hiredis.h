@@ -139,6 +139,8 @@ typedef struct redisContext {
     const char *ip;
     int port;
     const struct timeval *timeout;
+    const char *source_addr;
+    const char *path;
 } redisContext;
 
 void redisReconnect(redisContext *c);
