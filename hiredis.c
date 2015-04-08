@@ -658,7 +658,9 @@ void redisReconnect(redisContext *c) {
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
 
-    if (c->ip != NULL) {
+    if (c->source_addr != NULL && c->ip != NULL) {
+	redisContextConnectBindTcp(c,c->ip,c->port,NULL,c->source_addr);
+    } else if (c->ip != NULL) {
 	if (c->timeout == NULL) {
 	    redisContextConnectTcp(c, c->ip, c->port, NULL);
 	} else {
@@ -670,8 +672,6 @@ void redisReconnect(redisContext *c) {
 	} else {
 	    redisContextConnectUnix(c, c->path, c->timeout);
 	}
-    } else if (c->source_addr != NULL && c->ip != NULL) {
-	redisContextConnectBindTcp(c,c->ip,c->port,NULL,c->source_addr);
     } else {
 	/* Something bad happened here and shouldn't have. There isn't
 	   enough information in the context to reconnect. */
