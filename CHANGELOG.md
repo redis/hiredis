@@ -1,3 +1,14 @@
+### 0.13.0 - April 16, 2015
+
+This release adds a minimal Windows compatibility layer.
+The parser, standalone since v0.12.0, can now be compiled on Windows
+(and thus used in other client libraries as well)
+
+* Windows compatibility layer for parser code (tzickel)
+* Properly escape data printed to PKGCONF file (Dan Skorupski)
+* Fix tests when assert() undefined (Keith Bennett, Matt Stancliff)
+* Implement a reconnect method for the client context, this changes the structure of `redisContext` (Aaron Bedra)
+
 ### 0.12.1 - January 26, 2015
 
 * Fix `make install`: DESTDIR support, install all required files, install PKGCONF in proper location
