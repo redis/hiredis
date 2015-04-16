@@ -168,7 +168,18 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 redisContext *redisConnectFd(int fd);
+
+/**
+ * Reconnect the given context using the saved information.
+ *
+ * This re-uses the exact same connect options as in the initial connection.
+ * host, ip (or path), timeout and bind address are reused,
+ * flags are used unmodified from the existing context.
+ *
+ * Returns REDIS_OK on successfull connect or REDIS_ERR otherwise.
+ */
 int redisReconnect(redisContext *c);
+
 int redisSetTimeout(redisContext *c, const struct timeval tv);
 int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);
