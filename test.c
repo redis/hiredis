@@ -466,7 +466,7 @@ static void test_blocking_io_errors(struct config config) {
 
     test("Returns I/O error when the connection is lost: ");
     reply = redisCommand(c,"QUIT");
-    if (major >= 2 && minor > 0) {
+    if (major > 2 || (major == 2 && minor > 0)) {
         /* > 2.0 returns OK on QUIT and read() should be issued once more
          * to know the descriptor is at EOF. */
         test_cond(strcasecmp(reply->str,"OK") == 0 &&
