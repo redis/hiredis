@@ -387,4 +387,6 @@ as soon as possible in order to prevent allocation of useless memory.
 ## AUTHORS
 
 Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
-Pieter Noordhuis (pcnoordhuis at gmail) and is released under the BSD license.
+Pieter Noordhuis (pcnoordhuis at gmail) and is released under the BSD license.  
+Hiredis is currently maintained by Matt Stancliff (matt at genges dot com) and
+Jan-Erik Rediger (janerik at fnordig dot com)
