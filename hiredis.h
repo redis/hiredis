@@ -128,6 +128,11 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const s
 void redisFreeCommand(char *cmd);
 void redisFreeSdsCommand(sds cmd);
 
+enum redisConnectionType {
+    REDIS_CONN_TCP,
+    REDIS_CONN_UNIX,
+};
+
 /* Context for a connection to Redis */
 typedef struct redisContext {
     int err; /* Error flags, 0 when there is no error */
@@ -136,6 +141,20 @@ typedef struct redisContext {
     int flags;
     char *obuf; /* Write buffer */
     redisReader *reader; /* Protocol reader */
+
+    enum redisConnectionType connection_type;
+    struct timeval *timeout;
+
+    struct {
+        char *host;
+        char *source_addr;
+        int port;
+    } tcp;
+
+    struct {
+        char *path;
+    } unix;
+
 } redisContext;
 
 redisContext *redisConnect(const char *ip, int port);
@@ -149,6 +168,7 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 redisContext *redisConnectFd(int fd);
+int redisReconnect(redisContext *c);
 int redisSetTimeout(redisContext *c, const struct timeval tv);
 int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);
