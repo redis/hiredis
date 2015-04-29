@@ -600,9 +600,9 @@ static redisContext *redisContextInit(void) {
     c->errstr[0] = '\0';
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
-    c->tcp.host = NULL;
-    c->tcp.source_addr = NULL;
-    c->unix.path = NULL;
+    c->c_tcp.host = NULL;
+    c->c_tcp.source_addr = NULL;
+    c->c_unix.path = NULL;
     c->timeout = NULL;
 
     if (c->obuf == NULL || c->reader == NULL) {
@@ -622,12 +622,12 @@ void redisFree(redisContext *c) {
         sdsfree(c->obuf);
     if (c->reader != NULL)
         redisReaderFree(c->reader);
-    if (c->tcp.host)
-        free(c->tcp.host);
-    if (c->tcp.source_addr)
-        free(c->tcp.source_addr);
-    if (c->unix.path)
-        free(c->unix.path);
+    if (c->c_tcp.host)
+        free(c->c_tcp.host);
+    if (c->c_tcp.source_addr)
+        free(c->c_tcp.source_addr);
+    if (c->c_unix.path)
+        free(c->c_unix.path);
     if (c->timeout)
         free(c->timeout);
     free(c);
@@ -655,10 +655,10 @@ int redisReconnect(redisContext *c) {
     c->reader = redisReaderCreate();
 
     if (c->connection_type == REDIS_CONN_TCP) {
-        return redisContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
-                c->timeout, c->tcp.source_addr);
+        return redisContextConnectBindTcp(c, c->c_tcp.host, c->c_tcp.port,
+                c->timeout, c->c_tcp.source_addr);
     } else if (c->connection_type == REDIS_CONN_UNIX) {
-        return redisContextConnectUnix(c, c->unix.path, c->timeout);
+        return redisContextConnectUnix(c, c->c_unix.path, c->timeout);
     } else {
         /* Something bad happened here and shouldn't have. There isn't
            enough information in the context to reconnect. */

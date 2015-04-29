@@ -151,11 +151,11 @@ typedef struct redisContext {
         char *host;
         char *source_addr;
         int port;
-    } tcp;
+    } c_tcp;
 
     struct {
         char *path;
-    } unix;
+    } c_unix;
 
 } redisContext;
 
