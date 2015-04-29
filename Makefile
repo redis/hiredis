@@ -176,6 +176,10 @@ install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
 	@echo ""
 	$(MAKE) CFLAGS="-m32" LDFLAGS="-m32"
 
+32bit-vars:
+	$(eval CFLAGS=-m32)
+	$(eval LDFLAGS=-m32)
+
 gprof:
 	$(MAKE) CFLAGS="-pg" LDFLAGS="-pg"
 
