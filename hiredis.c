@@ -602,7 +602,7 @@ static redisContext *redisContextInit(void) {
     c->reader = redisReaderCreate();
     c->tcp.host = NULL;
     c->tcp.source_addr = NULL;
-    c->unix.path = NULL;
+    c->unix_sock.path = NULL;
     c->timeout = NULL;
 
     if (c->obuf == NULL || c->reader == NULL) {
@@ -626,8 +626,8 @@ void redisFree(redisContext *c) {
         free(c->tcp.host);
     if (c->tcp.source_addr)
         free(c->tcp.source_addr);
-    if (c->unix.path)
-        free(c->unix.path);
+    if (c->unix_sock.path)
+        free(c->unix_sock.path);
     if (c->timeout)
         free(c->timeout);
     free(c);
@@ -658,7 +658,7 @@ int redisReconnect(redisContext *c) {
         return redisContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
                 c->timeout, c->tcp.source_addr);
     } else if (c->connection_type == REDIS_CONN_UNIX) {
-        return redisContextConnectUnix(c, c->unix.path, c->timeout);
+        return redisContextConnectUnix(c, c->unix_sock.path, c->timeout);
     } else {
         /* Something bad happened here and shouldn't have. There isn't
            enough information in the context to reconnect. */

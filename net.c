@@ -422,8 +422,8 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
         return REDIS_ERR;
 
     c->connection_type = REDIS_CONN_UNIX;
-    if (c->unix.path != path)
-        c->unix.path = strdup(path);
+    if (c->unix_sock.path != path)
+        c->unix_sock.path = strdup(path);
 
     if (timeout) {
         if (c->timeout != timeout) {

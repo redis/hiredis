@@ -155,7 +155,7 @@ typedef struct redisContext {
 
     struct {
         char *path;
-    } unix;
+    } unix_sock;
 
 } redisContext;
 
