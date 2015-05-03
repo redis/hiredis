@@ -1,3 +1,14 @@
+### 0.13.1 - May 03, 2015
+
+This is a bug fix release.
+The new `reconnect` method introduced new struct members, which clashed with pre-defined names in pre-C99 code.
+Another commit forced C99 compilation just to make it work, but of course this is not desirable for outside projects.
+Other non-C99 code can now use hiredis as usual again.
+Sorry for the inconvenience.
+
+* Fix memory leak in async reply handling (Salvatore Sanfilippo)
+* Rename struct member to avoid name clash with pre-c99 code (Alex Balashov, ncopa)
+
 ### 0.13.0 - April 16, 2015
 
 This release adds a minimal Windows compatibility layer.
