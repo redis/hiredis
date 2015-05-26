@@ -808,6 +808,7 @@ int redisBufferRead(redisContext *c) {
             return REDIS_ERR;
         }
     } else if (nread == 0) {
+        c->flags &= ~REDIS_CONNECTED;
         __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
         return REDIS_ERR;
     } else {
