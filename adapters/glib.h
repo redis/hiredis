@@ -16,43 +16,43 @@ typedef struct
 static void
 redis_source_add_read (gpointer data)
 {
-    RedisSource *source = data;
+    RedisSource *source = (RedisSource *)data;
     g_return_if_fail(source);
     source->poll_fd.events |= G_IO_IN;
-    g_main_context_wakeup(g_source_get_context(data));
+    g_main_context_wakeup(g_source_get_context((GSource *)data));
 }
 
 static void
 redis_source_del_read (gpointer data)
 {
-    RedisSource *source = data;
+    RedisSource *source = (RedisSource *)data;
     g_return_if_fail(source);
     source->poll_fd.events &= ~G_IO_IN;
-    g_main_context_wakeup(g_source_get_context(data));
+    g_main_context_wakeup(g_source_get_context((GSource *)data));
 }
 
 static void
 redis_source_add_write (gpointer data)
 {
-    RedisSource *source = data;
+    RedisSource *source = (RedisSource *)data;
     g_return_if_fail(source);
     source->poll_fd.events |= G_IO_OUT;
-    g_main_context_wakeup(g_source_get_context(data));
+    g_main_context_wakeup(g_source_get_context((GSource *)data));
 }
 
 static void
 redis_source_del_write (gpointer data)
 {
-    RedisSource *source = data;
+    RedisSource *source = (RedisSource *)data;
     g_return_if_fail(source);
     source->poll_fd.events &= ~G_IO_OUT;
-    g_main_context_wakeup(g_source_get_context(data));
+    g_main_context_wakeup(g_source_get_context((GSource *)data));
 }
 
 static void
 redis_source_cleanup (gpointer data)
 {
-    RedisSource *source = data;
+    RedisSource *source = (RedisSource *)data;
 
     g_return_if_fail(source);
 
@@ -63,7 +63,7 @@ redis_source_cleanup (gpointer data)
      * current main loop. However, we will remove the GPollFD.
      */
     if (source->poll_fd.fd >= 0) {
-        g_source_remove_poll(data, &source->poll_fd);
+        g_source_remove_poll((GSource *)data, &source->poll_fd);
         source->poll_fd.fd = -1;
     }
 }
