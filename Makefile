@@ -4,7 +4,7 @@
 # This file is released under the BSD license, see the COPYING file
 
 OBJ=net.o hiredis.o sds.o async.o read.o
-EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
+EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib hiredis-example-macosx
 TESTS=hiredis-test
 LIBNAME=libhiredis
 PKGCONFNAME=hiredis.pc
@@ -94,6 +94,9 @@ hiredis-example-libev: examples/example-libev.c adapters/libev.h $(STLIBNAME)
 
 hiredis-example-glib: examples/example-glib.c adapters/glib.h $(STLIBNAME)
 	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) $(shell pkg-config --cflags --libs glib-2.0) -I. $< $(STLIBNAME)
+
+hiredis-example-macosx: examples/example-macosx.c adapters/macosx.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -framework CoreFoundation $(STLIBNAME)
 
 ifndef AE_DIR
 hiredis-example-ae:
