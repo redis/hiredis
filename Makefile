@@ -215,4 +215,4 @@ coverage: gcov
 noopt:
 	$(MAKE) OPTIMIZATION=""
 
-.PHONY: all test check clean dep install 32bit gprof gcov noopt
+.PHONY: all test check clean dep install 32bit 32bit-vars gprof gcov noopt
