@@ -429,6 +429,8 @@ sds sdscatfmt(sds s, char const *fmt, ...) {
     int i;
     va_list ap;
 
+    if (sh == NULL) return NULL;
+
     va_start(ap,fmt);
     f = fmt;    /* Next format specifier byte to process. */
     i = initlen; /* Position of the next byte to write to dest str. */
@@ -442,6 +444,7 @@ sds sdscatfmt(sds s, char const *fmt, ...) {
         if (sh->free == 0) {
             s = sdsMakeRoomFor(s,1);
             sh = (void*) (s-(sizeof(struct sdshdr)));
+            if (sh == NULL) return NULL;
         }
 
         switch(*f) {
@@ -456,6 +459,7 @@ sds sdscatfmt(sds s, char const *fmt, ...) {
                 if (sh->free < l) {
                     s = sdsMakeRoomFor(s,l);
                     sh = (void*) (s-(sizeof(struct sdshdr)));
+                    if (sh == NULL) return NULL;
                 }
                 memcpy(s+i,str,l);
                 sh->len += l;
@@ -474,6 +478,7 @@ sds sdscatfmt(sds s, char const *fmt, ...) {
                     if (sh->free < l) {
                         s = sdsMakeRoomFor(s,l);
                         sh = (void*) (s-(sizeof(struct sdshdr)));
+                        if (sh == NULL) return NULL;
                     }
                     memcpy(s+i,buf,l);
                     sh->len += l;
@@ -496,6 +501,7 @@ sds sdscatfmt(sds s, char const *fmt, ...) {
                     if (sh->free < l) {
                         s = sdsMakeRoomFor(s,l);
                         sh = (void*) (s-(sizeof(struct sdshdr)));
+                        if (sh == NULL) return NULL;
                     }
                     memcpy(s+i,buf,l);
                     sh->len += l;
@@ -544,6 +550,8 @@ void sdstrim(sds s, const char *cset) {
     struct sdshdr *sh = (void*) (s-sizeof *sh);
     char *start, *end, *sp, *ep;
     size_t len;
+
+    if (sh == NULL) return;
 
     sp = start = s;
     ep = end = s+sdslen(s)-1;
@@ -908,7 +916,7 @@ sds *sdssplitargs(const char *line, int *argc) {
             current = NULL;
         } else {
             /* Even on empty input string return something not NULL. */
-            if (vector == NULL) vector = malloc(sizeof(void*));
+            if (vector == NULL) vector = (char**)malloc(sizeof(char*));
             return vector;
         }
     }
