@@ -20,10 +20,10 @@ static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
     return;
   }
 
-  if (events & UV_READABLE) {
+  if ((events & UV_READABLE) && (p->context != NULL)) {
     redisAsyncHandleRead(p->context);
   }
-  if (events & UV_WRITABLE) {
+  if ((events & UV_WRITABLE) && (p->context != NULL) {
     redisAsyncHandleWrite(p->context);
   }
 }
@@ -77,6 +77,7 @@ static void on_close(uv_handle_t* handle) {
 static void redisLibuvCleanup(void *privdata) {
   redisLibuvEvents* p = (redisLibuvEvents*)privdata;
 
+  p->context = NULL;
   uv_close((uv_handle_t*)&p->handle, on_close);
 }
 
