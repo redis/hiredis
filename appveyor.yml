@@ -15,7 +15,7 @@ environment:
           CYG_CACHE: C:\cygwin64\var\cache\setup
           CYG_BASH: C:\cygwin64\bin\bash
           CC: gcc
-          CFLAGS: -Werror
+#          CFLAGS: -Werror
         - CYG_ROOT: C:\cygwin
           CYG_SETUP: setup-x86.exe
           CYG_MIRROR: http://cygwin.mirror.constant.com
@@ -24,7 +24,7 @@ environment:
           CC: gcc
           TARGET: 32bit
           TARGET_VARS: 32bit-vars
-          CFLAGS: -Werror
+#          CFLAGS: -Werror
 #        - CC: clang
 #          CFLAGS: -Werror
 #          LDFLAGS: 
