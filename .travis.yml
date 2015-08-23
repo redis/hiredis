@@ -1,16 +1,28 @@
 language: c
+sudo: false
+cache: ccache
 compiler:
   - gcc
   - clang
 
 env:
+  global:
+    - PATH="/usr/lib/ccache/:$PATH"
+  matrix:
     - CFLAGS="-Werror"
     - PRE="valgrind --track-origins=yes --leak-check=full"
     - TARGET="32bit" TARGET_VARS="32bit-vars" CFLAGS="-Werror"
     - TARGET="32bit" TARGET_VARS="32bit-vars" PRE="valgrind --track-origins=yes --leak-check=full"
 
-install:
-    - sudo apt-get update -qq
-    - sudo apt-get install libc6-dbg libc6-dev libc6-i686:i386 libc6-dev-i386 libc6-dbg:i386 valgrind -y
+script: colormake $TARGET CFLAGS="$CFLAGS" && colormake check PRE="$PRE" && colormake $TARGET_VARS hiredis-example
 
-script: make $TARGET CFLAGS="$CFLAGS" && make check PRE="$PRE" && make $TARGET_VARS hiredis-example
+addons:
+  apt:
+    packages:
+      - libc6-dbg
+      - libc6-dev
+      - libc6-i686:i386
+      - libc6-dev-i386
+      - libc6-dbg:i386
+      - valgrind
+      - colormake
