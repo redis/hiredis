@@ -14,7 +14,7 @@ env:
     - TARGET="32bit" TARGET_VARS="32bit-vars" CFLAGS="-Werror"
     - TARGET="32bit" TARGET_VARS="32bit-vars" PRE="valgrind --track-origins=yes --leak-check=full"
 
-script: make $TARGET CFLAGS="$CFLAGS" && make check PRE="$PRE" && make $TARGET_VARS hiredis-example
+script: colormake $TARGET CFLAGS="$CFLAGS" && colormake check PRE="$PRE" && colormake $TARGET_VARS hiredis-example
 
 addons:
   apt:
@@ -25,3 +25,4 @@ addons:
       - libc6-dev-i386
       - libc6-dbg:i386
       - valgrind
+      - colormake
