@@ -6,6 +6,9 @@ compiler:
   - clang
 
 env:
+  global:
+    - PATH="/usr/lib/ccache/:$PATH"
+  matrix:
     - CFLAGS="-Werror"
     - PRE="valgrind --track-origins=yes --leak-check=full"
     - TARGET="32bit" TARGET_VARS="32bit-vars" CFLAGS="-Werror"
