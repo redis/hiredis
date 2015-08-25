@@ -1,3 +1,13 @@
+### 0.13.2 - August 25, 2015
+
+* Prevent crash on pending replies in async code (Thanks, @switch-st)
+* Clear `REDIS_CONNECTED` flag when connection is closed (Thanks, Jerry Jacobs)
+* Add MacOS X addapter (Thanks, @dizzus)
+* Add Qt adapter (Thanks, Pietro Cerutti)
+* Add Ivykis adapter (Thanks, Gergely Nagy)
+
+All adapters are provided as is and are only tested where possible.
+
 ### 0.13.1 - May 03, 2015
 
 This is a bug fix release.
