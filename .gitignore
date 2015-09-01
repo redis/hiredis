@@ -5,3 +5,5 @@
 /*.dylib
 /*.a
 /*.pc
+CMakeLists.txt
+.idea/*

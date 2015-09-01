@@ -41,6 +41,16 @@
 #include "dict.c"
 #include "sds.h"
 
+struct redisConnectCallbackPrivObj {
+    redisConnectCallbackWithPrivdata *fn;
+    void *privData;
+};
+
+struct redisDisconnectCallbackPrivObj {
+    redisDisconnectCallbackWithPrivdata *fn;
+    void *privData;
+};
+
 #define _EL_ADD_READ(ctx) do { \
         if ((ctx)->ev.addRead) (ctx)->ev.addRead((ctx)->ev.data); \
     } while(0)
@@ -94,12 +104,12 @@ static void callbackValDestructor(void *privdata, void *val) {
 }
 
 static dictType callbackDict = {
-    callbackHash,
-    NULL,
-    callbackValDup,
-    callbackKeyCompare,
-    callbackKeyDestructor,
-    callbackValDestructor
+        callbackHash,
+        NULL,
+        callbackValDup,
+        callbackKeyCompare,
+        callbackKeyDestructor,
+        callbackValDestructor
 };
 
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
@@ -129,6 +139,9 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
 
     ac->onConnect = NULL;
     ac->onDisconnect = NULL;
+
+    ac->onConnectPrivObj = NULL;
+    ac->onDisconnectPrivObj = NULL;
 
     ac->replies.head = NULL;
     ac->replies.tail = NULL;
@@ -215,9 +228,30 @@ int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn
     return REDIS_ERR;
 }
 
+int redisAsyncSetConnectCallbackWithPrivdata(redisAsyncContext *ac, redisConnectCallbackWithPrivdata *fn, void* privData) {
+    if(ac->onConnectPrivObj == NULL) {
+        ac->onConnectPrivObj = malloc(sizeof(redisConnectCallbackPrivObj));
+        ac->onConnectPrivObj->fn = fn;
+        ac->onConnectPrivObj->privData = privData;
+        _EL_ADD_WRITE(ac);
+        return REDIS_OK;
+    }
+    return REDIS_ERR;
+}
+
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn) {
     if (ac->onDisconnect == NULL) {
         ac->onDisconnect = fn;
+        return REDIS_OK;
+    }
+    return REDIS_ERR;
+}
+
+int redisAsyncSetDisconnectCallbackWithPrivdata(redisAsyncContext *ac, redisDisconnectCallbackWithPrivdata *fn, void* privData) {
+    if(ac->onDisconnectPrivObj== NULL) {
+        ac->onDisconnectPrivObj = malloc(sizeof(redisDisconnectCallbackPrivObj));
+        ac->onDisconnectPrivObj->fn = fn;
+        ac->onDisconnectPrivObj->privData = privData;
         return REDIS_OK;
     }
     return REDIS_ERR;
@@ -311,6 +345,17 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
             ac->onDisconnect(ac,(ac->err == 0) ? REDIS_OK : REDIS_ERR);
         }
     }
+    if (ac->onDisconnectPrivObj && (c->flags & REDIS_CONNECTED)) {
+        if (c->flags & REDIS_FREEING) {
+            ac->onDisconnectPrivObj->fn(ac,REDIS_OK,ac->onDisconnectPrivObj->privData);
+        } else {
+            ac->onDisconnectPrivObj->fn(ac,(ac->err == 0) ? REDIS_OK : REDIS_ERR,ac->onDisconnectPrivObj->privData);
+        }
+    }
+
+    /* Free connect and disconnect callbacks with privData */
+    if (ac->onConnectPrivObj) free(ac->onConnectPrivObj);
+    if (ac->onDisconnectPrivObj) free(ac->onDisconnectPrivObj);
 
     /* Cleanup self */
     redisFree(c);
@@ -500,6 +545,8 @@ static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
             return REDIS_OK;
 
         if (ac->onConnect) ac->onConnect(ac,REDIS_ERR);
+        if (ac->onConnectPrivObj)
+            ac->onConnectPrivObj->fn(ac, REDIS_ERR, ac->onConnectPrivObj->privData);
         __redisAsyncDisconnect(ac);
         return REDIS_ERR;
     }
@@ -507,6 +554,8 @@ static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
     /* Mark context as connected. */
     c->flags |= REDIS_CONNECTED;
     if (ac->onConnect) ac->onConnect(ac,REDIS_OK);
+    if (ac->onConnectPrivObj)
+        ac->onConnectPrivObj->fn(ac, REDIS_OK, ac->onConnectPrivObj->privData);
     return REDIS_OK;
 }
 
@@ -626,10 +675,10 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
         /* (P)UNSUBSCRIBE does not have its own response: every channel or
          * pattern that is unsubscribed will receive a message. This means we
          * should not append a callback function for this command. */
-     } else if(strncasecmp(cstr,"monitor\r\n",9) == 0) {
-         /* Set monitor flag and push callback */
-         c->flags |= REDIS_MONITORING;
-         __redisPushCallback(&ac->replies,&cb);
+    } else if(strncasecmp(cstr,"monitor\r\n",9) == 0) {
+        /* Set monitor flag and push callback */
+        c->flags |= REDIS_MONITORING;
+        __redisPushCallback(&ac->replies,&cb);
     } else {
         if (c->flags & REDIS_SUBSCRIBED)
             /* This will likely result in an error reply, but it needs to be

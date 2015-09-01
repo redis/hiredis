@@ -56,6 +56,10 @@ typedef struct redisCallbackList {
 /* Connection callback prototypes */
 typedef void (redisDisconnectCallback)(const struct redisAsyncContext*, int status);
 typedef void (redisConnectCallback)(const struct redisAsyncContext*, int status);
+typedef void (redisDisconnectCallbackWithPrivdata)(const struct redisAsyncContext*, int status, void* privData);
+typedef void (redisConnectCallbackWithPrivdata)(const struct redisAsyncContext*, int status, void* privData);
+typedef struct redisDisconnectCallbackPrivObj redisDisconnectCallbackPrivObj;
+typedef struct redisConnectCallbackPrivObj redisConnectCallbackPrivObj;
 
 /* Context for an async connection to Redis */
 typedef struct redisAsyncContext {
@@ -85,9 +89,12 @@ typedef struct redisAsyncContext {
     /* Called when either the connection is terminated due to an error or per
      * user request. The status is set accordingly (REDIS_OK, REDIS_ERR). */
     redisDisconnectCallback *onDisconnect;
+    redisDisconnectCallbackPrivObj *onDisconnectPrivObj;
 
     /* Called when the first write event was received. */
     redisConnectCallback *onConnect;
+    redisConnectCallbackPrivObj *onConnectPrivObj;
+
 
     /* Regular command callbacks */
     redisCallbackList replies;
@@ -107,7 +114,9 @@ redisAsyncContext *redisAsyncConnectBindWithReuse(const char *ip, int port,
                                                   const char *source_addr);
 redisAsyncContext *redisAsyncConnectUnix(const char *path);
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
+int redisAsyncSetConnectCallbackWithPrivdata(redisAsyncContext *ac, redisConnectCallbackWithPrivdata *fn, void* privData);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
+int redisAsyncSetDisconnectCallbackWithPrivdata(redisAsyncContext *ac, redisDisconnectCallbackWithPrivdata *fn, void* privData);
 void redisAsyncDisconnect(redisAsyncContext *ac);
 void redisAsyncFree(redisAsyncContext *ac);
 
