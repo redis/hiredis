@@ -1,4 +1,4 @@
-### 0.13.2 - August 25, 2015
+### 0.13.2 (2015-08-25)
 
 * Prevent crash on pending replies in async code (Thanks, @switch-st)
 * Clear `REDIS_CONNECTED` flag when connection is closed (Thanks, Jerry Jacobs)
@@ -8,7 +8,7 @@
 
 All adapters are provided as is and are only tested where possible.
 
-### 0.13.1 - May 03, 2015
+### 0.13.1 (2015-05-03)
 
 This is a bug fix release.
 The new `reconnect` method introduced new struct members, which clashed with pre-defined names in pre-C99 code.
@@ -19,7 +19,7 @@ Sorry for the inconvenience.
 * Fix memory leak in async reply handling (Salvatore Sanfilippo)
 * Rename struct member to avoid name clash with pre-c99 code (Alex Balashov, ncopa)
 
-### 0.13.0 - April 16, 2015
+### 0.13.0 (2015-04-16)
 
 This release adds a minimal Windows compatibility layer.
 The parser, standalone since v0.12.0, can now be compiled on Windows
@@ -30,12 +30,12 @@ The parser, standalone since v0.12.0, can now be compiled on Windows
 * Fix tests when assert() undefined (Keith Bennett, Matt Stancliff)
 * Implement a reconnect method for the client context, this changes the structure of `redisContext` (Aaron Bedra)
 
-### 0.12.1 - January 26, 2015
+### 0.12.1 (2015-01-26)
 
 * Fix `make install`: DESTDIR support, install all required files, install PKGCONF in proper location
 * Fix `make test` as 32 bit build on 64 bit platform
 
-### 0.12.0 - January 22, 2015
+### 0.12.0 (2015-01-22)
 
 * Add optional KeepAlive support
 
