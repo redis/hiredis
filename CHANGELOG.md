@@ -1,3 +1,13 @@
+### 0.13.3 (2015-09-16)
+
+* Revert "Clear `REDIS_CONNECTED` flag when connection is closed".
+* Make tests pass on FreeBSD (Thanks, Giacomo Olgeni)
+
+
+If the `REDIS_CONNECTED` flag is cleared,
+the async onDisconnect callback function will never be called.
+This causes problems as the disconnect is never reported back to the user.
+
 ### 0.13.2 (2015-08-25)
 
 * Prevent crash on pending replies in async code (Thanks, @switch-st)
