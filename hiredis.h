@@ -41,7 +41,7 @@
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 13
-#define HIREDIS_PATCH 2
+#define HIREDIS_PATCH 3
 #define HIREDIS_SONAME 0.13
 
 /* Connection type can be blocking or non-blocking and is set in the
