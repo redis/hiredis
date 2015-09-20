@@ -12,22 +12,21 @@ typedef struct redisLibuvEvents {
   int                events;
 } redisLibuvEvents;
 
-
 static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
 
   if (status != 0) {
+    redisAsyncHandleWrite(p->context);
     return;
   }
 
-  if (events & UV_READABLE) {
+  if ((events & UV_READABLE) && (p->context != NULL)) {
     redisAsyncHandleRead(p->context);
   }
-  if (events & UV_WRITABLE) {
+  if ((events & UV_WRITABLE) && (p->context != NULL) {
     redisAsyncHandleWrite(p->context);
   }
 }
-
 
 static void redisLibuvAddRead(void *privdata) {
   redisLibuvEvents* p = (redisLibuvEvents*)privdata;
@@ -36,7 +35,6 @@ static void redisLibuvAddRead(void *privdata) {
 
   uv_poll_start(&p->handle, p->events, redisLibuvPoll);
 }
-
 
 static void redisLibuvDelRead(void *privdata) {
   redisLibuvEvents* p = (redisLibuvEvents*)privdata;
@@ -50,7 +48,6 @@ static void redisLibuvDelRead(void *privdata) {
   }
 }
 
-
 static void redisLibuvAddWrite(void *privdata) {
   redisLibuvEvents* p = (redisLibuvEvents*)privdata;
 
@@ -58,7 +55,6 @@ static void redisLibuvAddWrite(void *privdata) {
 
   uv_poll_start(&p->handle, p->events, redisLibuvPoll);
 }
-
 
 static void redisLibuvDelWrite(void *privdata) {
   redisLibuvEvents* p = (redisLibuvEvents*)privdata;
@@ -72,23 +68,21 @@ static void redisLibuvDelWrite(void *privdata) {
   }
 }
 
-
 static void on_close(uv_handle_t* handle) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
 
   free(p);
 }
 
-
 static void redisLibuvCleanup(void *privdata) {
   redisLibuvEvents* p = (redisLibuvEvents*)privdata;
 
+  p->context = NULL;
   uv_close((uv_handle_t*)&p->handle, on_close);
 }
 
-
 static int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
-  redisContext *c = &(ac->c);
+  redisContext* c = &(ac->c);
 
   if (ac->ev.data != NULL) {
     return REDIS_ERR;
