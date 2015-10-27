@@ -179,7 +179,7 @@ redisContext *redisConnectFd(int fd);
  * host, ip (or path), timeout and bind address are reused,
  * flags are used unmodified from the existing context.
  *
- * Returns REDIS_OK on successfull connect or REDIS_ERR otherwise.
+ * Returns REDIS_OK on successful connect or REDIS_ERR otherwise.
  */
 int redisReconnect(redisContext *c);
 
