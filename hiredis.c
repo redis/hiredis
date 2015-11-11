@@ -1019,3 +1019,9 @@ void *redisCommandArgv(redisContext *c, int argc, const char **argv, const size_
         return NULL;
     return __redisBlockForReply(c);
 }
+
+void *redisFormattedCommand(redisContext *c, const char *cmd, size_t len) {
+    if (redisAppendFormattedCommand(c,cmd,len) != REDIS_OK)
+        return NULL;
+    return __redisBlockForReply(c);
+}
