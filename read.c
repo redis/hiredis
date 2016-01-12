@@ -444,6 +444,7 @@ void redisReaderFree(redisReader *r) {
 
 int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
     sds newbuf;
+    int status = SDS_OK;
 
     /* Return early when this reader is in an erroneous state. */
     if (r->err)
@@ -461,7 +462,9 @@ int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
             assert(r->buf != NULL);
         }
 
-        newbuf = sdscatlen(r->buf,buf,len);
+        newbuf = sdscatlen(r->buf,buf,len,&status);
+        if (status != SDS_OK)
+            return REDIS_ERR;
         if (newbuf == NULL) {
             __redisReaderSetErrorOOM(r);
             return REDIS_ERR;

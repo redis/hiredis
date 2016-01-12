@@ -368,6 +368,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
     int pvariant;
     char *stype;
     sds sname;
+    int status = SDS_OK;
 
     /* Custom reply functions are not supported for pub/sub. This will fail
      * very hard when they are used... */
@@ -384,7 +385,8 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
 
         /* Locate the right callback */
         assert(reply->element[1]->type == REDIS_REPLY_STRING);
-        sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len);
+        sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len,&status);
+        if (status != SDS_OK) return REDIS_ERR;
         de = dictFind(callbacks,sname);
         if (de != NULL) {
             memcpy(dstcb,dictGetEntryVal(de),sizeof(*dstcb));
@@ -589,6 +591,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     const char *p;
     sds sname;
     int ret;
+    int status = SDS_OK;
 
     /* Don't accept new commands when the connection is about to be closed. */
     if (c->flags & (REDIS_DISCONNECTING | REDIS_FREEING)) return REDIS_ERR;
@@ -610,7 +613,9 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
 
         /* Add every channel/pattern to the list of subscription callbacks. */
         while ((p = nextArgument(p,&astr,&alen)) != NULL) {
-            sname = sdsnewlen(astr,alen);
+            sname = sdsnewlen(astr,alen,&status);
+            if (status != SDS_OK)
+                return REDIS_ERR;
             if (pvariant)
                 ret = dictReplace(ac->sub.patterns,sname,&cb);
             else
