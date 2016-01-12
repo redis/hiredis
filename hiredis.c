@@ -218,6 +218,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     int totlen = 0;
     int error_type = 0; /* 0 = no error; -1 = memory error; -2 = format error */
     int j;
+    int status = SDS_OK;
 
     /* Abort if there is not target to set */
     if (target == NULL)
@@ -244,7 +245,8 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     touched = 0;
                 }
             } else {
-                newarg = sdscatlen(curarg,c,1);
+                newarg = sdscatlen(curarg,c,1,&status);
+                if (status != SDS_OK) goto memory_err;
                 if (newarg == NULL) goto memory_err;
                 curarg = newarg;
                 touched = 1;
@@ -260,17 +262,22 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
             case 's':
                 arg = va_arg(ap,char*);
                 size = strlen(arg);
-                if (size > 0)
-                    newarg = sdscatlen(curarg,arg,size);
+                if (size > 0) {
+                    newarg = sdscatlen(curarg,arg,size,&status);
+                    if (status != SDS_OK) goto memory_err;
+                }
                 break;
             case 'b':
                 arg = va_arg(ap,char*);
                 size = va_arg(ap,size_t);
-                if (size > 0)
-                    newarg = sdscatlen(curarg,arg,size);
+                if (size > 0) {
+                    newarg = sdscatlen(curarg,arg,size,&status);
+                    if (status != SDS_OK) goto memory_err;
+                }
                 break;
             case '%':
-                newarg = sdscat(curarg,"%");
+                newarg = sdscat(curarg,"%",&status);
+                if (status != SDS_OK) goto memory_err;
                 break;
             default:
                 /* Try to detect printf format */
@@ -358,7 +365,8 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     if (_l < sizeof(_format)-2) {
                         memcpy(_format,c,_l);
                         _format[_l] = '\0';
-                        newarg = sdscatvprintf(curarg,_format,_cpy);
+                        newarg = sdscatvprintf(curarg,&status,_format,_cpy);
+                        if (status != SDS_OK) goto memory_err;
 
                         /* Update current position (note: outer blocks
                          * increment c twice so compensate here) */
@@ -481,6 +489,7 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
     unsigned long long totlen;
     int j;
     size_t len;
+    int status = SDS_OK;
 
     /* Abort on a NULL target */
     if (target == NULL)
@@ -499,17 +508,21 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
         return -1;
 
     /* We already know how much storage we need */
-    cmd = sdsMakeRoomFor(cmd, totlen);
+    cmd = sdsMakeRoomFor(cmd, totlen, &status);
     if (cmd == NULL)
         return -1;
 
     /* Construct command */
-    cmd = sdscatfmt(cmd, "*%i\r\n", argc);
+    cmd = sdscatfmt(cmd, &status, "*%i\r\n", argc);
+    if (status != SDS_OK) return -1;
     for (j=0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
-        cmd = sdscatfmt(cmd, "$%T\r\n", len);
-        cmd = sdscatlen(cmd, argv[j], len);
-        cmd = sdscatlen(cmd, "\r\n", sizeof("\r\n")-1);
+        cmd = sdscatfmt(cmd, &status, "$%T\r\n", len);
+        if (status != SDS_OK) return -1;
+        cmd = sdscatlen(cmd, argv[j], len, &status);
+        if (status != SDS_OK) return -1;
+        cmd = sdscatlen(cmd, "\r\n", sizeof("\r\n")-1, &status);
+        if (status != SDS_OK) return -1;
     }
 
     assert(sdslen(cmd)==totlen);
@@ -906,8 +919,13 @@ int redisGetReply(redisContext *c, void **reply) {
  */
 int __redisAppendCommand(redisContext *c, const char *cmd, size_t len) {
     sds newbuf;
+    int status = SDS_OK;
 
-    newbuf = sdscatlen(c->obuf,cmd,len);
+    newbuf = sdscatlen(c->obuf,cmd,len,&status);
+    if (status != SDS_OK) {
+      __redisSetError(c, REDIS_ERR_OTHER, "command too long");
+      return REDIS_ERR;
+    }
     if (newbuf == NULL) {
         __redisSetError(c,REDIS_ERR_OOM,"Out of memory");
         return REDIS_ERR;
