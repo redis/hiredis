@@ -48,9 +48,13 @@ After trying to connect to Redis using `redisConnect` you should
 check the `err` field to see if establishing the connection was successful:
 ```c
 redisContext *c = redisConnect("127.0.0.1", 6379);
-if (c != NULL && c->err) {
-    printf("Error: %s\n", c->errstr);
-    // handle error
+if (c == NULL || c->err) {
+    if (c) {
+        printf("Error: %s\n", c->errstr);
+        // handle error
+    } else {
+        printf("Can't allocate redis context\n");
+    }
 }
 ```
 
