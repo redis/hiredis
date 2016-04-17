@@ -14,7 +14,7 @@
 #define _XOPEN_SOURCE
 #endif
 
-#if __APPLE__ && __MACH__
+#if defined(__APPLE__) && defined(__MACH__)
 #define _OSX
 #endif
 
