@@ -328,12 +328,12 @@ static void test_reply_reader(void) {
 }
 
 static void test_free_null(void) {
-    void *redisContext = NULL;
+    void *redisCtx = NULL;
     void *reply = NULL;
 
     test("Don't fail when redisFree is passed a NULL value: ");
-    redisFree(redisContext);
-    test_cond(redisContext == NULL);
+    redisFree(redisCtx);
+    test_cond(redisCtx == NULL);
 
     test("Don't fail when freeReplyObject is passed a NULL value: ");
     freeReplyObject(reply);
