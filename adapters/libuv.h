@@ -17,6 +17,11 @@ static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
 
   if (status != 0) {
+      
+    snprintf(p->context->c.errstr, sizeof(p->context->c.errstr),"redisLibuvPoll error - %s", uv_strerror(status));
+    p->context->c.err = REDIS_ERR_IO;
+    redisAsyncHandleRead(p->context);
+    
     return;
   }
 
