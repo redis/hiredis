@@ -1,0 +1,86 @@
+#
+# Appveyor configuration file for CI build of hiredis-happ on Windows (under Cygwin)
+#
+# For further details see http://www.appveyor.com
+#
+
+#
+# Custom environment variables
+#
+environment:
+    matrix:
+        - CYG_ROOT: C:\cygwin64
+          CYG_SETUP: setup-x86_64.exe
+          CYG_MIRROR: http://cygwin.mirror.constant.com
+          CYG_CACHE: C:\cygwin64\var\cache\setup
+          CYG_BASH: C:\cygwin64\bin\bash
+          CC: gcc
+#          CFLAGS: -Werror
+        - CYG_ROOT: C:\cygwin
+          CYG_SETUP: setup-x86.exe
+          CYG_MIRROR: http://cygwin.mirror.constant.com
+          CYG_CACHE: C:\cygwin\var\cache\setup
+          CYG_BASH: C:\cygwin\bin\bash
+          CC: gcc
+          TARGET: 32bit
+          TARGET_VARS: 32bit-vars
+#          CFLAGS: -Werror
+#        - CC: clang
+#          CFLAGS: -Werror
+#          LDFLAGS: 
+#        - CC: clang
+#          TARGET: 32bit
+#          TARGET_VARS: 32bit-vars
+#          CFLAGS: -Werror
+#          LDFLAGS: 
+#
+# Cache Cygwin files to speed up build
+#
+cache:
+    - '%CYG_CACHE%'
+ 
+#
+# Do a shallow clone of the repo to speed up build
+#
+clone_depth: 1
+
+#
+# Initialisation prior to pulling the Mono repository
+# Attempt to ensure we don't try to convert line endings to Win32 CRLF as this will cause build to fail
+#
+init:
+    - git config --global core.autocrlf input
+
+#
+# Install needed build dependencies
+# 
+install:
+    - ps: 'Start-FileDownload "http://cygwin.com/$env:CYG_SETUP" -FileName "$env:CYG_SETUP"'
+    - '%CYG_SETUP% --quiet-mode --no-shortcuts --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --packages automake,bison,gcc-core,libtool,make,gettext-devel,gettext,intltool,pkg-config,clang,llvm > NUL 2>&1'
+    - '%CYG_BASH% -lc "cygcheck -dc cygwin"'
+
+# Cygwin build script
+#
+# NOTES:
+#
+# The stdin/stdout file descriptor appears not to be valid for the Appveyor
+# build which causes failures as certain functions attempt to redirect 
+# default file handles. Ensure a dummy file descriptor is opened with 'exec'.
+#
+build_script:
+    - 'echo building...'
+    - '%CYG_BASH% -lc "cd $APPVEYOR_BUILD_FOLDER; exec 0</dev/null; make LDFLAGS=$LDFLAGS CC=$CC $TARGET CFLAGS=$CFLAGS && make LDFLAGS=$LDFLAGS CC=$CC $TARGET_VARS hiredis-example"'
+#
+# Run unit test
+# there is no valgrind in cygwin, so skipped
+# test_script:
+    #- '%CYG_BASH% -lc "cd $APPVEYOR_BUILD_FOLDER; exec 0</dev/null; <test command here>"'
+
+#
+# Only build the master branch
+#
+branches:
+  only:
+    - master
+
+# no need artifacts

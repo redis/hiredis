@@ -6,6 +6,10 @@
 #define _DEFAULT_SOURCE
 #endif
 
+#if defined(__CYGWIN__)
+#include <sys/cdefs.h>
+#endif
+
 #if defined(__sun__)
 #define _POSIX_C_SOURCE 200112L
 #elif defined(__linux__) || defined(__OpenBSD__) || defined(__NetBSD__)
