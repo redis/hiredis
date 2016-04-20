@@ -424,14 +424,12 @@ sds sdscatprintf(sds s, const char *fmt, ...) {
  */
 sds sdscatfmt(sds s, char const *fmt, ...) {
     struct sdshdr *sh = (void*) (s-(sizeof(struct sdshdr)));
-    size_t initlen = sdslen(s);
     const char *f = fmt;
     int i;
     va_list ap;
 
     va_start(ap,fmt);
-    f = fmt;    /* Next format specifier byte to process. */
-    i = initlen; /* Position of the next byte to write to dest str. */
+    i = sdslen(s); /* Position of the next byte to write to dest str. */
     while(*f) {
         char next, *str;
         int l;
