@@ -33,10 +33,16 @@
 
 #ifndef __HIREDIS_H
 #define __HIREDIS_H
-#include "read.h"
+
 #include <stdarg.h> /* for va_list */
-#include <sys/time.h> /* for struct timeval */
 #include <stdint.h> /* uintXX_t, etc */
+#include <sys/time.h> /* for struct timeval */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "read.h"
 #include "sds.h" /* for sds */
 
 #define HIREDIS_MAJOR 0
@@ -102,10 +108,6 @@
             buf[(len)-1] = '\0';                                               \
         }                                                                      \
     } while (0)
-#endif
-
-#ifdef __cplusplus
-extern "C" {
 #endif
 
 /* This is the reply object returned by redisCommand() */
