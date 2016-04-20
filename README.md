@@ -68,6 +68,8 @@ if (c == NULL || c->err) {
 }
 ```
 
+*Note: A `redisContext` is not thread-safe.*
+
 ### Sending commands
 
 There are several ways to issue commands to Redis. The first that will be introduced is
@@ -255,6 +257,9 @@ Redis. It returns a pointer to the newly created `redisAsyncContext` struct. The
 should be checked after creation to see if there were errors creating the connection.
 Because the connection that will be created is non-blocking, the kernel is not able to
 instantly return if the specified host and port is able to accept a connection.
+
+*Note: A `redisAsyncContext` is not thread-safe.*
+
 ```c
 redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
 if (c->err) {
