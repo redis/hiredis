@@ -120,6 +120,16 @@ void sdsclear(sds s) {
     sh->buf[0] = '\0';
 }
 
+size_t sdslen(const sds s) {
+    struct sdshdr *sh = (struct sdshdr *)(s-sizeof *sh);
+    return sh->len;
+}
+
+size_t sdsavail(const sds s) {
+    struct sdshdr *sh = (struct sdshdr *)(s-sizeof *sh);
+    return sh->free;
+}
+
 /* Enlarge the free space at the end of the sds string so that the caller
  * is sure that after calling this function can overwrite up to addlen
  * bytes after the end of the string, plus one more byte for nul term.
