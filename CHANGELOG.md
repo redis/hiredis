@@ -29,6 +29,14 @@ This removes the following old function aliases, use the new name now:
 | redisReplyReaderGetObject   | redisReaderGetObject   |
 | redisReplyReaderGetError    | redisReaderGetError    |
 
+* The `DEBUG` variable in the Makefile was renamed to `DEBUG_FLAGS`
+
+Previously it broke some builds for people that had `DEBUG` set to some arbitrary value,
+due to debugging other software.
+By renaming we avoid unintentional name clashes.
+
+Simply rename `DEBUG` to `DEBUG_FLAGS` in your environment to make it working again.
+
 ### 0.13.3 (2015-09-16)
 
 * Revert "Clear `REDIS_CONNECTED` flag when connection is closed".
