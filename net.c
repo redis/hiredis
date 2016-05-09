@@ -430,7 +430,7 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
     struct sockaddr_un sa;
     long timeout_msec = -1;
 
-    if (redisCreateSocket(c,AF_LOCAL) < 0)
+    if (redisCreateSocket(c,AF_UNIX) < 0)
         return REDIS_ERR;
     if (redisSetBlocking(c,0) != REDIS_OK)
         return REDIS_ERR;
@@ -455,7 +455,7 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
     if (redisContextTimeoutMsec(c,&timeout_msec) != REDIS_OK)
         return REDIS_ERR;
 
-    sa.sun_family = AF_LOCAL;
+    sa.sun_family = AF_UNIX;
     strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);
     if (connect(c->fd, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
         if (errno == EINPROGRESS && !blocking) {
