@@ -44,22 +44,24 @@ typedef struct redisLibevEvents {
 } redisLibevEvents;
 
 static void redisLibevReadEvent(EV_P_ ev_io *watcher, int revents) {
+    redisLibevEvents *e;
 #if EV_MULTIPLICITY
     ((void)loop);
 #endif
     ((void)revents);
 
-    redisLibevEvents *e = (redisLibevEvents*)watcher->data;
+    e = (redisLibevEvents*)watcher->data;
     redisAsyncHandleRead(e->context);
 }
 
 static void redisLibevWriteEvent(EV_P_ ev_io *watcher, int revents) {
+    redisLibevEvents *e;
 #if EV_MULTIPLICITY
     ((void)loop);
 #endif
     ((void)revents);
 
-    redisLibevEvents *e = (redisLibevEvents*)watcher->data;
+    e = (redisLibevEvents*)watcher->data;
     redisAsyncHandleWrite(e->context);
 }
 
