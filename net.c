@@ -384,6 +384,7 @@ addrretry:
                 if (++reuses >= REDIS_CONNECT_RETRIES) {
                     goto error;
                 } else {
+                    redisContextCloseFd(c);
                     goto addrretry;
                 }
             } else {
