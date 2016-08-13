@@ -272,6 +272,10 @@ static void test_reply_reader(void) {
 
     test("Error handling in reply parser: ");
     reader = redisReaderCreate();
+    if (NULL == reader) {
+        test("redisReaderCreate() failed");
+        return;
+    }
     redisReaderFeed(reader,(char*)"@foo\r\n",6);
     ret = redisReaderGetReply(reader,NULL);
     test_cond(ret == REDIS_ERR &&
