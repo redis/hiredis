@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
  * Copyright (c) 2010-2011, Pieter Noordhuis <pcnoordhuis at gmail dot com>
+ * Copyright (c) 2016, tpltne <tpltnt dot hiredis at dropcut dot net>
  *
  * All rights reserved.
  *
@@ -69,6 +70,9 @@ static unsigned int callbackHash(const void *key) {
 static void *callbackValDup(void *privdata, const void *src) {
     ((void) privdata);
     redisCallback *dup = malloc(sizeof(*dup));
+    if (NULL == dup) {
+        return NULL;
+    }
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }
