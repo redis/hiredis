@@ -223,6 +223,14 @@ int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallba
     return REDIS_ERR;
 }
 
+int redisAsyncSetConnectionErrorCallback(redisAsyncContext *ac, redisDisconnectCallback *fn) {
+    if (ac->onConnectionError == NULL) {
+        ac->onConnectionError = fn;
+        return REDIS_OK;
+    }
+    return REDIS_ERR;
+}
+
 /* Helper functions to push/shift callbacks */
 static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
     redisCallback *cb;
@@ -534,6 +542,17 @@ void redisAsyncHandleRead(redisAsyncContext *ac) {
     }
 }
 
+void redisAsyncHandleError(redisAsyncContext *ac) {
+    redisContext *c = &(ac->c);
+    
+    if (redisCheckSocketError(c) == REDIS_ERR) {
+      if (ac->onDisconnect) ac->onDisconnect(ac, REDIS_ERR);
+      __redisAsyncDisconnect(ac);
+    } else {
+      if (ac->onConnectionError) ac->onConnectionError(ac, REDIS_ERR);
+    }
+}
+
 void redisAsyncHandleWrite(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     int done = 0;
@@ -589,14 +608,13 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     const char *p;
     sds sname;
     int ret;
-
     /* Don't accept new commands when the connection is about to be closed. */
     if (c->flags & (REDIS_DISCONNECTING | REDIS_FREEING)) return REDIS_ERR;
-
+  
     /* Setup callback */
     cb.fn = fn;
     cb.privdata = privdata;
-
+         
     /* Find out which command will be appended. */
     p = nextArgument(cmd,&cstr,&clen);
     assert(p != NULL);

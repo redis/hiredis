@@ -56,6 +56,7 @@ typedef struct redisCallbackList {
 /* Connection callback prototypes */
 typedef void (redisDisconnectCallback)(const struct redisAsyncContext*, int status);
 typedef void (redisConnectCallback)(const struct redisAsyncContext*, int status);
+typedef void (redisConnectionErrorCallback)(const struct redisAsyncContext*, int status);
 
 /* Context for an async connection to Redis */
 typedef struct redisAsyncContext {
@@ -85,10 +86,11 @@ typedef struct redisAsyncContext {
     /* Called when either the connection is terminated due to an error or per
      * user request. The status is set accordingly (REDIS_OK, REDIS_ERR). */
     redisDisconnectCallback *onDisconnect;
-
     /* Called when the first write event was received. */
     redisConnectCallback *onConnect;
 
+    redisConnectionErrorCallback *onConnectionError;
+  
     /* Regular command callbacks */
     redisCallbackList replies;
 
@@ -108,12 +110,14 @@ redisAsyncContext *redisAsyncConnectBindWithReuse(const char *ip, int port,
 redisAsyncContext *redisAsyncConnectUnix(const char *path);
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
+int redisAsyncSetConnectionErrorCallback(redisAsyncContext *ac, redisConnectionErrorCallback *fn);
 void redisAsyncDisconnect(redisAsyncContext *ac);
 void redisAsyncFree(redisAsyncContext *ac);
 
 /* Handle read/write events */
 void redisAsyncHandleRead(redisAsyncContext *ac);
 void redisAsyncHandleWrite(redisAsyncContext *ac);
+void redisAsyncHandleError(redisAsyncContext *ac);
 
 /* Command functions for an async context. Write the command to the
  * output buffer and register the provided callback. */

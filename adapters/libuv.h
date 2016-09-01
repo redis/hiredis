@@ -17,7 +17,8 @@ static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
 
   if (status != 0) {
-    return;
+    p->context->err = status;
+    redisAsyncHandleError(p->context);
   }
 
   if (events & UV_READABLE) {
@@ -27,6 +28,7 @@ static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
     redisAsyncHandleWrite(p->context);
   }
 }
+
 
 
 static void redisLibuvAddRead(void *privdata) {
