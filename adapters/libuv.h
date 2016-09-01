@@ -30,7 +30,6 @@ static void redisLibuvPoll(uv_poll_t* handle, int status, int events) {
 }
 
 
-
 static void redisLibuvAddRead(void *privdata) {
   redisLibuvEvents* p = (redisLibuvEvents*)privdata;
 
