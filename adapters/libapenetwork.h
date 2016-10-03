@@ -30,7 +30,7 @@
 
 #ifndef __HIREDIS_LIBAPENETWORK_H__
 #define __HIREDIS_LIBAPENETWORK_H__
-#include <native_netlib.h>
+#include <ape_netlib.h>
 #include "../hiredis.h"
 #include "../async.h"
 
