@@ -133,7 +133,7 @@ void redisFreeSdsCommand(sds cmd);
 
 enum redisConnectionType {
     REDIS_CONN_TCP,
-    REDIS_CONN_UNIX,
+    REDIS_CONN_UNIX
 };
 
 /* Context for a connection to Redis */
