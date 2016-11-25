@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <ctype.h>
 
+#include "alloc.h"
 #include "read.h"
 #include "sds.h"
 
@@ -416,7 +417,7 @@ static int processItem(redisReader *r) {
 redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     redisReader *r;
 
-    r = calloc(sizeof(redisReader),1);
+    r = redisAllocator.calloc(sizeof(redisReader),1);
     if (r == NULL)
         return NULL;
 
@@ -426,7 +427,7 @@ redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     r->buf = sdsempty();
     r->maxbuf = REDIS_READER_MAX_BUF;
     if (r->buf == NULL) {
-        free(r);
+        redisAllocator.free(r);
         return NULL;
     }
 
@@ -439,7 +440,7 @@ void redisReaderFree(redisReader *r) {
         r->fn->freeObject(r->reply);
     if (r->buf != NULL)
         sdsfree(r->buf);
-    free(r);
+    redisAllocator.free(r);
 }
 
 int redisReaderFeed(redisReader *r, const char *buf, size_t len) {

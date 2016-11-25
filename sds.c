@@ -35,6 +35,7 @@
 #include <assert.h>
 
 #include "sds.h"
+#include "alloc.h"
 
 /* Create a new sds string with the content specified by the 'init' pointer
  * and 'initlen'.
@@ -52,9 +53,9 @@ sds sdsnewlen(const void *init, size_t initlen) {
     struct sdshdr *sh;
 
     if (init) {
-        sh = malloc(sizeof *sh+initlen+1);
+        sh = redisAllocator.malloc(sizeof *sh+initlen+1);
     } else {
-        sh = calloc(sizeof *sh+initlen+1,1);
+        sh = redisAllocator.calloc(sizeof *sh+initlen+1,1);
     }
     if (sh == NULL) return NULL;
     sh->len = initlen;
@@ -85,7 +86,7 @@ sds sdsdup(const sds s) {
 /* Free an sds string. No operation is performed if 's' is NULL. */
 void sdsfree(sds s) {
     if (s == NULL) return;
-    free(s-sizeof(struct sdshdr));
+    redisAllocator.free(s-sizeof(struct sdshdr));
 }
 
 /* Set the sds string length to the length as obtained with strlen(), so
@@ -139,7 +140,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
         newlen *= 2;
     else
         newlen += SDS_MAX_PREALLOC;
-    newsh = realloc(sh, sizeof *newsh+newlen+1);
+    newsh = redisAllocator.realloc(sh, sizeof *newsh+newlen+1);
     if (newsh == NULL) return NULL;
 
     newsh->free = newlen - len;
@@ -156,7 +157,7 @@ sds sdsRemoveFreeSpace(sds s) {
     struct sdshdr *sh;
 
     sh = (void*) (s-sizeof *sh);
-    sh = realloc(sh, sizeof *sh+sh->len+1);
+    sh = redisAllocator.realloc(sh, sizeof *sh+sh->len+1);
     sh->free = 0;
     return sh->buf;
 }
@@ -363,20 +364,20 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
     size_t buflen = 16;
 
     while(1) {
-        buf = malloc(buflen);
+        buf = redisAllocator.malloc(buflen);
         if (buf == NULL) return NULL;
         buf[buflen-2] = '\0';
         va_copy(cpy,ap);
         vsnprintf(buf, buflen, fmt, cpy);
         if (buf[buflen-2] != '\0') {
-            free(buf);
+            redisAllocator.free(buf);
             buflen *= 2;
             continue;
         }
         break;
     }
     t = sdscat(s, buf);
-    free(buf);
+    redisAllocator.free(buf);
     return t;
 }
 
@@ -661,7 +662,7 @@ sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count
 
     if (seplen < 1 || len < 0) return NULL;
 
-    tokens = malloc(sizeof(sds)*slots);
+    tokens = redisAllocator.malloc(sizeof(sds)*slots);
     if (tokens == NULL) return NULL;
 
     if (len == 0) {
@@ -674,7 +675,7 @@ sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count
             sds *newtokens;
 
             slots *= 2;
-            newtokens = realloc(tokens,sizeof(sds)*slots);
+            newtokens = redisAllocator.realloc(tokens,sizeof(sds)*slots);
             if (newtokens == NULL) goto cleanup;
             tokens = newtokens;
         }
@@ -698,7 +699,7 @@ cleanup:
     {
         int i;
         for (i = 0; i < elements; i++) sdsfree(tokens[i]);
-        free(tokens);
+        redisAllocator.free(tokens);
         *count = 0;
         return NULL;
     }
@@ -709,7 +710,7 @@ void sdsfreesplitres(sds *tokens, int count) {
     if (!tokens) return;
     while(count--)
         sdsfree(tokens[count]);
-    free(tokens);
+    redisAllocator.free(tokens);
 }
 
 /* Create an sds string from a long long value. It is much faster than:
@@ -902,13 +903,13 @@ sds *sdssplitargs(const char *line, int *argc) {
                 if (*p) p++;
             }
             /* add the token to the vector */
-            vector = realloc(vector,((*argc)+1)*sizeof(char*));
+            vector = redisAllocator.realloc(vector,((*argc)+1)*sizeof(char*));
             vector[*argc] = current;
             (*argc)++;
             current = NULL;
         } else {
             /* Even on empty input string return something not NULL. */
-            if (vector == NULL) vector = malloc(sizeof(void*));
+            if (vector == NULL) vector = redisAllocator.malloc(sizeof(void*));
             return vector;
         }
     }
@@ -916,7 +917,7 @@ sds *sdssplitargs(const char *line, int *argc) {
 err:
     while((*argc)--)
         sdsfree(vector[*argc]);
-    free(vector);
+    redisAllocator.free(vector);
     if (current) sdsfree(current);
     *argc = 0;
     return NULL;

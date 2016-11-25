@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <limits.h>
+#include "alloc.h"
 #include "dict.h"
 
 /* -------------------------- private prototypes ---------------------------- */
@@ -71,7 +72,7 @@ static void _dictReset(dict *ht) {
 
 /* Create a new hash table */
 static dict *dictCreate(dictType *type, void *privDataPtr) {
-    dict *ht = malloc(sizeof(*ht));
+    dict *ht = redisAllocator.malloc(sizeof(*ht));
     _dictInit(ht,type,privDataPtr);
     return ht;
 }
@@ -97,7 +98,7 @@ static int dictExpand(dict *ht, unsigned long size) {
     _dictInit(&n, ht->type, ht->privdata);
     n.size = realsize;
     n.sizemask = realsize-1;
-    n.table = calloc(realsize,sizeof(dictEntry*));
+    n.table = redisAllocator.calloc(realsize,sizeof(dictEntry*));
 
     /* Copy all the elements from the old to the new table:
      * note that if the old hash table is empty ht->size is zero,
@@ -124,7 +125,7 @@ static int dictExpand(dict *ht, unsigned long size) {
         }
     }
     assert(ht->used == 0);
-    free(ht->table);
+    redisAllocator.free(ht->table);
 
     /* Remap the new hashtable in the old */
     *ht = n;
@@ -142,7 +143,7 @@ static int dictAdd(dict *ht, void *key, void *val) {
         return DICT_ERR;
 
     /* Allocates the memory and stores key */
-    entry = malloc(sizeof(*entry));
+    entry = redisAllocator.malloc(sizeof(*entry));
     entry->next = ht->table[index];
     ht->table[index] = entry;
 
@@ -199,7 +200,7 @@ static int dictDelete(dict *ht, const void *key) {
 
             dictFreeEntryKey(ht,de);
             dictFreeEntryVal(ht,de);
-            free(de);
+            redisAllocator.free(de);
             ht->used--;
             return DICT_OK;
         }
@@ -222,13 +223,13 @@ static int _dictClear(dict *ht) {
             nextHe = he->next;
             dictFreeEntryKey(ht, he);
             dictFreeEntryVal(ht, he);
-            free(he);
+            redisAllocator.free(he);
             ht->used--;
             he = nextHe;
         }
     }
     /* Free the table and the allocated cache structure */
-    free(ht->table);
+    redisAllocator.free(ht->table);
     /* Re-initialize the table */
     _dictReset(ht);
     return DICT_OK; /* never fails */
@@ -237,7 +238,7 @@ static int _dictClear(dict *ht) {
 /* Clear & Release the hash table */
 static void dictRelease(dict *ht) {
     _dictClear(ht);
-    free(ht);
+    redisAllocator.free(ht);
 }
 
 static dictEntry *dictFind(dict *ht, const void *key) {
@@ -256,7 +257,7 @@ static dictEntry *dictFind(dict *ht, const void *key) {
 }
 
 static dictIterator *dictGetIterator(dict *ht) {
-    dictIterator *iter = malloc(sizeof(*iter));
+    dictIterator *iter = redisAllocator.malloc(sizeof(*iter));
 
     iter->ht = ht;
     iter->index = -1;
@@ -286,7 +287,7 @@ static dictEntry *dictNext(dictIterator *iter) {
 }
 
 static void dictReleaseIterator(dictIterator *iter) {
-    free(iter);
+    redisAllocator.free(iter);
 }
 
 /* ------------------------- private functions ------------------------------ */
