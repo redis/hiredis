@@ -26,6 +26,7 @@
 #ifndef __HIREDIS_QT_H__
 #define __HIREDIS_QT_H__
 #include <QSocketNotifier>
+#include "../alloc.h"
 #include "../async.h"
 
 static void RedisQtAddRead(void *);
@@ -93,27 +94,38 @@ class RedisQtAdapter : public QObject {
         }
 
     private:
+        QSocketNotifier *allocNotifier(int socket, Type type, QObject * parent = 0) {
+            void * buf = redisAllocator.malloc(sizeof(QSocketNotifier));
+            QSocketNotifier * ret = new (buf) QSocketNotifier(socket, type, parent);
+            return ret;
+        }
+
+        void freeNotifier(QSocketNotifier* notifier) {
+            notifier->~QSocketNotifier();
+            redisAllocator.free(notifier);
+        }
+
         void addRead() {
             if (m_read) return;
-            m_read = new QSocketNotifier(m_ctx->c.fd, QSocketNotifier::Read, 0);
+            m_read = allocNotifier(m_ctx->c.fd, QSocketNotifier::Read, 0);
             connect(m_read, SIGNAL(activated(int)), this, SLOT(read()));
         }
 
         void delRead() {
             if (!m_read) return;
-            delete m_read;
+            freeNotifier(m_read);
             m_read = 0;
         }
 
         void addWrite() {
             if (m_write) return;
-            m_write = new QSocketNotifier(m_ctx->c.fd, QSocketNotifier::Write, 0);
+            m_write = allocNotifier(m_ctx->c.fd, QSocketNotifier::Write, 0);
             connect(m_write, SIGNAL(activated(int)), this, SLOT(write()));
         }
 
         void delWrite() {
             if (!m_write) return;
-            delete m_write;
+            freeNotifier(m_write);
             m_write = 0;
         }
 

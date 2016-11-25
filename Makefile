@@ -3,7 +3,7 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ=net.o hiredis.o sds.o async.o read.o
+OBJ=net.o hiredis.o sds.o async.o read.o alloc.o
 EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
 TESTS=hiredis-test
 LIBNAME=libhiredis
@@ -76,6 +76,7 @@ net.o: net.c fmacros.h net.h hiredis.h read.h sds.h
 read.o: read.c fmacros.h read.h sds.h
 sds.o: sds.c sds.h
 test.o: test.c fmacros.h hiredis.h read.h sds.h
+alloc.o: alloc.c alloc.h
 
 $(DYLIBNAME): $(OBJ)
 	$(DYLIB_MAKE_CMD) $(OBJ)
@@ -182,7 +183,7 @@ $(PKGCONFNAME): hiredis.h
 
 install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_LIBRARY_PATH)
-	$(INSTALL) hiredis.h async.h read.h sds.h adapters $(INSTALL_INCLUDE_PATH)
+	$(INSTALL) hiredis.h async.h read.h sds.h alloc.h adapters $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIBNAME)
 	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)

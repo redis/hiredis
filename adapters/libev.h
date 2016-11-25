@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <ev.h>
+#include "../alloc.h"
 #include "../hiredis.h"
 #include "../async.h"
 
@@ -107,7 +108,7 @@ static void redisLibevCleanup(void *privdata) {
     redisLibevEvents *e = (redisLibevEvents*)privdata;
     redisLibevDelRead(privdata);
     redisLibevDelWrite(privdata);
-    free(e);
+    redisAllocator.free(e);
 }
 
 static int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
@@ -119,7 +120,7 @@ static int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisLibevEvents*)malloc(sizeof(*e));
+    e = (redisLibevEvents*)redisAllocator.malloc(sizeof(*e));
     e->context = ac;
 #if EV_MULTIPLICITY
     e->loop = loop;

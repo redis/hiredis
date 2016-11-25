@@ -32,6 +32,7 @@
 #define __HIREDIS_AE_H__
 #include <sys/types.h>
 #include <ae.h>
+#include "../alloc.h"
 #include "../hiredis.h"
 #include "../async.h"
 
@@ -96,7 +97,7 @@ static void redisAeCleanup(void *privdata) {
     redisAeEvents *e = (redisAeEvents*)privdata;
     redisAeDelRead(privdata);
     redisAeDelWrite(privdata);
-    free(e);
+    redisAllocator.free(e);
 }
 
 static int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
@@ -108,7 +109,7 @@ static int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisAeEvents*)malloc(sizeof(*e));
+    e = (redisAeEvents*)redisAllocator.malloc(sizeof(*e));
     e->context = ac;
     e->loop = loop;
     e->fd = c->fd;
