@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <limits.h>
 
+#include "alloc.h"
 #include "hiredis.h"
 #include "net.h"
 
@@ -631,6 +632,74 @@ static void test_throughput(struct config config) {
     disconnect(c, 0);
 }
 
+static size_t alloc_count = 0;
+static size_t calloc_count = 0;
+static size_t realloc_count = 0;
+static size_t dealloc_count = 0;
+
+static void* my_malloc(size_t s)
+{
+    ++alloc_count;
+    return malloc(s);
+}
+
+static void* my_calloc(size_t s, size_t c)
+{
+    ++calloc_count;
+    return calloc(s, c);
+}
+
+static void* my_realloc(void* p, size_t s)
+{
+    if (p)
+        ++realloc_count;
+    else
+        ++alloc_count;
+    return realloc(p, s);
+}
+
+static void my_free(void* p)
+{
+    if (p)
+        ++dealloc_count;
+    free(p);
+}
+
+static void test_custom_memory_management(struct config config)
+{
+    redisContext *c = NULL;
+    redisReply *reply = NULL;
+    struct redisAllocator_t original_allocator = redisAllocator;
+
+    test("Custom memory management: ");
+    redisAllocator.malloc = my_malloc;
+    redisAllocator.realloc = my_realloc;
+    redisAllocator.calloc = my_calloc;
+    redisAllocator.free = my_free;
+
+    alloc_count = 0;
+    calloc_count = 0;
+    realloc_count = 0;
+    dealloc_count = 0;
+
+    c = connect(config);
+
+    reply = redisCommand(c,"PING");
+    freeReplyObject(reply);
+    reply = redisCommand(c,"SET foo bar");
+    freeReplyObject(reply);
+    reply = redisCommand(c,"SET %s %s","foo","hello world");
+    freeReplyObject(reply);
+    reply = redisCommand(c,"GET foo");
+    freeReplyObject(reply);
+
+    disconnect(c, 0);
+
+    redisAllocator = original_allocator;
+
+    test_cond(alloc_count + calloc_count == dealloc_count);
+}
+
 // static long __test_callback_flags = 0;
 // static void __test_callback(redisContext *c, void *privdata) {
 //     ((void)c);
@@ -776,6 +845,7 @@ int main(int argc, char **argv) {
 
     printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     cfg.type = CONN_TCP;
+    test_custom_memory_management(cfg);
     test_blocking_connection(cfg);
     test_blocking_connection_timeouts(cfg);
     test_blocking_io_errors(cfg);
@@ -795,7 +865,6 @@ int main(int argc, char **argv) {
         cfg.type = CONN_FD;
         test_blocking_connection(cfg);
     }
-
 
     if (fails) {
         printf("*** %d TESTS FAILED ***\n", fails);
