@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <ctype.h>
 
+#include "alloc.h"
 #include "hiredis.h"
 #include "net.h"
 #include "sds.h"
@@ -61,7 +62,7 @@ static redisReplyObjectFunctions defaultFunctions = {
 
 /* Create a reply object */
 static redisReply *createReplyObject(int type) {
-    redisReply *r = calloc(1,sizeof(*r));
+    redisReply *r = redisAllocator.calloc(1,sizeof(*r));
 
     if (r == NULL)
         return NULL;
@@ -86,17 +87,17 @@ void freeReplyObject(void *reply) {
             for (j = 0; j < r->elements; j++)
                 if (r->element[j] != NULL)
                     freeReplyObject(r->element[j]);
-            free(r->element);
+            redisAllocator.free(r->element);
         }
         break;
     case REDIS_REPLY_ERROR:
     case REDIS_REPLY_STATUS:
     case REDIS_REPLY_STRING:
         if (r->str != NULL)
-            free(r->str);
+            redisAllocator.free(r->str);
         break;
     }
-    free(r);
+    redisAllocator.free(r);
 }
 
 static void *createStringObject(const redisReadTask *task, char *str, size_t len) {
@@ -107,7 +108,7 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     if (r == NULL)
         return NULL;
 
-    buf = malloc(len+1);
+    buf = redisAllocator.malloc(len+1);
     if (buf == NULL) {
         freeReplyObject(r);
         return NULL;
@@ -139,7 +140,7 @@ static void *createArrayObject(const redisReadTask *task, int elements) {
         return NULL;
 
     if (elements > 0) {
-        r->element = calloc(elements,sizeof(redisReply*));
+        r->element = redisAllocator.calloc(elements,sizeof(redisReply*));
         if (r->element == NULL) {
             freeReplyObject(r);
             return NULL;
@@ -232,7 +233,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
         if (*c != '%' || c[1] == '\0') {
             if (*c == ' ') {
                 if (touched) {
-                    newargv = realloc(curargv,sizeof(char*)*(argc+1));
+                    newargv = redisAllocator.realloc(curargv,sizeof(char*)*(argc+1));
                     if (newargv == NULL) goto memory_err;
                     curargv = newargv;
                     curargv[argc++] = curarg;
@@ -381,7 +382,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     /* Add the last argument if needed */
     if (touched) {
-        newargv = realloc(curargv,sizeof(char*)*(argc+1));
+        newargv = redisAllocator.realloc(curargv,sizeof(char*)*(argc+1));
         if (newargv == NULL) goto memory_err;
         curargv = newargv;
         curargv[argc++] = curarg;
@@ -397,7 +398,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     totlen += 1+countDigits(argc)+2;
 
     /* Build the command at protocol level */
-    cmd = malloc(totlen+1);
+    cmd = redisAllocator.malloc(totlen+1);
     if (cmd == NULL) goto memory_err;
 
     pos = sprintf(cmd,"*%d\r\n",argc);
@@ -412,7 +413,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     assert(pos == totlen);
     cmd[pos] = '\0';
 
-    free(curargv);
+    redisAllocator.free(curargv);
     *target = cmd;
     return totlen;
 
@@ -428,7 +429,7 @@ cleanup:
     if (curargv) {
         while(argc--)
             sdsfree(curargv[argc]);
-        free(curargv);
+        redisAllocator.free(curargv);
     }
 
     sdsfree(curarg);
@@ -436,7 +437,7 @@ cleanup:
     /* No need to check cmd since it is the last statement that can fail,
      * but do it anyway to be as defensive as possible. */
     if (cmd != NULL)
-        free(cmd);
+        redisAllocator.free(cmd);
 
     return error_type;
 }
@@ -545,7 +546,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     }
 
     /* Build the command at protocol level */
-    cmd = malloc(totlen+1);
+    cmd = redisAllocator.malloc(totlen+1);
     if (cmd == NULL)
         return -1;
 
@@ -566,7 +567,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
 }
 
 void redisFreeCommand(char *cmd) {
-    free(cmd);
+    redisAllocator.free(cmd);
 }
 
 void __redisSetError(redisContext *c, int type, const char *str) {
@@ -592,7 +593,7 @@ redisReader *redisReaderCreate(void) {
 static redisContext *redisContextInit(void) {
     redisContext *c;
 
-    c = calloc(1,sizeof(redisContext));
+    c = redisAllocator.calloc(1,sizeof(redisContext));
     if (c == NULL)
         return NULL;
 
@@ -623,14 +624,14 @@ void redisFree(redisContext *c) {
     if (c->reader != NULL)
         redisReaderFree(c->reader);
     if (c->tcp.host)
-        free(c->tcp.host);
+        redisAllocator.free(c->tcp.host);
     if (c->tcp.source_addr)
-        free(c->tcp.source_addr);
+        redisAllocator.free(c->tcp.source_addr);
     if (c->unix_sock.path)
-        free(c->unix_sock.path);
+        redisAllocator.free(c->unix_sock.path);
     if (c->timeout)
-        free(c->timeout);
-    free(c);
+        redisAllocator.free(c->timeout);
+    redisAllocator.free(c);
 }
 
 int redisFreeKeepFd(redisContext *c) {
@@ -940,11 +941,11 @@ int redisvAppendCommand(redisContext *c, const char *format, va_list ap) {
     }
 
     if (__redisAppendCommand(c,cmd,len) != REDIS_OK) {
-        free(cmd);
+        redisAllocator.free(cmd);
         return REDIS_ERR;
     }
 
-    free(cmd);
+    redisAllocator.free(cmd);
     return REDIS_OK;
 }
 

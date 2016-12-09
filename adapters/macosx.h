@@ -8,6 +8,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 
+#include "../alloc.h"
 #include "../hiredis.h"
 #include "../async.h"
 
@@ -27,7 +28,7 @@ static int freeRedisRunLoop(RedisRunLoop* redisRunLoop) {
             CFSocketInvalidate(redisRunLoop->socketRef);
             CFRelease(redisRunLoop->socketRef);
         }
-        free(redisRunLoop);
+        redisAllocator.free(redisRunLoop);
     }
     return REDIS_ERR;
 }
@@ -80,7 +81,7 @@ static int redisMacOSAttach(redisAsyncContext *redisAsyncCtx, CFRunLoopRef runLo
     /* Nothing should be attached when something is already attached */
     if( redisAsyncCtx->ev.data != NULL ) return REDIS_ERR;
 
-    RedisRunLoop* redisRunLoop = (RedisRunLoop*) calloc(1, sizeof(RedisRunLoop));
+    RedisRunLoop* redisRunLoop = (RedisRunLoop*) redisAllocator.calloc(1, sizeof(RedisRunLoop));
     if( !redisRunLoop ) return REDIS_ERR;
 
     /* Setup redis stuff */

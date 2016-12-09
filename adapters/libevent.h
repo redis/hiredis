@@ -31,6 +31,7 @@
 #ifndef __HIREDIS_LIBEVENT_H__
 #define __HIREDIS_LIBEVENT_H__
 #include <event.h>
+#include "../alloc.h"
 #include "../hiredis.h"
 #include "../async.h"
 
@@ -75,7 +76,7 @@ static void redisLibeventCleanup(void *privdata) {
     redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     event_del(&e->rev);
     event_del(&e->wev);
-    free(e);
+    redisAllocator.free(e);
 }
 
 static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
@@ -87,7 +88,7 @@ static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisLibeventEvents*)malloc(sizeof(*e));
+    e = (redisLibeventEvents*)redisAllocator.malloc(sizeof(*e));
     e->context = ac;
 
     /* Register functions to start/stop listening for events */

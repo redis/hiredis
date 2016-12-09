@@ -51,11 +51,19 @@
 #include <limits.h>
 #include <stdlib.h>
 
+#include "alloc.h"
 #include "net.h"
 #include "sds.h"
 
 /* Defined in hiredis.c */
 void __redisSetError(redisContext *c, int type, const char *str);
+
+static char* redisAllocatedStrdup(const char* str) {
+    size_t slen = strlen(str);
+    char* ret = (char*)redisAllocator.malloc(slen+1);
+    memcpy(ret, str, slen+1);
+    return ret;
+}
 
 static void redisContextCloseFd(redisContext *c) {
     if (c && c->fd >= 0) {
@@ -286,21 +294,21 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
      **/
     if (c->tcp.host != addr) {
         if (c->tcp.host)
-            free(c->tcp.host);
+            redisAllocator.free(c->tcp.host);
 
-        c->tcp.host = strdup(addr);
+        c->tcp.host = redisAllocatedStrdup(addr);
     }
 
     if (timeout) {
         if (c->timeout != timeout) {
             if (c->timeout == NULL)
-                c->timeout = malloc(sizeof(struct timeval));
+                c->timeout = redisAllocator.malloc(sizeof(struct timeval));
 
             memcpy(c->timeout, timeout, sizeof(struct timeval));
         }
     } else {
         if (c->timeout)
-            free(c->timeout);
+            redisAllocator.free(c->timeout);
         c->timeout = NULL;
     }
 
@@ -310,11 +318,11 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     }
 
     if (source_addr == NULL) {
-        free(c->tcp.source_addr);
+        redisAllocator.free(c->tcp.source_addr);
         c->tcp.source_addr = NULL;
     } else if (c->tcp.source_addr != source_addr) {
-        free(c->tcp.source_addr);
-        c->tcp.source_addr = strdup(source_addr);
+        redisAllocator.free(c->tcp.source_addr);
+        c->tcp.source_addr = redisAllocatedStrdup(source_addr);
     }
 
     snprintf(_port, 6, "%d", port);
@@ -438,18 +446,18 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
 
     c->connection_type = REDIS_CONN_UNIX;
     if (c->unix_sock.path != path)
-        c->unix_sock.path = strdup(path);
+        c->unix_sock.path = redisAllocatedStrdup(path);
 
     if (timeout) {
         if (c->timeout != timeout) {
             if (c->timeout == NULL)
-                c->timeout = malloc(sizeof(struct timeval));
+                c->timeout = redisAllocator.malloc(sizeof(struct timeval));
 
             memcpy(c->timeout, timeout, sizeof(struct timeval));
         }
     } else {
         if (c->timeout)
-            free(c->timeout);
+            redisAllocator.free(c->timeout);
         c->timeout = NULL;
     }
 

@@ -1,8 +1,6 @@
-/* SDSLib 2.0 -- A C dynamic strings library
+/*
+ * Copyright (c) 2016, Mark Rohrbacher <m.rohrbacher at r-dev dot de>
  *
- * Copyright (c) 2006-2015, Salvatore Sanfilippo <antirez at gmail dot com>
- * Copyright (c) 2015, Oran Agra
- * Copyright (c) 2015, Redis Labs, Inc
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,14 +28,26 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* SDS allocator selection.
- *
- * This file is used in order to change the SDS allocator at compile time.
- * Just define the following defines to what you want to use. Also add
- * the include of your alternate allocator if needed (not needed in order
- * to use the default libc allocator). */
+#ifndef __ALLOC_H
+#define __ALLOC_H
 
-#include "alloc.h"
-#define s_malloc redisAllocator.malloc
-#define s_realloc redisAllocator.realloc
-#define s_free redisAllocator.free
+#include <unistd.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct redisAllocator_t {
+    void * (*malloc)(size_t size);
+    void * (*calloc)(size_t nmemb, size_t size);
+    void * (*realloc)(void *ptr, size_t size);
+    void (*free)(void *ptr);
+} redisAllocator_t;
+
+extern struct redisAllocator_t redisAllocator;
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

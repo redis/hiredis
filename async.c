@@ -36,6 +36,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include "alloc.h"
 #include "async.h"
 #include "net.h"
 #include "dict.c"
@@ -68,7 +69,7 @@ static unsigned int callbackHash(const void *key) {
 
 static void *callbackValDup(void *privdata, const void *src) {
     ((void) privdata);
-    redisCallback *dup = malloc(sizeof(*dup));
+    redisCallback *dup = redisAllocator.malloc(sizeof(*dup));
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }
@@ -90,7 +91,7 @@ static void callbackKeyDestructor(void *privdata, void *key) {
 
 static void callbackValDestructor(void *privdata, void *val) {
     ((void) privdata);
-    free(val);
+    redisAllocator.free(val);
 }
 
 static dictType callbackDict = {
@@ -105,7 +106,7 @@ static dictType callbackDict = {
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac;
 
-    ac = realloc(c,sizeof(redisAsyncContext));
+    ac = redisAllocator.realloc(c,sizeof(redisAsyncContext));
     if (ac == NULL)
         return NULL;
 
@@ -228,7 +229,7 @@ static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
     redisCallback *cb;
 
     /* Copy callback from stack to heap */
-    cb = malloc(sizeof(*cb));
+    cb = redisAllocator.malloc(sizeof(*cb));
     if (cb == NULL)
         return REDIS_ERR_OOM;
 
@@ -256,7 +257,7 @@ static int __redisShiftCallback(redisCallbackList *list, redisCallback *target) 
         /* Copy callback from heap to stack */
         if (target != NULL)
             memcpy(target,cb,sizeof(*cb));
-        free(cb);
+        redisAllocator.free(cb);
         return REDIS_OK;
     }
     return REDIS_ERR;
@@ -658,7 +659,7 @@ int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdat
         return REDIS_ERR;
 
     status = __redisAsyncCommand(ac,fn,privdata,cmd,len);
-    free(cmd);
+    redisAllocator.free(cmd);
     return status;
 }
 
