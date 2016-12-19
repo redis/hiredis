@@ -38,6 +38,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #include "hiredis.h"
 #include "net.h"
@@ -46,7 +47,7 @@
 static redisReply *createReplyObject(int type);
 static void *createStringObject(const redisReadTask *task, char *str, size_t len);
 static void *createArrayObject(const redisReadTask *task, int elements);
-static void *createIntegerObject(const redisReadTask *task, long long value);
+static void *createIntegerObject(const redisReadTask *task, int64_t value);
 static void *createNilObject(const redisReadTask *task);
 
 /* Default set of functions to build the reply. Keep in mind that such a
@@ -156,7 +157,7 @@ static void *createArrayObject(const redisReadTask *task, int elements) {
     return r;
 }
 
-static void *createIntegerObject(const redisReadTask *task, long long value) {
+static void *createIntegerObject(const redisReadTask *task, int64_t value) {
     redisReply *r, *parent;
 
     r = createReplyObject(REDIS_REPLY_INTEGER);
