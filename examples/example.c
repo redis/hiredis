@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include <hiredis.h>
 
@@ -44,11 +45,11 @@ int main(int argc, char **argv) {
     freeReplyObject(reply);
 
     reply = redisCommand(c,"INCR counter");
-    printf("INCR counter: %lld\n", reply->integer);
+    printf("INCR counter: %" PRId64 "\n", reply->integer);
     freeReplyObject(reply);
     /* again ... */
     reply = redisCommand(c,"INCR counter");
-    printf("INCR counter: %lld\n", reply->integer);
+    printf("INCR counter: %" PRId64 "\n", reply->integer);
     freeReplyObject(reply);
 
     /* Create a list of numbers, from 0 to 9 */

@@ -7,7 +7,7 @@
 #include <async.h>
 #include <adapters/libevent.h>
 
-void getCallback(redisAsyncContext *c, void *r, void *privdata) {
+static void getCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = r;
     if (reply == NULL) return;
     printf("argv[%s]: %s\n", (char*)privdata, reply->str);
@@ -16,7 +16,7 @@ void getCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisAsyncDisconnect(c);
 }
 
-void connectCallback(const redisAsyncContext *c, int status) {
+static void connectCallback(const redisAsyncContext *c, int status) {
     if (status != REDIS_OK) {
         printf("Error: %s\n", c->errstr);
         return;
@@ -24,7 +24,7 @@ void connectCallback(const redisAsyncContext *c, int status) {
     printf("Connected...\n");
 }
 
-void disconnectCallback(const redisAsyncContext *c, int status) {
+static void disconnectCallback(const redisAsyncContext *c, int status) {
     if (status != REDIS_OK) {
         printf("Error: %s\n", c->errstr);
         return;
@@ -33,10 +33,13 @@ void disconnectCallback(const redisAsyncContext *c, int status) {
 }
 
 int main (int argc, char **argv) {
+	struct event_base *base;
+	redisAsyncContext *c;
+	
     signal(SIGPIPE, SIG_IGN);
-    struct event_base *base = event_base_new();
+    base = event_base_new();
 
-    redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
+    c = redisAsyncConnect("127.0.0.1", 6379);
     if (c->err) {
         /* Let *c leak for now... */
         printf("Error: %s\n", c->errstr);
