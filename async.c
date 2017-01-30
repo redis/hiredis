@@ -395,7 +395,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
                 cb->pending_subs -= 1;
             }
 
-            memcpy(dstcb,dictGetEntryVal(de),sizeof(*dstcb));
+            memcpy(dstcb,cb,sizeof(*dstcb));
 
             /* If this is an unsubscribe message, remove it. */
             if (strcasecmp(stype+pvariant,"unsubscribe") == 0) {
