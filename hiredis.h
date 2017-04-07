@@ -37,7 +37,23 @@
 #include <stdarg.h> /* for va_list */
 #include <sys/time.h> /* for struct timeval */
 #include <stdint.h> /* uintXX_t, etc */
-#include "sds.h" /* for sds */
+
+#if defined(__STDC__)
+# define PREDEF_STANDARD_C_1989
+# if defined(__STDC_VERSION__)
+#  define PREDEF_STANDARD_C_1990
+#  if (__STDC_VERSION__ >= 199409L)
+#   define PREDEF_STANDARD_C_1994
+#  endif
+#  if (__STDC_VERSION__ >= 199901L)
+#   define PREDEF_STANDARD_C_1999
+#  endif
+# endif
+#endif
+
+#ifdef PREDEF_STANDARD_C_1999
+	#include "sds.h" /* for sds */
+#endif
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 13
@@ -111,7 +127,7 @@ extern "C" {
 /* This is the reply object returned by redisCommand() */
 typedef struct redisReply {
     int type; /* REDIS_REPLY_* */
-    long long integer; /* The integer when type is REDIS_REPLY_INTEGER */
+    int64_t integer; /* The integer when type is REDIS_REPLY_INTEGER */
     size_t len; /* Length of string */
     char *str; /* Used for both REDIS_REPLY_ERROR and REDIS_REPLY_STRING */
     size_t elements; /* number of elements, for REDIS_REPLY_ARRAY */
@@ -127,9 +143,12 @@ void freeReplyObject(void *reply);
 int redisvFormatCommand(char **target, const char *format, va_list ap);
 int redisFormatCommand(char **target, const char *format, ...);
 int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
-int redisFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const size_t *argvlen);
 void redisFreeCommand(char *cmd);
-void redisFreeSdsCommand(sds cmd);
+
+#ifdef PREDEF_STANDARD_C_1999
+	int redisFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const size_t *argvlen);
+	void redisFreeSdsCommand(sds cmd);
+#endif
 
 enum redisConnectionType {
     REDIS_CONN_TCP,

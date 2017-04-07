@@ -33,6 +33,7 @@
 #ifndef __HIREDIS_READ_H
 #define __HIREDIS_READ_H
 #include <stdio.h> /* for size_t */
+#include <stdint.h> /* for int64_t */
 
 #define REDIS_ERR -1
 #define REDIS_OK 0
@@ -72,7 +73,7 @@ typedef struct redisReadTask {
 typedef struct redisReplyObjectFunctions {
     void *(*createString)(const redisReadTask*, char*, size_t);
     void *(*createArray)(const redisReadTask*, int);
-    void *(*createInteger)(const redisReadTask*, long long);
+    void *(*createInteger)(const redisReadTask*, int64_t);
     void *(*createNil)(const redisReadTask*);
     void (*freeObject)(void*);
 } redisReplyObjectFunctions;
