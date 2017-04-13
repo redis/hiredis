@@ -1,0 +1,31 @@
+{
+  "description": "Minimalistic C client for Redis >= 1.2",
+
+  "keywords": [
+    "client",
+    "redis"
+  ],
+
+  "name": "hiredis",
+  "repo": "redis/hiredis",
+
+  "src": [
+    "adapters/ae.h",
+    "adapters/libev.h",
+    "adapters/libevent.h",
+    "adapters/libuv.h",
+    "async.c",
+    "async.h",
+    "dict.c",
+    "dict.h",
+    "fmacros.h",
+    "hiredis.c",
+    "hiredis.h",
+    "net.c",
+    "net.h",
+    "sds.c",
+    "sds.h"
+  ],
+
+  "version": "0.11.0"
+}
