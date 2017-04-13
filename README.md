@@ -318,6 +318,23 @@ valid for the duration of the callback.
 
 All pending callbacks are called with a `NULL` reply when the context encountered an error.
 
+#### A note on SUBSCRIBE/UNSUBSCRIBE
+
+The asynchronous API is very suitable for `SUBSCRIBE`, since it invokes a callback on a PUBLISH event. 
+This comes with a drawback, which is that once a `SUBSCRIBE` command was issued on a particular context,
+you cannot send any other command to that context other than `(P)SUBSCRIBE`/`UNSUBSCRIBE` until there is 
+no subcription anymore.
+
+What it means in practice, is that this won't work:
+
+```c
+redisAsyncCommand( ctx, onMessage, NULL, "SUBSCRIBE topic" );
+redisAsyncCommand( ctx, onMessage, NULL, "SUBSCRIBE othertopic" ); // Works
+redisAsyncCommand( ctx, onMessage, NULL, "SET myKey 1234" ); // Will fail
+```
+
+The solution here is to manage 2 contexts: one for your subscribtions and another for your usual commands.
+
 ### Disconnecting
 
 An asynchronous connection can be terminated using:
