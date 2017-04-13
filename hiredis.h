@@ -197,6 +197,12 @@ int redisBufferWrite(redisContext *c, int *done);
 int redisGetReply(redisContext *c, void **reply);
 int redisGetReplyFromReader(redisContext *c, void **reply);
 
+/* In a blocking context, this function checks if there is data available
+ * to prevent blocking in redisGetReply whilst there is no data. Using a
+ * timeout of 0 returns immediatly, a readev of 1 means that there is
+ * data available */
+int redisSelect(redisContext *c, int *readev, int timeout);
+
 /* Write a formatted command to the output buffer. Use these functions in blocking mode
  * to get a pipeline of commands. */
 int redisAppendFormattedCommand(redisContext *c, const char *cmd, size_t len);

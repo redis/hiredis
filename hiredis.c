@@ -897,6 +897,26 @@ int redisGetReply(redisContext *c, void **reply) {
     return REDIS_OK;
 }
 
+int redisSelect(redisContext *c, int *readev, int timeout) {
+    int result;
+    int readevent = 0;
+    struct timeval tv;
+    fd_set rfds;
+
+    FD_ZERO(&rfds);
+    FD_SET(c->fd, &rfds);
+    tv.tv_sec = (time_t)timeout;
+    tv.tv_usec = 0;
+    result = select(c->fd + 1, &rfds, NULL, NULL, &tv);
+    if (result > 0) {
+        /* one or more sockets have data, since our fd is the only one,
+         * that must be it */
+        readevent = 1;
+    }
+
+    if (readev != NULL) *readev = readevent;
+    return REDIS_OK;
+}
 
 /* Helper function for the redisAppendCommand* family of functions.
  *
