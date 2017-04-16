@@ -168,6 +168,12 @@ static void test_format_commands(void) {
         len == 4+4+(3+2)+4+(1+2)+4+(1+2));
     free(cmd);
 
+    test("Format command with literal double quote(\"): ");
+    len = redisFormatCommand(&cmd,"EVAL \"return redis.call('get','foo')\" 0");
+    test_cond(strncmp(cmd,"*3\r\n$4\r\nEVAL\r\n$30\r\nreturn redis.call('get','foo')\r\n$1\r\n0\r\n",len) == 0 &&
+        len == 4+4+(4+2)+5+(30+2)+4+(1+2));
+    free(cmd);
+
     /* Vararg width depends on the type. These tests make sure that the
      * width is correctly determined using the format and subsequent varargs
      * can correctly be interpolated. */

@@ -218,6 +218,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     int totlen = 0;
     int error_type = 0; /* 0 = no error; -1 = memory error; -2 = format error */
     int j;
+    int commented = 0;
 
     /* Abort if there is not target to set */
     if (target == NULL)
@@ -229,8 +230,8 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
         return -1;
 
     while(*c != '\0') {
-        if (*c != '%' || c[1] == '\0') {
-            if (*c == ' ') {
+        if (*c != '%' || commented == 1 || c[1] == '\0') {
+            if (*c == ' ' && commented == 0 ) {
                 if (touched) {
                     newargv = realloc(curargv,sizeof(char*)*(argc+1));
                     if (newargv == NULL) goto memory_err;
@@ -242,6 +243,12 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     curarg = sdsempty();
                     if (curarg == NULL) goto memory_err;
                     touched = 0;
+                }
+            } else if ( *c == '"' ) {
+                if( commented == 0 ) {
+                    commented = 1;
+                } else {
+                    commented = 0;
                 }
             } else {
                 newarg = sdscatlen(curarg,c,1);
@@ -378,6 +385,8 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
         }
         c++;
     }
+
+    if( commented == 1 ) goto err;
 
     /* Add the last argument if needed */
     if (touched) {
