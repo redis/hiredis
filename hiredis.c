@@ -1005,7 +1005,11 @@ void *redisvCommand(redisContext *c, const char *format, va_list ap) {
     return __redisBlockForReply(c);
 }
 
+#ifdef __cplusplus
+redisReply *redisCommand(redisContext *c, const char *format, ...) {
+#else
 void *redisCommand(redisContext *c, const char *format, ...) {
+#endif
     va_list ap;
     void *reply = NULL;
     va_start(ap,format);
