@@ -38,7 +38,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
-
+#include <sys/socket.h>
 #include "hiredis.h"
 #include "net.h"
 #include "sds.h"
@@ -831,6 +831,9 @@ int redisBufferRead(redisContext *c) {
 int redisBufferWrite(redisContext *c, int *done) {
     int nwritten;
 
+    int set = 1;
+    setsockopt(c->fd, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof(int));
+    
     /* Return early when the context has seen an error. */
     if (c->err)
         return REDIS_ERR;
