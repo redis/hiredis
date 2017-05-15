@@ -357,6 +357,7 @@ addrretry:
                 n = 1;
                 if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char*) &n,
                                sizeof(n)) < 0) {
+                    freeaddrinfo(bservinfo);
                     goto error;
                 }
             }
