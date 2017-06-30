@@ -341,7 +341,7 @@ addrretry:
             continue;
 
         c->fd = s;
-        if (redisSetBlocking(c,0) != REDIS_OK)
+        if (redisSetBlocking(c,blocking) != REDIS_OK)
             goto error;
         if (c->tcp.source_addr) {
             int bound = 0;
