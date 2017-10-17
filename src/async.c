@@ -29,6 +29,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef __VXWORKS__
+#include "vxworks.h"
+#endif
 #include "fmacros.h"
 #include <stdlib.h>
 #include <string.h>

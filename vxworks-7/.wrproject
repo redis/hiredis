@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<wrxml>
+    <properties platform="VxWorks7" platform_name="vxworks-7" root="1" type="DownloadableKernelModuleProject"/>
+    <attributes>
+        <mapAttribute>
+            <intAttribute key="BuildSupportEnabled" value="1"/>
+            <stringAttribute key="BLD::Info|cmd" value="%makeprefix% make --no-print-directory"/>
+            <listAttribute key="BLD::Info|GlobalMacros">
+                <stringAttribute value="PROJECT_TYPE"/>
+                <stringAttribute value="DEFINES"/>
+                <stringAttribute value="EXPAND_DBG"/>
+                <stringAttribute value="APICHECK_OPTIONS"/>
+            </listAttribute>
+            <stringAttribute key="BLD::Info|GlobalMacro|PROJECT_TYPE" value="DKM"/>
+            <stringAttribute key="BLD::Info|GlobalMacro|DEFINES" value=""/>
+            <stringAttribute key="BLD::Info|GlobalMacro|EXPAND_DBG" value="0"/>
+            <stringAttribute key="BLD::Info|GlobalMacro|APICHECK_OPTIONS" value="-warning"/>
+            <listAttribute key="BLD::Info|Macros">
+                <stringAttribute value="VX_CPU_FAMILY"/>
+                <stringAttribute value="CPU"/>
+                <stringAttribute value="TOOL_FAMILY"/>
+                <stringAttribute value="TOOL_VERSION"/>
+                <stringAttribute value="_CC_VERSION"/>
+                <stringAttribute value="TOOL"/>
+                <stringAttribute value="TOOL_PATH"/>
+                <stringAttribute value="CC_ARCH_SPEC"/>
+                <stringAttribute value="VSB_DIR"/>
+                <stringAttribute value="VSB_CONFIG_FILE"/>
+                <stringAttribute value="LIBPATH"/>
+                <stringAttribute value="LIBS"/>
+                <stringAttribute value="DKM_LONGCALL"/>
+                <stringAttribute value="APICHECK_CMD"/>
+                <stringAttribute value="APICHECK"/>
+            </listAttribute>
+            <listAttribute key="BLD::Info|Tools">
+                <stringAttribute value="C-Compiler"/>
+                <stringAttribute value="C++-Compiler"/>
+                <stringAttribute value="Linker"/>
+                <stringAttribute value="Partial Image Linker"/>
+                <stringAttribute value="Librarian"/>
+                <stringAttribute value="Assembler"/>
+            </listAttribute>
+            <stringAttribute key="BLD::Info|Tool|C-Compiler|sigs" value="*.c"/>
+            <booleanAttribute key="BLD::Info|Tool|C-Compiler|object" value="true"/>
+            <booleanAttribute key="BLD::Info|Tool|C-Compiler|passAble" value="false"/>
+            <stringAttribute key="BLD::Info|Tool|C++-Compiler|sigs" value="*.cpp;*.CPP;*.C;*.cxx;*.cc"/>
+            <booleanAttribute key="BLD::Info|Tool|C++-Compiler|object" value="true"/>
+            <booleanAttribute key="BLD::Info|Tool|C++-Compiler|passAble" value="false"/>
+            <stringAttribute key="BLD::Info|Tool|Linker|sigs" value=""/>
+            <booleanAttribute key="BLD::Info|Tool|Linker|object" value="false"/>
+            <booleanAttribute key="BLD::Info|Tool|Linker|passAble" value="false"/>
+            <stringAttribute key="BLD::Info|Tool|Partial Image Linker|sigs" value=""/>
+            <booleanAttribute key="BLD::Info|Tool|Partial Image Linker|object" value="false"/>
+            <booleanAttribute key="BLD::Info|Tool|Partial Image Linker|passAble" value="true"/>
+            <stringAttribute key="BLD::Info|Tool|Librarian|sigs" value=""/>
+            <booleanAttribute key="BLD::Info|Tool|Librarian|object" value="false"/>
+            <booleanAttribute key="BLD::Info|Tool|Librarian|passAble" value="true"/>
+            <stringAttribute key="BLD::Info|Tool|Assembler|sigs" value="*.s"/>
+            <booleanAttribute key="BLD::Info|Tool|Assembler|object" value="true"/>
+            <booleanAttribute key="BLD::Info|Tool|Assembler|passAble" value="false"/>
+            <listAttribute key="BLD::Info|specs">
+                <stringAttribute value="vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP"/>
+            </listAttribute>
+            <stringAttribute key="BLD::Info|redirDir|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP"/>
+            <stringAttribute key="BLD::Info|Macro|VX_CPU_FAMILY|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="arm"/>
+            <stringAttribute key="BLD::Info|Macro|CPU|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="ARMARCH8A"/>
+            <stringAttribute key="BLD::Info|Macro|TOOL_FAMILY|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="llvm"/>
+            <stringAttribute key="BLD::Info|Macro|TOOL_VERSION|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="llvm_2016_04"/>
+            <stringAttribute key="BLD::Info|Macro|_CC_VERSION|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="llvm_3_8_1_1"/>
+            <stringAttribute key="BLD::Info|Macro|TOOL|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="llvm"/>
+            <stringAttribute key="BLD::Info|Macro|TOOL_PATH|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="$(WIND_HOME)/compilers/llvm-3.8.1.1/$(WIND_VX7_LLVM_HOST_TYPE)/bin"/>
+            <stringAttribute key="BLD::Info|Macro|CC_ARCH_SPEC|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="--target=arm64 -ftls-model=local-exec -ffixed-x18 -mno-implicit-float "/>
+            <stringAttribute key="BLD::Info|Macro|VSB_DIR|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="$(WS_ROOT_DIR)/vxw7_ge_rtm_e_BSP"/>
+            <stringAttribute key="BLD::Info|Macro|VSB_CONFIG_FILE|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="$(VSB_DIR)/h/config/vsbConfig.h"/>
+            <stringAttribute key="BLD::Info|Macro|LIBPATH|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value=""/>
+            <stringAttribute key="BLD::Info|Macro|LIBS|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value=""/>
+            <stringAttribute key="BLD::Info|Macro|DKM_LONGCALL|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value=""/>
+            <stringAttribute key="BLD::Info|Macro|APICHECK_CMD|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="apicheck.sh -r &quot;$(VSB_DIR)/krnl/apicheck/forbidden_api.lst&quot; -n &quot;nmarm64&quot; -u -s &quot;$&lt;&quot; &quot;$@&quot; $(APICHECK_OPTIONS)"/>
+            <stringAttribute key="BLD::Info|Macro|APICHECK|value|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="0"/>
+            <listAttribute key="BLD::Info|Incl|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP">
+                <stringAttribute value="-I%Proj-vxw7_ge_rtm_e_BSP%/share/h"/>
+                <stringAttribute value="-I%Proj-vxw7_ge_rtm_e_BSP%/krnl/h/system"/>
+                <stringAttribute value="-I%Proj-vxw7_ge_rtm_e_BSP%/krnl/h/public"/>
+                <stringAttribute value="-I$(PRJ_ROOT_DIR)/include"/>
+            </listAttribute>
+            <listAttribute key="BLD::Info|Definess|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP">
+                <stringAttribute value="-DCPU=_VX_$(CPU)"/>
+                <stringAttribute value="-DTOOL_FAMILY=$(TOOL_FAMILY)"/>
+                <stringAttribute value="-DTOOL=$(TOOL)"/>
+                <stringAttribute value="-D_WRS_KERNEL"/>
+                <stringAttribute value="-D_WRS_VX_SMP"/>
+                <stringAttribute value="-D_WRS_CONFIG_SMP"/>
+                <stringAttribute value="-D_VSB_CONFIG_FILE=\&quot;$(VSB_DIR)/h/config/vsbConfig.h\&quot;"/>
+                <stringAttribute value="-DARMEL "/>
+                <stringAttribute value="-D_HAVE_TOOL_XTORS"/>
+                <stringAttribute value="-fno-use-init-array"/>
+                <stringAttribute value="-D__ELF__"/>
+                <stringAttribute value="-U__USER_LABEL_PREFIX__"/>
+                <stringAttribute value="-D__USER_LABEL_PREFIX__="/>
+                <stringAttribute value="-DARM_USE_VFP"/>
+            </listAttribute>
+            <stringAttribute key="BLD::Info|Tool|C-Compiler|derivedSigs|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="*.o"/>
+            <stringAttribute key="BLD::Info|Tool|C-Compiler|dbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-g"/>
+            <stringAttribute key="BLD::Info|Tool|C-Compiler|nonDbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-O2"/>
+            <stringAttribute key="BLD::Info|Tool|C-Compiler|flags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="$(CC_ARCH_SPEC)  -D__vxworks -D__VXWORKS__ -nostdlibinc -nostdinc++ -fno-zero-initialized-in-bss -Wall     $(DKM_LONGCALL)"/>
+            <stringAttribute key="BLD::Info|Tool|C-Compiler|cmd|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="echo &quot;building $@&quot;;%ccompilerprefix% $(TOOL_PATH)/ccllvm %DebugModeFlags% %ToolFlags% %Defines% $(DEFINES) $(ADDED_CFLAGS) %Includes% $(ADDED_INCLUDES) -o %OutFile% -c %InFile% &amp;&amp; if [ &quot;$(APICHECK)&quot; = &quot;1&quot; ]; then $(APICHECK_CMD);fi"/>
+            <stringAttribute key="BLD::Info|Tool|C++-Compiler|derivedSigs|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="*.o"/>
+            <stringAttribute key="BLD::Info|Tool|C++-Compiler|dbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-g"/>
+            <stringAttribute key="BLD::Info|Tool|C++-Compiler|nonDbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-O2"/>
+            <stringAttribute key="BLD::Info|Tool|C++-Compiler|flags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="$(CC_ARCH_SPEC)  -D__vxworks -D__VXWORKS__ -nostdlibinc -nostdinc++ -fno-zero-initialized-in-bss -Wall     $(DKM_LONGCALL) -std=c++11"/>
+            <stringAttribute key="BLD::Info|Tool|C++-Compiler|cmd|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="echo &quot;building $@&quot;;%cppcompilerprefix% $(TOOL_PATH)/ccllvm %DebugModeFlags% %ToolFlags% %Defines% $(DEFINES) $(ADDED_C++FLAGS) %Includes% $(ADDED_INCLUDES) -o %OutFile% -c %InFile% &amp;&amp; if [ &quot;$(APICHECK)&quot; = &quot;1&quot; ]; then $(APICHECK_CMD);fi"/>
+            <stringAttribute key="BLD::Info|Tool|Linker|derivedSigs|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="*.out"/>
+            <stringAttribute key="BLD::Info|Tool|Linker|dbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-g"/>
+            <stringAttribute key="BLD::Info|Tool|Linker|nonDbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-O2"/>
+            <stringAttribute key="BLD::Info|Tool|Linker|flags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-T $(WIND_BASE)/build/tool/llvm_2016_04/krnl/ldscripts/link.OUT"/>
+            <stringAttribute key="BLD::Info|Tool|Linker|cmd|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="echo &quot;building $@&quot;;rm -f %OutFile%;$(TOOL_PATH)/nmarm64 %Objects% | tclsh $(WIND_BASE)/host/resource/hutils/tcl/munch.tcl -c arm64 -tags $(VSB_DIR)/krnl/tags/dkm.tags &gt; $(OBJ_DIR)/ctdt.c;%ccompilerprefix% $(TOOL_PATH)/ccllvm %DebugModeFlags% $(CC_ARCH_SPEC) -fdollars-in-identifiers -Wall   $(ADDED_CFLAGS) %Includes% $(ADDED_INCLUDES)  $(DKM_LONGCALL) %Defines% $(DEFINES) -o $(OBJ_DIR)/ctdt.o -c $(OBJ_DIR)/ctdt.c; %linkerprefix% $(TOOL_PATH)/ldarm64 -X -r -EL -m aarch64elf  --eh-frame-hdr %ToolFlags% -o %OutFile% $(OBJ_DIR)/ctdt.o %Objects% %Libraries% $(LIBPATH) $(LIBS) $(ADDED_LIBPATH) $(ADDED_LIBS) &amp;&amp; if [ &quot;$(EXPAND_DBG)&quot; = &quot;1&quot; ]; then plink &quot;$@&quot;;fi"/>
+            <stringAttribute key="BLD::Info|Tool|Partial Image Linker|derivedSigs|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="*.o"/>
+            <stringAttribute key="BLD::Info|Tool|Partial Image Linker|dbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value=""/>
+            <stringAttribute key="BLD::Info|Tool|Partial Image Linker|nonDbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value=""/>
+            <stringAttribute key="BLD::Info|Tool|Partial Image Linker|flags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value=""/>
+            <stringAttribute key="BLD::Info|Tool|Partial Image Linker|cmd|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="echo &quot;building $@&quot;; %linkerprefix% $(TOOL_PATH)/ldarm64 -X -r -EL -m aarch64elf  --eh-frame-hdr %ToolFlags% -o %OutFile% %Objects% $(ADDED_OBJECTS) %Libraries% $(LIBPATH) $(LIBS) $(ADDED_LIBPATH) $(ADDED_LIBS) &amp;&amp; if [ &quot;$(EXPAND_DBG)&quot; = &quot;1&quot; ]; then plink &quot;$@&quot;;fi"/>
+            <stringAttribute key="BLD::Info|Tool|Librarian|derivedSigs|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="*.a"/>
+            <stringAttribute key="BLD::Info|Tool|Librarian|dbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value=""/>
+            <stringAttribute key="BLD::Info|Tool|Librarian|nonDbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value=""/>
+            <stringAttribute key="BLD::Info|Tool|Librarian|flags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="crus"/>
+            <stringAttribute key="BLD::Info|Tool|Librarian|cmd|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="echo &quot;building $@&quot;;%archiverprefix% $(TOOL_PATH)/ararm64 %ToolFlags% %OutFile% %Objects% $(ADDED_OBJECTS)"/>
+            <stringAttribute key="BLD::Info|Tool|Assembler|derivedSigs|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="*.o"/>
+            <stringAttribute key="BLD::Info|Tool|Assembler|dbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-g"/>
+            <stringAttribute key="BLD::Info|Tool|Assembler|nonDbgFlags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="-O2"/>
+            <stringAttribute key="BLD::Info|Tool|Assembler|flags|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="$(CC_ARCH_SPEC)  -D__vxworks -D__VXWORKS__ -nostdlibinc -nostdinc++ -fno-zero-initialized-in-bss  -xassembler-with-cpp   $(DKM_LONGCALL)"/>
+            <stringAttribute key="BLD::Info|Tool|Assembler|cmd|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP" value="echo &quot;building $@&quot;;%assemblerprefix% $(TOOL_PATH)/ccllvm %DebugModeFlags% %ToolFlags% %Defines% $(DEFINES) $(ADDED_CFLAGS) %Includes% $(ADDED_INCLUDES) -o %OutFile% -c %InFile%"/>
+            <stringAttribute key="BLD::Info|redirRoot" value=""/>
+            <stringAttribute key="BLD::Info|defaultSpec" value="vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP"/>
+            <listAttribute key="BLD::Info|Libs|vxw7_ge_rtm_e_BSP_ARMARCH8Allvm_LP64_LARGE_SMP"/>
+        </mapAttribute>
+    </attributes>
+    <buildtargets>
+        <buildtarget buildtool="Librarian" name="libcsp_hiredis_static" passed="true" targetname="libcsp_hiredis_static">
+            <contents>
+                <folder name="/csp_hiredis_static" recursive="true">
+                    <excludes>
+                        <file name="src/test.c"/>
+                    </excludes>
+                </folder>
+            </contents>
+        </buildtarget>
+    </buildtargets>
+</wrxml>

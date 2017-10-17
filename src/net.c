@@ -32,7 +32,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef __VXWORKS__
+#include "vxworks.h"
+#else
 #include "fmacros.h"
+#endif
+#include "wrapper/wrapperHostLib.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -47,7 +52,13 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+
+#ifdef __VXWORKS__
+#include <ioLib.h>
+#else
 #include <poll.h>
+#endif
+
 #include <limits.h>
 #include <stdlib.h>
 
@@ -106,18 +117,30 @@ static int redisSetBlocking(redisContext *c, int blocking) {
     /* Set the socket nonblocking.
      * Note that fcntl(2) for F_GETFL and F_SETFL can't be
      * interrupted by a signal. */
-    if ((flags = fcntl(c->fd, F_GETFL)) == -1) {
+#ifndef __VXWORKS__
+    if ((flags = fcntl(c->fd, F_GETFL)) == -1) 
+    {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(F_GETFL)");
         redisContextCloseFd(c);
         return REDIS_ERR;
     }
+#endif
 
-    if (blocking)
-        flags &= ~O_NONBLOCK;
+#ifdef __VXWORKS__
+    if(blocking)
+    	flags = 0;
     else
-        flags |= O_NONBLOCK;
-
-    if (fcntl(c->fd, F_SETFL, flags) == -1) {
+    	flags = 1;
+    if((flags = ioctl(c->fd, FIONBIO, &flags)) == -1) 
+#else
+	if (blocking)
+		flags &= ~O_NONBLOCK;
+	else
+		flags |= O_NONBLOCK;
+	
+    if (fcntl(c->fd, F_SETFL, flags) == -1) 
+#endif
+    {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(F_SETFL)");
         redisContextCloseFd(c);
         return REDIS_ERR;
@@ -202,15 +225,51 @@ static int redisContextTimeoutMsec(redisContext *c, long *result)
 }
 
 static int redisContextWaitReady(redisContext *c, long msec) {
-    struct pollfd   wfd[1];
+#ifndef __VXWORKS__
+	 struct pollfd   wfd[1];
 
     wfd[0].fd     = c->fd;
-    wfd[0].events = POLLOUT;
-
-    if (errno == EINPROGRESS) {
+	wfd[0].events = POLLOUT;
+	
+	if (errno == EINPROGRESS) {
         int res;
+		int epfd;
+		struct epoll_event epollEvt;
+		
+		epollEvt.events = EPOLLOUT;
+		epfd = epoll_create_and_ctl(1, &c->fd, &epollEvt);
+		if(epfd == -1)
+		{
+			__redisSetErrorFromErrno(c, REDIS_ERR_IO, "epoll_create_and_ctl()"); 
+			redisContextCloseFd(c);
+			return REDIS_ERR;
+		}
 
-        if ((res = poll(wfd, 1, msec)) == -1) {
+		if ((res = poll(wfd, 1, msec)) == -1) {
+
+#else
+    
+	if (errno == EINPROGRESS) {
+			int res;
+		fd_set fdset;
+		struct timeval timeOut;
+
+		if ( msec < 1000 )
+		{
+			timeOut.tv_usec = (msec * 1000);
+			timeOut.tv_sec = 0;
+		}
+		else
+		{
+			timeOut.tv_sec = msec / 1000;
+			timeOut.tv_usec = (msec % 1000);
+		}
+
+		FD_ZERO(&fdset);
+		FD_SET(c->fd, &fdset);
+
+		if((res = select(FD_SETSIZE, NULL, &fdset, NULL, &timeOut)) == -1) { 
+#endif
             __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
             redisContextCloseFd(c);
             return REDIS_ERR;

@@ -84,11 +84,19 @@
  * depending on system issues, so we need to operate on the error buffer
  * differently depending on which strerror_r we're using. */
 #ifndef _GNU_SOURCE
+#ifdef __VXWORKS__ 
+#define __redis_strerror_r(errno, buf, len)                                    \
+    do {                                                                       \
+        strerror_r((errno), (buf));                                     	   \
+    } while (0)
+#else
 /* "regular" POSIX strerror_r that does the right thing. */
 #define __redis_strerror_r(errno, buf, len)                                    \
     do {                                                                       \
         strerror_r((errno), (buf), (len));                                     \
     } while (0)
+
+#endif
 #else
 /* "bad" GNU strerror_r we need to clean up after. */
 #define __redis_strerror_r(errno, buf, len)                                    \
