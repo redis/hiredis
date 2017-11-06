@@ -16,7 +16,8 @@
 enum connection_type {
     CONN_TCP,
     CONN_UNIX,
-    CONN_FD
+    CONN_FD,
+    CONN_TCP_CLOEXEC
 };
 
 struct config {
@@ -106,6 +107,8 @@ static redisContext *connect(struct config config) {
             printf("Connecting to inherited fd %d\n", fd);
             c = redisConnectFd(fd);
         }
+    } else if (config.type == CONN_TCP_CLOEXEC) {
+        c = redisConnectCloseOnExec(config.tcp.host, config.tcp.port);
     } else {
         assert(NULL);
     }
@@ -647,6 +650,86 @@ static void test_throughput(struct config config) {
     disconnect(c, 0);
 }
 
+static void test_close_on_exec(struct config config) {
+    
+    redisContext *c;
+
+    c = connect(config);
+    {
+        FILE *pipe_fp;
+        char readbuf[16];
+
+        {
+            char command_fmt[] = "stat /proc/self/fd/%d 2>&1";
+            int command_size;
+            char *command;
+
+            command_size = snprintf(NULL, 0, command_fmt, c->fd);
+            command = malloc((command_size + 1) * sizeof(command));
+            if (snprintf(command, command_size + 1, command_fmt, c->fd) < command_size) {
+                fprintf(stderr, "Failed to allocate test command\n");
+                exit(1);
+            }
+
+            if ((pipe_fp = popen(command, "r")) == NULL) {
+                fprintf(stderr, "Failed to popen\n");
+                free(command);
+                exit(1);
+            }
+            free(command);
+        }
+
+        if (fgets(readbuf, 16, pipe_fp) == NULL) {
+            fprintf(stderr, "Error reading from pipe");
+            pclose(pipe_fp);
+            exit(1);
+        }
+        pclose(pipe_fp);
+
+        test("Keep socket on fork+exec without setting close-on-exec: ");
+        test_cond(strncmp(readbuf, "stat: cannot", strlen("stat: cannot")) != 0);
+    }
+    disconnect(c, 0);
+
+    config.type = CONN_TCP_CLOEXEC;
+    c = connect(config);
+    {
+        FILE *pipe_fp;
+        char readbuf[16];
+
+        {
+            char command_fmt[] = "stat /proc/self/fd/%d 2>&1";
+            int command_size;
+            char *command;
+
+            command_size = snprintf(NULL, 0, command_fmt, c->fd);
+            command = malloc((command_size + 1) * sizeof(command));
+            if (snprintf(command, command_size + 1, command_fmt, c->fd) < command_size) {
+                fprintf(stderr, "Failed to allocate test command\n");
+                exit(1);
+            }
+
+            if ((pipe_fp = popen(command, "r")) == NULL) {
+                fprintf(stderr, "Failed to popen\n");
+                free(command);
+                exit(1);
+            }
+            free(command);
+        }
+
+        if (fgets(readbuf, 16, pipe_fp) == NULL) {
+            fprintf(stderr, "Error reading from pipe");
+            pclose(pipe_fp);
+            exit(1);
+        }
+        pclose(pipe_fp);
+
+        test("Don't keep socket on fork+exec when setting close-on-exec: ");
+        test_cond(strncmp(readbuf, "stat: cannot", strlen("stat: cannot")) == 0);
+    }
+    disconnect(c, 0);
+}
+
 // static long __test_callback_flags = 0;
 // static void __test_callback(redisContext *c, void *privdata) {
 //     ((void)c);
@@ -798,6 +881,7 @@ int main(int argc, char **argv) {
     test_invalid_timeout_errors(cfg);
     test_append_formatted_commands(cfg);
     if (throughput) test_throughput(cfg);
+    test_close_on_exec(cfg);
 
     printf("\nTesting against Unix socket connection (%s):\n", cfg.unix_sock.path);
     cfg.type = CONN_UNIX;

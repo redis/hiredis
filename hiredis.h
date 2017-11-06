@@ -37,6 +37,7 @@
 #include <stdarg.h> /* for va_list */
 #include <sys/time.h> /* for struct timeval */
 #include <stdint.h> /* uintXX_t, etc */
+#include <string.h> /* for strerror_r */
 #include "sds.h" /* for sds */
 
 #define HIREDIS_MAJOR 0
@@ -73,6 +74,9 @@
 
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
 #define REDIS_REUSEADDR 0x80
+
+/* Flag that is set when we should set FD_CLOEXEC when opening the socket */
+#define REDIS_CLOEXEC 0x100
 
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
@@ -167,6 +171,9 @@ redisContext *redisConnectBindNonBlock(const char *ip, int port,
                                        const char *source_addr);
 redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
                                                 const char *source_addr);
+redisContext *redisConnectCloseOnExec(const char *ip, int port);
+redisContext *redisConnectWithTimeoutCloseOnExec(const char *ip, int port, const struct timeval tv);
+redisContext *redisConnectNonBlockCloseOnExec(const char *ip, int port);
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
