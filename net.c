@@ -56,10 +56,10 @@
 
 #ifdef SOCK_CLOEXEC
 /* sock_cloexec is initialized to SOCK_CLOEXEC and cleared to zero if
- * a socket() call ever fails with EINVAL. */
+ * socket(2) ever fails with EINVAL when SOCK_CLOEXEC is set. */
 static int sock_cloexec = SOCK_CLOEXEC;
 #else
-#define sock_cloexec 0
+static int sock_cloexec = 0;
 #endif
 
 /* Defined in hiredis.c */
