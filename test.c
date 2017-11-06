@@ -881,7 +881,7 @@ int main(int argc, char **argv) {
     test_invalid_timeout_errors(cfg);
     test_append_formatted_commands(cfg);
     if (throughput) test_throughput(cfg);
-    test_non_inheritable_socket(cfg);
+    test_close_on_exec(cfg);
 
     printf("\nTesting against Unix socket connection (%s):\n", cfg.unix_sock.path);
     cfg.type = CONN_UNIX;
