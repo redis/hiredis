@@ -30,6 +30,9 @@
  */
 
 
+#ifdef __VXWORKS__
+#include "vxworks.h"
+#endif
 #include "fmacros.h"
 #include <string.h>
 #include <stdlib.h>

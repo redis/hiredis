@@ -1,0 +1,71 @@
+# The file ".wrmakefile" is the template used by the Wind River Workbench to
+# generate the makefiles of this project. Add user-specific build targets and
+# make rules only(!) in this project's ".wrmakefile" file. These will then be
+# automatically dumped into the makefiles.
+
+WIND_HOME := $(subst \,/,$(WIND_HOME))
+WIND_BASE := $(subst \,/,$(WIND_BASE))
+WIND_USR := $(subst \,/,$(WIND_USR))
+WRVX_COMPBASE := $(subst \,/,$(WRVX_COMPBASE))
+WIND_KRNL_MK := $(subst \,/,$(WIND_KRNL_MK))
+WIND_USR_MK := $(subst \,/,$(WIND_USR_MK))
+WIND_BUILD := $(subst \,/,$(WIND_BUILD))
+WIND_BUILD_TOOL := $(subst \,/,$(WIND_BUILD_TOOL))
+
+all : check_vsb pre_build main_all post_build
+
+_clean ::
+	@echo "make: removing targets and objects of `pwd`"
+
+%IDE_GENERATED%
+
+-include $(PRJ_ROOT_DIR)/*.makefile
+
+-include *.makefile
+
+TARGET_JOBS_RULE=$(MAKE) -f $(MAKEFILE) --jobs $(TARGET_JOBS) $(MFLAGS) $* TARGET_JOBS=1
+ifeq ($(JOBS),1)
+main_all : external_build $(PROJECT_TARGETS)
+	@echo "make: built targets of `pwd`"
+else
+main_all : external_build 
+	@$(MAKE) -f $(MAKEFILE) --jobs $(JOBS) $(MFLAGS) $(PROJECT_TARGETS) TARGET_JOBS=1 &&\
+	echo "make: built targets of `pwd`"
+endif 
+
+check_vsb :
+	@if [ "$(SKIP_VSB_CHECK)" = "" ]; then\
+		if [ -f $(WIND_BASE)/build/mk/scripts/check_vsb.sh ]; then\
+			jobsoption="";\
+			if [ "$(JOBS)" != "" ]; then\
+				jobsoption="-j $(JOBS)";\
+			fi;\
+			sh $(WIND_BASE)/build/mk/scripts/check_vsb.sh $$jobsoption $(VSB_DIR);\
+		fi;\
+	fi
+
+# entry point for extending the build
+external_build ::
+	@echo ""
+
+# main entry point for pre processing prior to the build
+pre_build :: check_objdirs $(PRE_BUILD_STEP) generate_sources
+	@echo ""
+
+# entry point for generating sources prior to the build
+generate_sources ::
+	@echo ""
+
+# main entry point for post processing after the build
+post_build :: $(POST_BUILD_STEP) deploy_output
+	@echo ""
+
+# entry point for deploying output after the build
+deploy_output ::
+	@echo ""
+
+clean :: external_clean $(CLEAN_STEP) _clean
+
+# entry point for extending the build clean
+external_clean ::
+	@echo ""

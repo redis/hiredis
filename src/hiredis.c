@@ -31,9 +31,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef __VXWORKS__
+#include "vxworks.h"
+#endif
 #include "fmacros.h"
 #include <string.h>
+#ifdef __VXWORKS__
+#include "stdlib.h"
+#else
 #include <stdlib.h>
+#endif
 #include <unistd.h>
 #include <assert.h>
 #include <errno.h>
