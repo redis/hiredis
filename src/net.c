@@ -34,10 +34,10 @@
 
 #ifdef __VXWORKS__
 #include "vxworks.h"
+#include "wrapper/wrapperHostLib.h"
 #else
 #include "fmacros.h"
 #endif
-#include "wrapper/wrapperHostLib.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
