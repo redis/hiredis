@@ -7,6 +7,9 @@
 
 void __redisSetError(redisContext *c, int type, const char *str);
 
+/**
+ * Callback used for debugging
+ */
 static void sslLogCallback(const SSL *ssl, int where, int ret) {
     const char *retstr = "";
     int should_log = 1;
@@ -96,7 +99,7 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
 
     redisSsl *s = c->ssl;
     s->ctx = SSL_CTX_new(SSLv23_client_method());
-    SSL_CTX_set_info_callback(s->ctx, sslLogCallback);
+    /* SSL_CTX_set_info_callback(s->ctx, sslLogCallback); */
     SSL_CTX_set_mode(s->ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_CTX_set_options(s->ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
     SSL_CTX_set_verify(s->ctx, SSL_VERIFY_PEER, NULL);
@@ -121,7 +124,6 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
             __redisSetError(c, REDIS_ERR, "Invalid client key");
             return REDIS_ERR;
         }
-        printf("Loaded certificate!\n");
     }
 
     s->ssl = SSL_new(s->ctx);
@@ -134,13 +136,10 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
     SSL_set_connect_state(s->ssl);
 
     c->flags |= REDIS_SSL;
-    printf("Before SSL_connect()\n");
     int rv = SSL_connect(c->ssl->ssl);
     if (rv == 1) {
-        printf("SSL_connect() success!\n");
         return REDIS_OK;
     }
-    printf("ConnectRV: %d\n", rv);
 
     rv = SSL_get_error(s->ssl, rv);
     if (((c->flags & REDIS_BLOCK) == 0) &&
@@ -150,9 +149,7 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
 
     if (c->err == 0) {
         __redisSetError(c, REDIS_ERR_IO, "SSL_connect() failed");
-        printf("rv: %d\n", rv);
     }
-    printf("ERROR!!!\n");
     return REDIS_ERR;
 }
 
