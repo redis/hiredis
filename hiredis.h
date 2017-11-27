@@ -74,6 +74,9 @@
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
 #define REDIS_REUSEADDR 0x80
 
+/* Flag that is set when this connection is done through SSL */
+#define REDIS_SSL 0x100
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
@@ -136,6 +139,8 @@ enum redisConnectionType {
     REDIS_CONN_UNIX
 };
 
+struct redisSsl;
+
 /* Context for a connection to Redis */
 typedef struct redisContext {
     int err; /* Error flags, 0 when there is no error */
@@ -158,6 +163,9 @@ typedef struct redisContext {
         char *path;
     } unix_sock;
 
+    /* For SSL communication */
+    struct redisSsl *ssl;
+
 } redisContext;
 
 redisContext *redisConnect(const char *ip, int port);
@@ -171,6 +179,13 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 redisContext *redisConnectFd(int fd);
+
+/**
+ * Secure the connection using SSL. This should be done before any command is
+ * executed on the connection.
+ */
+int redisSecureConnection(redisContext *c, const char *capath, const char *certpath,
+                          const char *keypath);
 
 /**
  * Reconnect the given context using the saved information.
