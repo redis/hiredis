@@ -3,8 +3,8 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ=net.o hiredis.o sds.o async.o read.o
-EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
+OBJ=net.o hiredis.o sds.o async.o read.o sslio.o
+EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib hiredis-example-ssl
 TESTS=hiredis-test
 LIBNAME=libhiredis
 PKGCONFNAME=hiredis.pc
@@ -53,6 +53,10 @@ DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(L
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=$(AR) rcs $(STLIBNAME)
 
+OPENSSL_PREFIX=/usr/local/opt/openssl
+CFLAGS+=-I$(OPENSSL_PREFIX)/include
+LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+
 # Platform-specific overrides
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 ifeq ($(uname_S),SunOS)
@@ -70,10 +74,11 @@ all: $(DYLIBNAME) $(STLIBNAME) hiredis-test $(PKGCONFNAME)
 # Deps (use make dep to generate this)
 async.o: async.c fmacros.h async.h hiredis.h read.h sds.h net.h dict.c dict.h
 dict.o: dict.c fmacros.h dict.h
-hiredis.o: hiredis.c fmacros.h hiredis.h read.h sds.h net.h
+hiredis.o: hiredis.c fmacros.h hiredis.h read.h sds.h net.h sslio.h
 net.o: net.c fmacros.h net.h hiredis.h read.h sds.h
 read.o: read.c fmacros.h read.h sds.h
 sds.o: sds.c sds.h
+sslio.o: sslio.c sslio.h hiredis.h
 test.o: test.c fmacros.h hiredis.h read.h sds.h
 
 $(DYLIBNAME): $(OBJ)
@@ -100,6 +105,9 @@ hiredis-example-ivykis: examples/example-ivykis.c adapters/ivykis.h $(STLIBNAME)
 
 hiredis-example-macosx: examples/example-macosx.c adapters/macosx.h $(STLIBNAME)
 	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -framework CoreFoundation $(STLIBNAME)
+
+hiredis-example-ssl: examples/example-ssl.c $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< $(STLIBNAME)
 
 ifndef AE_DIR
 hiredis-example-ae:
@@ -158,7 +166,7 @@ clean:
 	rm -rf $(DYLIBNAME) $(STLIBNAME) $(TESTS) $(PKGCONFNAME) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
 
 dep:
-	$(CC) -MM *.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MM *.c
 
 INSTALL?= cp -pPR
 

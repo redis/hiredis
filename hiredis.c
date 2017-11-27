@@ -42,6 +42,7 @@
 #include "hiredis.h"
 #include "net.h"
 #include "sds.h"
+#include "sslio.h"
 
 static redisReply *createReplyObject(int type);
 static void *createStringObject(const redisReadTask *task, char *str, size_t len);
@@ -614,7 +615,9 @@ void redisFree(redisContext *c) {
     free(c->unix_sock.path);
     free(c->timeout);
     free(c->saddr);
-    free(c);
+    if (c->ssl) {
+        redisFreeSsl(c->ssl);
+    }
 }
 
 int redisFreeKeepFd(redisContext *c) {
@@ -760,6 +763,11 @@ redisContext *redisConnectFd(int fd) {
     return c;
 }
 
+int redisSecureConnection(redisContext *c, const char *caPath,
+                          const char *certPath, const char *keyPath) {
+    return redisSslCreate(c, caPath, certPath, keyPath);
+}
+
 /* Set read/write timeout on a blocking socket. */
 int redisSetTimeout(redisContext *c, const struct timeval tv) {
     if (c->flags & REDIS_BLOCK)
@@ -772,6 +780,24 @@ int redisEnableKeepAlive(redisContext *c) {
     if (redisKeepAlive(c, REDIS_KEEPALIVE_INTERVAL) != REDIS_OK)
         return REDIS_ERR;
     return REDIS_OK;
+}
+
+static int rawRead(redisContext *c, char *buf, size_t bufcap) {
+    int nread = read(c->fd, buf, bufcap);
+    if (nread == -1) {
+        if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+            /* Try again later */
+            return 0;
+        } else {
+            __redisSetError(c, REDIS_ERR_IO, NULL);
+            return -1;
+        }
+    } else if (nread == 0) {
+        __redisSetError(c, REDIS_ERR_EOF, "Server closed the connection");
+        return -1;
+    } else {
+        return nread;
+    }
 }
 
 /* Use this function to handle a read event on the descriptor. It will try
@@ -787,24 +813,31 @@ int redisBufferRead(redisContext *c) {
     if (c->err)
         return REDIS_ERR;
 
-    nread = read(c->fd,buf,sizeof(buf));
-    if (nread == -1) {
+    nread = c->flags & REDIS_SSL ?
+        redisSslRead(c, buf, sizeof(buf)) : rawRead(c, buf, sizeof(buf));
+    if (nread > 0) {
+        if (redisReaderFeed(c->reader, buf, nread) != REDIS_OK) {
+            __redisSetError(c, c->reader->err, c->reader->errstr);
+            return REDIS_ERR;
+        } else {
+        }
+    } else if (nread < 0) {
+        return REDIS_ERR;
+    }
+    return REDIS_OK;
+}
+
+static int rawWrite(redisContext *c) {
+    int nwritten = write(c->fd, c->obuf, sdslen(c->obuf));
+    if (nwritten < 0) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
         } else {
-            __redisSetError(c,REDIS_ERR_IO,NULL);
-            return REDIS_ERR;
-        }
-    } else if (nread == 0) {
-        __redisSetError(c,REDIS_ERR_EOF,"Server closed the connection");
-        return REDIS_ERR;
-    } else {
-        if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
-            __redisSetError(c,c->reader->err,c->reader->errstr);
-            return REDIS_ERR;
+            __redisSetError(c, REDIS_ERR_IO, NULL);
+            return -1;
         }
     }
-    return REDIS_OK;
+    return nwritten;
 }
 
 /* Write the output buffer to the socket.
@@ -817,21 +850,15 @@ int redisBufferRead(redisContext *c) {
  * c->errstr to hold the appropriate error string.
  */
 int redisBufferWrite(redisContext *c, int *done) {
-    int nwritten;
 
     /* Return early when the context has seen an error. */
     if (c->err)
         return REDIS_ERR;
 
     if (sdslen(c->obuf) > 0) {
-        nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
-        if (nwritten == -1) {
-            if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
-                /* Try again later */
-            } else {
-                __redisSetError(c,REDIS_ERR_IO,NULL);
-                return REDIS_ERR;
-            }
+        int nwritten = (c->flags & REDIS_SSL) ? redisSslWrite(c) : rawWrite(c);
+        if (nwritten < 0) {
+            return REDIS_ERR;
         } else if (nwritten > 0) {
             if (nwritten == (signed)sdslen(c->obuf)) {
                 sdsfree(c->obuf);
