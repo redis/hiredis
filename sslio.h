@@ -33,6 +33,15 @@ typedef struct redisSsl {
      * previously called with in the event of an SSL_read/SSL_write situation
      */
     size_t lastLen;
+
+    /** Whether the SSL layer requires read (possibly before a write) */
+    int wantRead;
+
+    /**
+     * Whether a write was requested prior to a read. If set, the write()
+     * should resume whenever a read takes place, if possible
+     */
+    int pendingWrite;
 } redisSsl;
 
 struct redisContext;

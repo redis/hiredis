@@ -40,6 +40,7 @@
 #include "net.h"
 #include "dict.c"
 #include "sds.h"
+#include "sslio.h"
 
 #define _EL_ADD_READ(ctx) do { \
         if ((ctx)->ev.addRead) (ctx)->ev.addRead((ctx)->ev.data); \
@@ -511,6 +512,87 @@ static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
     return REDIS_OK;
 }
 
+#ifndef HIREDIS_NOSSL
+/**
+ * Handle SSL when socket becomes available for reading. This also handles
+ * read-while-write and write-while-read
+ */
+static void asyncSslRead(redisAsyncContext *ac) {
+    int rv;
+    redisSsl *ssl = ac->c.ssl;
+    redisContext *c = &ac->c;
+
+    ssl->wantRead = 0;
+
+    if (ssl->pendingWrite) {
+        int done;
+
+        /* This is probably just a write event */
+        ssl->pendingWrite = 0;
+        rv = redisBufferWrite(c, &done);
+        if (rv == REDIS_ERR) {
+            __redisAsyncDisconnect(ac);
+            return;
+        } else if (!done) {
+            _EL_ADD_WRITE(ac);
+        }
+    }
+
+    rv = redisBufferRead(c);
+    if (rv == REDIS_ERR) {
+        __redisAsyncDisconnect(ac);
+    } else {
+        _EL_ADD_READ(ac);
+        redisProcessCallbacks(ac);
+    }
+}
+
+/**
+ * Handle SSL when socket becomes available for writing
+ */
+static void asyncSslWrite(redisAsyncContext *ac) {
+    int rv, done = 0;
+    redisSsl *ssl = ac->c.ssl;
+    redisContext *c = &ac->c;
+
+    ssl->pendingWrite = 0;
+    rv = redisBufferWrite(c, &done);
+    if (rv == REDIS_ERR) {
+        __redisAsyncDisconnect(ac);
+        return;
+    }
+
+    if (!done) {
+        if (ssl->wantRead) {
+            /* Need to read-before-write */
+            ssl->pendingWrite = 1;
+            _EL_DEL_WRITE(ac);
+        } else {
+            /* No extra reads needed, just need to write more */
+            _EL_ADD_WRITE(ac);
+        }
+    } else {
+        /* Already done! */
+        _EL_DEL_WRITE(ac);
+    }
+
+    /* Always reschedule a read */
+    _EL_ADD_READ(ac);
+}
+#else
+
+/* Just so we're able to compile */
+static void asyncSslRead(redisAsyncContext *ac) {
+    abort();
+    (void)ac;
+}
+static void asyncSslWrite(redisAsyncContext *ac) {
+    abort();
+    (void)ac;
+}
+
+#endif
+
 /* This function should be called when the socket is readable.
  * It processes all replies that can be read and executes their callbacks.
  */
@@ -524,6 +606,11 @@ void redisAsyncHandleRead(redisAsyncContext *ac) {
         /* Try again later when the context is still not connected. */
         if (!(c->flags & REDIS_CONNECTED))
             return;
+    }
+
+    if (c->flags & REDIS_SSL) {
+        asyncSslRead(ac);
+        return;
     }
 
     if (redisBufferRead(c) == REDIS_ERR) {
@@ -546,6 +633,11 @@ void redisAsyncHandleWrite(redisAsyncContext *ac) {
         /* Try again later when the context is still not connected. */
         if (!(c->flags & REDIS_CONNECTED))
             return;
+    }
+
+    if (c->flags & REDIS_SSL) {
+        asyncSslWrite(ac);
+        return;
     }
 
     if (redisBufferWrite(c,&done) == REDIS_ERR) {

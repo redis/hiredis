@@ -99,7 +99,7 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
 
     redisSsl *s = c->ssl;
     s->ctx = SSL_CTX_new(SSLv23_client_method());
-    /* SSL_CTX_set_info_callback(s->ctx, sslLogCallback); */
+    SSL_CTX_set_info_callback(s->ctx, sslLogCallback);
     SSL_CTX_set_mode(s->ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_CTX_set_options(s->ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
     SSL_CTX_set_verify(s->ctx, SSL_VERIFY_PEER, NULL);
@@ -153,6 +153,22 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
     return REDIS_ERR;
 }
 
+static int maybeCheckWant(redisSsl *rssl, int rv) {
+    /**
+     * If the error is WANT_READ or WANT_WRITE, the appropriate flags are set
+     * and true is returned. False is returned otherwise
+     */
+    if (rv == SSL_ERROR_WANT_READ) {
+        rssl->wantRead = 1;
+        return 1;
+    } else if (rv == SSL_ERROR_WANT_WRITE) {
+        rssl->pendingWrite = 1;
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 int redisSslRead(redisContext *c, char *buf, size_t bufcap) {
     int nread = SSL_read(c->ssl->ssl, buf, bufcap);
     if (nread > 0) {
@@ -162,7 +178,7 @@ int redisSslRead(redisContext *c, char *buf, size_t bufcap) {
         return -1;
     } else {
         int err = SSL_get_error(c->ssl->ssl, nread);
-        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        if (maybeCheckWant(c->ssl, err)) {
             return 0;
         } else {
             __redisSetError(c, REDIS_ERR_IO, NULL);
@@ -181,7 +197,7 @@ int redisSslWrite(redisContext *c) {
         c->ssl->lastLen = len;
 
         int err = SSL_get_error(c->ssl->ssl, rv);
-        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        if (maybeCheckWant(c->ssl, err)) {
             return 0;
         } else {
             __redisSetError(c, REDIS_ERR_IO, NULL);
