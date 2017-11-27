@@ -4,7 +4,8 @@
 # This file is released under the BSD license, see the COPYING file
 
 OBJ=net.o hiredis.o sds.o async.o read.o sslio.o
-EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib hiredis-example-ssl
+EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib \
+		 hiredis-example-ssl hiredis-example-libevent-ssl
 TESTS=hiredis-test
 LIBNAME=libhiredis
 PKGCONFNAME=hiredis.pc
@@ -92,6 +93,9 @@ static: $(STLIBNAME)
 
 # Binaries:
 hiredis-example-libevent: examples/example-libevent.c adapters/libevent.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -levent $(STLIBNAME)
+
+hiredis-example-libevent-ssl: examples/example-libevent-ssl.c adapters/libevent.h $(STLIBNAME)
 	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -levent $(STLIBNAME)
 
 hiredis-example-libev: examples/example-libev.c adapters/libev.h $(STLIBNAME)
