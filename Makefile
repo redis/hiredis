@@ -161,7 +161,7 @@ clean:
 dep:
 	$(CC) -MM *.c
 
-ifeq ($(uname_S),SunOS)
+ifeq ($(uname_S),$(filter $(uname_S),SunOS OpenBSD))
   INSTALL?= cp -r
 endif
 
