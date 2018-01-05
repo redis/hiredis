@@ -16,6 +16,8 @@
 #define _XOPEN_SOURCE
 #elif defined(__FreeBSD__)
 // intentionally left blank, don't define _XOPEN_SOURCE
+#elif defined(AIX)
+// intentionally left blank, don't define _XOPEN_SOURCE
 #else
 #define _XOPEN_SOURCE
 #endif
@@ -26,6 +28,11 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 #define _OSX
+#endif
+
+#ifndef AIX
+# define _XOPEN_SOURCE_EXTENDED 1
+# define _ALL_SOURCE
 #endif
 
 #endif
