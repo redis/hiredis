@@ -55,7 +55,9 @@ STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=$(AR) rcs $(STLIBNAME)
 
 ifdef USE_SSL
-	OPENSSL_PREFIX=/usr/local/opt/openssl
+	# This is the prefix of openssl on my system. This should be the sane default
+	# based on the platform
+	OPENSSL_PREFIX?=/usr/local/opt/openssl
 	CFLAGS+=-I$(OPENSSL_PREFIX)/include -DHIREDIS_SSL
 	LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
 endif
