@@ -2,7 +2,7 @@
 #include "sslio.h"
 
 #include <assert.h>
-#ifndef HIREDIS_NOSSL
+#ifdef HIREDIS_SSL
 #include <pthread.h>
 
 void __redisSetError(redisContext *c, int type, const char *str);

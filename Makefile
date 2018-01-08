@@ -54,9 +54,11 @@ DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(L
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=$(AR) rcs $(STLIBNAME)
 
-OPENSSL_PREFIX=/usr/local/opt/openssl
-CFLAGS+=-I$(OPENSSL_PREFIX)/include
-LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+ifdef USE_SSL
+	OPENSSL_PREFIX=/usr/local/opt/openssl
+	CFLAGS+=-I$(OPENSSL_PREFIX)/include -DHIREDIS_SSL
+	LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+endif
 
 # Platform-specific overrides
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')

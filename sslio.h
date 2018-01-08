@@ -2,19 +2,26 @@
 #define REDIS_SSLIO_H
 
 
-#ifdef HIREDIS_NOSSL
+#ifndef HIREDIS_SSL
 typedef struct redisSsl {
-    int dummy;
+    size_t lastLen;
+    int wantRead;
+    int pendingWrite;
 } redisSsl;
-static void redisFreeSsl(redisSsl *) {
+static inline void redisFreeSsl(redisSsl *ssl) {
+    (void)ssl;
 }
-static int redisSslCreate(struct redisContext *c) {
+static inline int redisSslCreate(struct redisContext *c, const char *ca,
+                          const char *cert, const char *key) {
+    (void)c;(void)ca;(void)cert;(void)key;
     return REDIS_ERR;
 }
-static int redisSslRead(struct redisContect *c, char *s, size_t, n) {
+static inline int redisSslRead(struct redisContext *c, char *s, size_t n) {
+    (void)c;(void)s;(void)n;
     return -1;
 }
-static int redisSslWrite(struct redisContext *c) {
+static inline int redisSslWrite(struct redisContext *c) {
+    (void)c;
     return -1;
 }
 #else
@@ -53,5 +60,5 @@ int redisSslCreate(struct redisContext *c, const char *caPath,
 int redisSslRead(struct redisContext *c, char *buf, size_t bufcap);
 int redisSslWrite(struct redisContext *c);
 
-#endif /* !HIREDIS_NOSSL */
+#endif /* HIREDIS_SSL */
 #endif /* HIREDIS_SSLIO_H */
