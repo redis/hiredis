@@ -57,7 +57,7 @@ static void opensslDoLock(int mode, int lkid, const char *f, int line) {
     } else {
         sslLockRelease(l);
     }
-    
+
     (void)f;
     (void)line;
 }
