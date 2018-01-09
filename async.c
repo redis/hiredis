@@ -525,10 +525,12 @@ static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
     }
 }
 
-#ifndef HIREDIS_NOSSL
 /**
  * Handle SSL when socket becomes available for reading. This also handles
- * read-while-write and write-while-read
+ * read-while-write and write-while-read.
+ * 
+ * These functions will not work properly unless `HIREDIS_SSL` is defined
+ * (however, they will compile)
  */
 static void asyncSslRead(redisAsyncContext *ac) {
     int rv;
@@ -592,19 +594,6 @@ static void asyncSslWrite(redisAsyncContext *ac) {
     /* Always reschedule a read */
     _EL_ADD_READ(ac);
 }
-#else
-
-/* Just so we're able to compile */
-static void asyncSslRead(redisAsyncContext *ac) {
-    abort();
-    (void)ac;
-}
-static void asyncSslWrite(redisAsyncContext *ac) {
-    abort();
-    (void)ac;
-}
-
-#endif
 
 /* This function should be called when the socket is readable.
  * It processes all replies that can be read and executes their callbacks.
