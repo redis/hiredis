@@ -45,5 +45,6 @@ int redisContextConnectBindTcp(redisContext *c, const char *addr, int port,
                                const char *source_addr);
 int redisContextConnectUnix(redisContext *c, const char *path, const struct timeval *timeout);
 int redisKeepAlive(redisContext *c, int interval);
+int redisFinishAsyncConnect(redisContext *c, int *completed);
 
 #endif
