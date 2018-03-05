@@ -221,8 +221,10 @@ static int redisContextWaitReady(redisContext *c, long msec) {
             return REDIS_ERR;
         }
 
-        if (redisCheckSocketError(c) != REDIS_OK)
+        if (redisCheckConnectDone(c, &res) != REDIS_OK || res == 0) {
+            redisCheckSocketError(c);
             return REDIS_ERR;
+        }
 
         return REDIS_OK;
     }
@@ -232,7 +234,7 @@ static int redisContextWaitReady(redisContext *c, long msec) {
     return REDIS_ERR;
 }
 
-int redisFinishAsyncConnect(redisContext *c, int *completed) {
+int redisCheckConnectDone(redisContext *c, int *completed) {
     int rc = connect(c->fd, (const struct sockaddr *)c->saddr, c->addrlen);
     if (rc == 0) {
         *completed = 1;
@@ -410,8 +412,14 @@ addrretry:
             if (errno == EHOSTUNREACH) {
                 redisContextCloseFd(c);
                 continue;
-            } else if (errno == EINPROGRESS && !blocking) {
-                /* This is ok. */
+            } else if (errno == EINPROGRESS) {
+                if (blocking) {
+                    goto wait_for_ready;
+                }
+                /* This is ok.
+                 * Note that even when it's in blocking mode, we unset blocking
+                 * for `connect()`
+                 */
             } else if (errno == EADDRNOTAVAIL && reuseaddr) {
                 if (++reuses >= REDIS_CONNECT_RETRIES) {
                     goto error;
@@ -420,6 +428,7 @@ addrretry:
                     goto addrretry;
                 }
             } else {
+                wait_for_ready:
                 if (redisContextWaitReady(c,timeout_msec) != REDIS_OK)
                     goto error;
             }

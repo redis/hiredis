@@ -508,7 +508,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
     int completed = 0;
     redisContext *c = &(ac->c);
-    if (redisFinishAsyncConnect(c, &completed) == REDIS_ERR) {
+    if (redisCheckConnectDone(c, &completed) == REDIS_ERR) {
         /* Error! */
         redisCheckSocketError(c);
         if (ac->onConnect) ac->onConnect(ac, REDIS_ERR);
