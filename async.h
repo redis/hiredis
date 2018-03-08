@@ -57,6 +57,7 @@ typedef struct redisCallbackList {
 /* Connection callback prototypes */
 typedef void (redisDisconnectCallback)(const struct redisAsyncContext*, int status);
 typedef void (redisConnectCallback)(const struct redisAsyncContext*, int status);
+typedef void(redisTimerCallback)(void *timer, void *privdata);
 
 /* Context for an async connection to Redis */
 typedef struct redisAsyncContext {
@@ -81,6 +82,7 @@ typedef struct redisAsyncContext {
         void (*addWrite)(void *privdata);
         void (*delWrite)(void *privdata);
         void (*cleanup)(void *privdata);
+        void (*scheduleTimer)(void *privdata, struct timeval tv);
     } ev;
 
     /* Called when either the connection is terminated due to an error or per
@@ -113,12 +115,15 @@ redisAsyncContext *redisAsyncConnectBindWithReuse(const char *ip, int port,
 redisAsyncContext *redisAsyncConnectUnix(const char *path);
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
+
+void redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv);
 void redisAsyncDisconnect(redisAsyncContext *ac);
 void redisAsyncFree(redisAsyncContext *ac);
 
 /* Handle read/write events */
 void redisAsyncHandleRead(redisAsyncContext *ac);
 void redisAsyncHandleWrite(redisAsyncContext *ac);
+void redisAsyncHandleTimeout(redisAsyncContext *ac);
 
 /* Command functions for an async context. Write the command to the
  * output buffer and register the provided callback. */
