@@ -420,8 +420,6 @@ redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     if (r == NULL)
         return NULL;
 
-    r->err = 0;
-    r->errstr[0] = '\0';
     r->fn = fn;
     r->buf = sdsempty();
     r->maxbuf = REDIS_READER_MAX_BUF;

@@ -596,14 +596,8 @@ static redisContext *redisContextInit(void) {
     if (c == NULL)
         return NULL;
 
-    c->err = 0;
-    c->errstr[0] = '\0';
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
-    c->tcp.host = NULL;
-    c->tcp.source_addr = NULL;
-    c->unix_sock.path = NULL;
-    c->timeout = NULL;
 
     if (c->obuf == NULL || c->reader == NULL) {
         redisFree(c);
