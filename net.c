@@ -285,8 +285,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
      * This is a bit ugly, but atleast it works and doesn't leak memory.
      **/
     if (c->tcp.host != addr) {
-        if (c->tcp.host)
-            free(c->tcp.host);
+        free(c->tcp.host);
 
         c->tcp.host = strdup(addr);
     }
@@ -299,8 +298,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
             memcpy(c->timeout, timeout, sizeof(struct timeval));
         }
     } else {
-        if (c->timeout)
-            free(c->timeout);
+        free(c->timeout);
         c->timeout = NULL;
     }
 
@@ -452,8 +450,7 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
             memcpy(c->timeout, timeout, sizeof(struct timeval));
         }
     } else {
-        if (c->timeout)
-            free(c->timeout);
+        free(c->timeout);
         c->timeout = NULL;
     }
 
