@@ -37,10 +37,6 @@
 
 #include "hiredis.h"
 
-#if defined(__sun) || defined(AIX)
-#define AF_LOCAL AF_UNIX
-#endif
-
 int redisCheckSocketError(redisContext *c);
 int redisContextSetTimeout(redisContext *c, const struct timeval tv);
 int redisContextConnectTcp(redisContext *c, const char *addr, int port, const struct timeval *timeout);
