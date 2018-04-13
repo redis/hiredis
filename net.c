@@ -136,7 +136,7 @@ int redisKeepAlive(redisContext *c, int interval) {
 
     val = interval;
 
-#ifdef _OSX
+#if defined(__APPLE__) && defined(__MACH__)
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val)) < 0) {
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
         return REDIS_ERR;
