@@ -412,7 +412,10 @@ addrretry:
 error:
     rv = REDIS_ERR;
 end:
-    freeaddrinfo(servinfo);
+    if(servinfo) {
+        freeaddrinfo(servinfo);
+    }
+
     return rv;  // Need to return REDIS_OK if alright
 }
 
