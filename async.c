@@ -397,8 +397,11 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
                 /* If this was the last unsubscribe message, revert to
                  * non-subscribe mode. */
                 assert(reply->element[2]->type == REDIS_REPLY_INTEGER);
-                if (reply->element[2]->integer == 0)
+                if (reply->element[2]->integer == 0 
+                    && dictSize(ac->sub.channels) == 0 
+                    && dictSize(ac->sub.patterns) == 0) {
                     c->flags &= ~REDIS_SUBSCRIBED;
+                }
             }
         }
         sdsfree(sname);
@@ -616,7 +619,6 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
                 ret = dictReplace(ac->sub.patterns,sname,&cb);
             else
                 ret = dictReplace(ac->sub.channels,sname,&cb);
-
             if (ret == 0) sdsfree(sname);
         }
     } else if (strncasecmp(cstr,"unsubscribe\r\n",13) == 0) {
