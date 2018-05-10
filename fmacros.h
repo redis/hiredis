@@ -7,6 +7,7 @@
 #endif
 
 #if defined(__CYGWIN__)
+#define _POSIX_C_SOURCE 200112L
 #include <sys/cdefs.h>
 #endif
 
