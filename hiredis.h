@@ -83,7 +83,7 @@
 /* strerror_r has two completely different prototypes and behaviors
  * depending on system issues, so we need to operate on the error buffer
  * differently depending on which strerror_r we're using. */
-#ifndef _GNU_SOURCE
+#if ! (defined(_GNU_SOURCE) && defined(__GLIBC__))
 /* "regular" POSIX strerror_r that does the right thing. */
 #define __redis_strerror_r(errno, buf, len)                                    \
     do {                                                                       \
