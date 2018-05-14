@@ -52,11 +52,9 @@ static void __redisReaderSetError(redisReader *r, int type, const char *str) {
     }
 
     /* Clear input buffer on errors. */
-    if (r->buf != NULL) {
-        sdsfree(r->buf);
-        r->buf = NULL;
-        r->pos = r->len = 0;
-    }
+    sdsfree(r->buf);
+    r->buf = NULL;
+    r->pos = r->len = 0;
 
     /* Reset task stack. */
     r->ridx = -1;
@@ -420,8 +418,6 @@ redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     if (r == NULL)
         return NULL;
 
-    r->err = 0;
-    r->errstr[0] = '\0';
     r->fn = fn;
     r->buf = sdsempty();
     r->maxbuf = REDIS_READER_MAX_BUF;
@@ -435,10 +431,11 @@ redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
 }
 
 void redisReaderFree(redisReader *r) {
+    if (r == NULL)
+        return;
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
-    if (r->buf != NULL)
-        sdsfree(r->buf);
+    sdsfree(r->buf);
     free(r);
 }
 
