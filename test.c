@@ -302,6 +302,44 @@ static void test_reply_reader(void) {
               strncasecmp(reader->errstr,"No support for",14) == 0);
     redisReaderFree(reader);
 
+    test("Correctly parses LLONG_MAX: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ":9223372036854775807\r\n",22);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+            ((redisReply*)reply)->type == REDIS_REPLY_INTEGER &&
+            ((redisReply*)reply)->integer == LLONG_MAX);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error when > LLONG_MAX: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ":9223372036854775808\r\n",22);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad integer value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Correctly parses LLONG_MIN: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ":-9223372036854775808\r\n",23);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+            ((redisReply*)reply)->type == REDIS_REPLY_INTEGER &&
+            ((redisReply*)reply)->integer == LLONG_MIN);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error when < LLONG_MIN: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ":-9223372036854775809\r\n",23);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad integer value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
     test("Works with NULL functions for reply: ");
     reader = redisReaderCreate();
     reader->fn = NULL;

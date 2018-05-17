@@ -39,6 +39,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
+#include <limits.h>
 
 #include "read.h"
 #include "sds.h"
@@ -142,32 +143,24 @@ static char *seekNewline(char *s, size_t len) {
 }
 
 /* Read a long long value starting at *s, under the assumption that it will be
- * terminated by \r\n. Ambiguously returns -1 for unexpected input. */
-static long long readLongLong(char *s) {
-    long long v = 0;
-    int dec, mult = 1;
-    char c;
+ * terminated by \r\n. Returns REDIS_ERR for unexpected inputs or if the
+ * resulting value would be greater than LLONG_MAX. */
+static int readLongLong(char *s, long long* val) {
+    char* end;
+    errno = 0;
 
-    if (*s == '-') {
-        mult = -1;
-        s++;
-    } else if (*s == '+') {
-        mult = 1;
-        s++;
+    long long v = strtoll(s, &end, 10);
+
+    if(s == end || ((v == LLONG_MAX || v == LLONG_MIN) && errno == ERANGE)
+        || (*end != '\r' || *(end+1) != '\n')) {
+        return REDIS_ERR;
     }
 
-    while ((c = *(s++)) != '\r') {
-        dec = c - '0';
-        if (dec >= 0 && dec < 10) {
-            v *= 10;
-            v += dec;
-        } else {
-            /* Should not happen... */
-            return -1;
-        }
+    if(val) {
+        *val = v;
     }
 
-    return mult*v;
+    return REDIS_OK;
 }
 
 static char *readLine(redisReader *r, int *_len) {
@@ -218,10 +211,17 @@ static int processLineItem(redisReader *r) {
 
     if ((p = readLine(r,&len)) != NULL) {
         if (cur->type == REDIS_REPLY_INTEGER) {
-            if (r->fn && r->fn->createInteger)
-                obj = r->fn->createInteger(cur,readLongLong(p));
-            else
+            if (r->fn && r->fn->createInteger) {
+                long long v;
+                if(readLongLong(p, &v) == REDIS_ERR) {
+                    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                            "Bad integer value");
+                    return REDIS_ERR;
+                }
+                obj = r->fn->createInteger(cur,v);
+            } else {
                 obj = (void*)REDIS_REPLY_INTEGER;
+            }
         } else {
             /* Type will be error or status. */
             if (r->fn && r->fn->createString)
@@ -248,7 +248,7 @@ static int processBulkItem(redisReader *r) {
     redisReadTask *cur = &(r->rstack[r->ridx]);
     void *obj = NULL;
     char *p, *s;
-    long len;
+    long long len;
     unsigned long bytelen;
     int success = 0;
 
@@ -257,7 +257,12 @@ static int processBulkItem(redisReader *r) {
     if (s != NULL) {
         p = r->buf+r->pos;
         bytelen = s-(r->buf+r->pos)+2; /* include \r\n */
-        len = readLongLong(p);
+
+        if (readLongLong(p, &len) == REDIS_ERR) {
+            __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                    "Bad bulk string length");
+            return REDIS_ERR;
+        }
 
         if (len < 0) {
             /* The nil object can always be created. */
@@ -301,7 +306,7 @@ static int processMultiBulkItem(redisReader *r) {
     redisReadTask *cur = &(r->rstack[r->ridx]);
     void *obj;
     char *p;
-    long elements;
+    long long elements;
     int root = 0;
 
     /* Set error for nested multi bulks with depth > 7 */
@@ -312,7 +317,12 @@ static int processMultiBulkItem(redisReader *r) {
     }
 
     if ((p = readLine(r,NULL)) != NULL) {
-        elements = readLongLong(p);
+        if(readLongLong(p, &elements) == REDIS_ERR) {
+            __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                    "Bad multi-bulk length");
+            return REDIS_ERR;
+        }
+
         root = (r->ridx == 0);
 
         if (elements == -1) {
