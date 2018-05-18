@@ -264,7 +264,13 @@ static int processBulkItem(redisReader *r) {
             return REDIS_ERR;
         }
 
-        if (len < 0) {
+        if (len < -1 || (LLONG_MAX > SIZE_MAX && len > (long long)SIZE_MAX)) {
+            __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                    "Bulk string length out of range");
+            return REDIS_ERR;
+        }
+
+        if (len == -1) {
             /* The nil object can always be created. */
             if (r->fn && r->fn->createNil)
                 obj = r->fn->createNil(cur);
@@ -324,6 +330,12 @@ static int processMultiBulkItem(redisReader *r) {
         }
 
         root = (r->ridx == 0);
+
+        if(elements < -1 || elements > INT_MAX) {
+            __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                    "Multi-bulk length out of range");
+            return REDIS_ERR;
+        }
 
         if (elements == -1) {
             if (r->fn && r->fn->createNil)

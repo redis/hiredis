@@ -340,6 +340,44 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("Set error when array < -1: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "*-2\r\n+asdf\r\n",12);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Multi-bulk length out of range") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error when bulk < -1: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "$-2\r\nasdf\r\n",11);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bulk string length out of range") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error when array > INT_MAX: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "*9223372036854775807\r\n+asdf\r\n",29);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+            strcasecmp(reader->errstr,"Multi-bulk length out of range") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+#if LLONG_MAX > SIZE_MAX
+    test("Set error when bulk > SIZE_MAX: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "$9223372036854775807\r\nasdf\r\n",28);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+            strcasecmp(reader->errstr,"Bulk string length out of range") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+#endif
+
     test("Works with NULL functions for reply: ");
     reader = redisReaderCreate();
     reader->fn = NULL;
