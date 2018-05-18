@@ -14,6 +14,8 @@
 User code should compare this to `size_t` values as well.
 If it was used to compare to other values, casting might be necessary or can be removed, if casting was applied before.
 
+* `redisReplyObjectFunctions.createArray` now takes `size_t` for its length parameter.
+
 * Remove backwards compatibility macro's
 
 This removes the following old function aliases, use the new name now:

@@ -358,7 +358,8 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
-    test("Set error when array > INT_MAX: ");
+#if LLONG_MAX > SIZE_MAX
+    test("Set error when array > SIZE_MAX: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, "*9223372036854775807\r\n+asdf\r\n",29);
     ret = redisReaderGetReply(reader,&reply);
@@ -367,7 +368,6 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
-#if LLONG_MAX > SIZE_MAX
     test("Set error when bulk > SIZE_MAX: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, "$9223372036854775807\r\nasdf\r\n",28);
