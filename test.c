@@ -695,7 +695,7 @@ static void test_throughput(struct config config) {
     replies = malloc(sizeof(redisReply*)*num);
     t1 = usec();
     for (i = 0; i < num; i++) {
-        replies[i] = redisCommand(c, "INCRBY incrkey %lld", 10000000);
+        replies[i] = redisCommand(c, "INCRBY incrkey %d", 1000000);
         assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_INTEGER);
     }
     t2 = usec();
@@ -733,7 +733,7 @@ static void test_throughput(struct config config) {
 
     replies = malloc(sizeof(redisReply*)*num);
     for (i = 0; i < num; i++)
-        redisAppendCommand(c,"INCRBY incrkey %lld", 10000000);
+        redisAppendCommand(c,"INCRBY incrkey %d", 1000000);
     t1 = usec();
     for (i = 0; i < num; i++) {
         assert(redisGetReply(c, (void*)&replies[i]) == REDIS_OK);
