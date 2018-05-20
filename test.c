@@ -692,6 +692,17 @@ static void test_throughput(struct config config) {
     free(replies);
     printf("\t(%dx LRANGE with 500 elements: %.3fs)\n", num, (t2-t1)/1000000.0);
 
+    replies = malloc(sizeof(redisReply*)*num);
+    t1 = usec();
+    for (i = 0; i < num; i++) {
+        replies[i] = redisCommand(c, "INCRBY incrkey %lld", 10000000);
+        assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_INTEGER);
+    }
+    t2 = usec();
+    for (i = 0; i < num; i++) freeReplyObject(replies[i]);
+    free(replies);
+    printf("\t(%dx INCRBY: %.3fs)\n", num, (t2-t1)/1000000.0);
+
     num = 10000;
     replies = malloc(sizeof(redisReply*)*num);
     for (i = 0; i < num; i++)
@@ -719,6 +730,19 @@ static void test_throughput(struct config config) {
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
     free(replies);
     printf("\t(%dx LRANGE with 500 elements (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
+
+    replies = malloc(sizeof(redisReply*)*num);
+    for (i = 0; i < num; i++)
+        redisAppendCommand(c,"INCRBY incrkey %lld", 10000000);
+    t1 = usec();
+    for (i = 0; i < num; i++) {
+        assert(redisGetReply(c, (void*)&replies[i]) == REDIS_OK);
+        assert(replies[i] != NULL && replies[i]->type == REDIS_REPLY_INTEGER);
+    }
+    t2 = usec();
+    for (i = 0; i < num; i++) freeReplyObject(replies[i]);
+    free(replies);
+    printf("\t(%dx INCRBY (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
 
     disconnect(c, 0);
 }
