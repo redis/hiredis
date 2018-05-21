@@ -6,6 +6,9 @@
 * Import latest upstream sds. This breaks applications that are linked against the old hiredis v0.13
 * Fix warnings, when compiled with -Wshadow
 * Make hiredis compile in Cygwin on Windows, now CI-tested
+* Bulk and multi-bulk lengths less than -1 or greater than `LLONG_MAX` are now
+  protocol errors. This is consistent with the RESP specification. On 32-bit
+  platforms, the upper bound is lowered to `SIZE_MAX`.
 
 **BREAKING CHANGES**:
 
