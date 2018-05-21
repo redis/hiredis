@@ -42,7 +42,7 @@ CXX:=$(shell sh -c 'type $${CXX%% *} >/dev/null 2>/dev/null && echo $(CXX) || ec
 OPTIMIZATION?=-O3
 WARNINGS=-Wall -W -Wstrict-prototypes -Wwrite-strings
 DEBUG_FLAGS?= -g -ggdb
-REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(DEBUG_FLAGS)
+REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CFLAGS) $(WARNINGS) $(DEBUG_FLAGS) 
 REAL_LDFLAGS=$(LDFLAGS)
 
 DYLIBSUFFIX=so
@@ -53,6 +53,8 @@ DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
 DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=ar rcs $(STLIBNAME)
+
+USE_SSL:=1
 
 ifdef USE_SSL
 	# This is the prefix of openssl on my system. This should be the sane default
