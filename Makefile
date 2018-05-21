@@ -54,6 +54,8 @@ DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(L
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=$(AR) rcs $(STLIBNAME)
 
+USE_SSL:=1
+
 ifdef USE_SSL
 	# This is the prefix of openssl on my system. This should be the sane default
 	# based on the platform
