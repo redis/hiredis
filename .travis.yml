@@ -14,6 +14,21 @@ branches:
     - trying
     - master
 
+before_install:
+  - |
+    BAZEL_VERSION=0.16.0
+    if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
+      OS=darwin
+    else
+      sysctl kernel.unprivileged_userns_clone=1
+      OS=linux
+    fi
+    URL="https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-${OS}-x86_64.sh"
+    wget -O install.sh "${URL}"
+    chmod +x install.sh
+    ./install.sh --user
+    rm -f install.sh
+
 before_script:
     - if [ "$TRAVIS_OS_NAME" == "osx" ] ; then brew update; brew install redis; fi
 
@@ -42,4 +57,9 @@ matrix:
     - os: osx
       env: TARGET="32bit" TARGET_VARS="32bit-vars" PRE="valgrind --track-origins=yes --leak-check=full"
 
-script: make $TARGET CFLAGS="$CFLAGS" && make check PRE="$PRE" && make $TARGET_VARS hiredis-example
+script:
+    - make $TARGET CFLAGS="$CFLAGS"
+    - make check PRE="$PRE"
+    - make $TARGET_VARS hiredis-example
+    - bazel test //...
+    - cat bazel-testlogs/test/test.log

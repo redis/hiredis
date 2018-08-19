@@ -1,3 +1,4 @@
+/bazel-*
 /hiredis-test
 /examples/hiredis-example*
 /*.o
