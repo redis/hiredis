@@ -373,6 +373,10 @@ addrretry:
                 goto error;
             }
         }
+        if (blocking && redisSetBlocking(c,1) != REDIS_OK)
+            goto error;
+        if (redisSetTcpNoDelay(c) != REDIS_OK)
+            goto error;
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
                 redisContextCloseFd(c);
@@ -391,10 +395,6 @@ addrretry:
                     goto error;
             }
         }
-        if (blocking && redisSetBlocking(c,1) != REDIS_OK)
-            goto error;
-        if (redisSetTcpNoDelay(c) != REDIS_OK)
-            goto error;
 
         c->flags |= REDIS_CONNECTED;
         rv = REDIS_OK;
