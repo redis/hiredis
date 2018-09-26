@@ -38,7 +38,7 @@
 #include <errno.h>
 #include "async.h"
 #include "net.h"
-#include "dict.c"
+#include "dict_c.h"
 #include "sds.h"
 
 #define _EL_ADD_READ(ctx) do { \
@@ -408,7 +408,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
                 assert(reply->element[2]->type == REDIS_REPLY_INTEGER);
 
                 /* Unset subscribed flag only when no pipelined pending subscribe. */
-                if (reply->element[2]->integer == 0 
+                if (reply->element[2]->integer == 0
                     && dictSize(ac->sub.channels) == 0
                     && dictSize(ac->sub.patterns) == 0)
                     c->flags &= ~REDIS_SUBSCRIBED;

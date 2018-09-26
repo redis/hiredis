@@ -858,6 +858,8 @@ int main(int argc, char **argv) {
     };
     int throughput = 1;
     int test_inherit_fd = 1;
+    int tcp = 1;
+    int unix_sock = 1;
 
     /* Ignore broken pipe signal (for I/O error tests). */
     signal(SIGPIPE, SIG_IGN);
@@ -878,6 +880,10 @@ int main(int argc, char **argv) {
             throughput = 0;
         } else if (argc >= 1 && !strcmp(argv[0],"--skip-inherit-fd")) {
             test_inherit_fd = 0;
+        } else if (argc >= 1 && !strcmp(argv[0], "--skip-tcp")) {
+            tcp = 0;
+        } else if (argc >= 1 && !strcmp(argv[0], "--skip-unix-sock")) {
+            unix_sock = 0;
         } else {
             fprintf(stderr, "Invalid argument: %s\n", argv[0]);
             exit(1);
@@ -890,21 +896,29 @@ int main(int argc, char **argv) {
     test_blocking_connection_errors();
     test_free_null();
 
-    printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
-    cfg.type = CONN_TCP;
-    test_blocking_connection(cfg);
-    test_blocking_connection_timeouts(cfg);
-    test_blocking_io_errors(cfg);
-    test_invalid_timeout_errors(cfg);
-    test_append_formatted_commands(cfg);
-    if (throughput) test_throughput(cfg);
+    if (tcp) {
+        printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
+        cfg.type = CONN_TCP;
+        test_blocking_connection(cfg);
+        test_blocking_connection_timeouts(cfg);
+        test_blocking_io_errors(cfg);
+        test_invalid_timeout_errors(cfg);
+        test_append_formatted_commands(cfg);
+        if (throughput) {
+            test_throughput(cfg);
+        }
+    }
 
-    printf("\nTesting against Unix socket connection (%s):\n", cfg.unix_sock.path);
-    cfg.type = CONN_UNIX;
-    test_blocking_connection(cfg);
-    test_blocking_connection_timeouts(cfg);
-    test_blocking_io_errors(cfg);
-    if (throughput) test_throughput(cfg);
+    if (unix_sock) {
+        printf("\nTesting against Unix socket connection (%s):\n", cfg.unix_sock.path);
+        cfg.type = CONN_UNIX;
+        test_blocking_connection(cfg);
+        test_blocking_connection_timeouts(cfg);
+        test_blocking_io_errors(cfg);
+        if (throughput) {
+            test_throughput(cfg);
+        }
+    }
 
     if (test_inherit_fd) {
         printf("\nTesting against inherited fd (%s):\n", cfg.unix_sock.path);
