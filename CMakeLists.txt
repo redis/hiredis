@@ -18,6 +18,8 @@ getVersionBit(HIREDIS_PATCH)
 
 MESSAGE("Detected version: ${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
 
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR})
+
 ADD_LIBRARY(hiredis SHARED
     async.c
     dict.c
@@ -44,4 +46,5 @@ ADD_EXECUTABLE(hiredis-test
 TARGET_LINK_LIBRARIES(hiredis-test hiredis)
 
 # Add examples
+ADD_SUBDIRECTORY(examples)
 
