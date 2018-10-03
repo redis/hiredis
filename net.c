@@ -221,8 +221,10 @@ static int redisContextWaitReady(redisContext *c, long msec) {
             return REDIS_ERR;
         }
 
-        if (redisCheckSocketError(c) != REDIS_OK)
+        if (redisCheckConnectDone(c, &res) != REDIS_OK || res == 0) {
+            redisCheckSocketError(c);
             return REDIS_ERR;
+        }
 
         return REDIS_OK;
     }
@@ -232,13 +234,37 @@ static int redisContextWaitReady(redisContext *c, long msec) {
     return REDIS_ERR;
 }
 
+int redisCheckConnectDone(redisContext *c, int *completed) {
+    int rc = connect(c->fd, (const struct sockaddr *)c->saddr, c->addrlen);
+    if (rc == 0) {
+        *completed = 1;
+        return REDIS_OK;
+    }
+    switch (errno) {
+    case EISCONN:
+        *completed = 1;
+        return REDIS_OK;
+    case EALREADY:
+    case EINPROGRESS:
+    case EWOULDBLOCK:
+        *completed = 0;
+        return REDIS_OK;
+    default:
+        return REDIS_ERR;
+    }
+}
+
 int redisCheckSocketError(redisContext *c) {
-    int err = 0;
+    int err = 0, errno_saved = errno;
     socklen_t errlen = sizeof(err);
 
     if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"getsockopt(SO_ERROR)");
         return REDIS_ERR;
+    }
+
+    if (err == 0) {
+        err = errno_saved;
     }
 
     if (err) {
@@ -373,12 +399,27 @@ addrretry:
                 goto error;
             }
         }
+
+        /* For repeat connection */
+        if (c->saddr) {
+            free(c->saddr);
+        }
+        c->saddr = malloc(p->ai_addrlen);
+        memcpy(c->saddr, p->ai_addr, p->ai_addrlen);
+        c->addrlen = p->ai_addrlen;
+
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
                 redisContextCloseFd(c);
                 continue;
-            } else if (errno == EINPROGRESS && !blocking) {
-                /* This is ok. */
+            } else if (errno == EINPROGRESS) {
+                if (blocking) {
+                    goto wait_for_ready;
+                }
+                /* This is ok.
+                 * Note that even when it's in blocking mode, we unset blocking
+                 * for `connect()`
+                 */
             } else if (errno == EADDRNOTAVAIL && reuseaddr) {
                 if (++reuses >= REDIS_CONNECT_RETRIES) {
                     goto error;
@@ -387,6 +428,7 @@ addrretry:
                     goto addrretry;
                 }
             } else {
+                wait_for_ready:
                 if (redisContextWaitReady(c,timeout_msec) != REDIS_OK)
                     goto error;
             }

@@ -606,12 +606,14 @@ void redisFree(redisContext *c) {
         return;
     if (c->fd > 0)
         close(c->fd);
+
     sdsfree(c->obuf);
     redisReaderFree(c->reader);
     free(c->tcp.host);
     free(c->tcp.source_addr);
     free(c->unix_sock.path);
     free(c->timeout);
+    free(c->saddr);
     free(c);
 }
 
