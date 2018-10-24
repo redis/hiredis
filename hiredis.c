@@ -777,7 +777,7 @@ int redisEnableKeepAlive(redisContext *c) {
 /* Use this function to handle a read event on the descriptor. It will try
  * and read some bytes from the socket and feed them to the reply parser.
  *
- * After this function is called, you may use redisContextReadReply to
+ * After this function is called, you may use redisGetReplyFromReader to
  * see if there is a reply available. */
 int redisBufferRead(redisContext *c) {
     char buf[1024*16];
