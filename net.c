@@ -472,7 +472,7 @@ int redisContextConnectBindTcp(redisContext *c, const char *addr, int port,
 
 int redisContextConnectUnix(redisContext *c, const char *path, const struct timeval *timeout) {
     int blocking = (c->flags & REDIS_BLOCK);
-    struct sockaddr_un sa;
+    struct sockaddr_un *sa;
     long timeout_msec = -1;
 
     if (redisCreateSocket(c,AF_UNIX) < 0)
@@ -499,9 +499,10 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
     if (redisContextTimeoutMsec(c,&timeout_msec) != REDIS_OK)
         return REDIS_ERR;
 
-    sa.sun_family = AF_UNIX;
-    strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);
-    if (connect(c->fd, (struct sockaddr*)&sa, sizeof(sa)) == -1) {
+    sa = (struct sockaddr_un*)(c->saddr = malloc(sizeof(struct sockaddr_un)));
+    sa->sun_family = AF_UNIX;
+    strncpy(sa->sun_path,path,sizeof(sa->sun_path)-1);
+    if (connect(c->fd, (struct sockaddr*)sa, sizeof(*sa)) == -1) {
         if (errno == EINPROGRESS && !blocking) {
             /* This is ok. */
         } else {
