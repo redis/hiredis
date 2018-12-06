@@ -153,7 +153,7 @@ typedef struct {
 #define REDIS_OPTIONS_SET_TCP(opts, ip_, port_) \
     (opts)->type = REDIS_CONN_TCP; \
     (opts)->endpoint.tcp.ip = ip_; \
-    (opts)->endpoint.tcp.port = port;
+    (opts)->endpoint.tcp.port = port_;
 
 #define REDIS_OPTIONS_SET_UNIX(opts, path) \
     (opts)->type = REDIS_CONN_UNIX;        \
