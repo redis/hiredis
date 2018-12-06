@@ -112,10 +112,52 @@ void redisFreeSdsCommand(sds cmd);
 
 enum redisConnectionType {
     REDIS_CONN_TCP,
-    REDIS_CONN_UNIX
+    REDIS_CONN_UNIX,
+    REDIS_CONN_USERFD
 };
 
 struct redisSsl;
+
+#define REDIS_OPT_NONBLOCK 0x01
+#define REDIS_OPT_REUSEADDR 0x02
+
+typedef struct {
+    /*
+     * the type of connection to use. This also indicates which
+     * `endpoint` member field to use
+     */
+    int type;
+    /* bit field of REDIS_OPT_xxx */
+    int options;
+    /* timeout value. if NULL, no timeout is used */
+    const struct timeval *timeout;
+    union {
+        /** use this field for tcp/ip connections */
+        struct {
+            const char *source_addr;
+            const char *ip;
+            int port;
+        } tcp;
+        /** use this field for unix domain sockets */
+        const char *unix_socket;
+        /**
+         * use this field to have hiredis operate an already-open
+         * file descriptor */
+        int fd;
+    } endpoint;
+} redisOptions;
+
+/**
+ * Helper macros to initialize options to their specified fields.
+ */
+#define REDIS_OPTIONS_SET_TCP(opts, ip_, port_) \
+    (opts)->type = REDIS_CONN_TCP; \
+    (opts)->endpoint.tcp.ip = ip_; \
+    (opts)->endpoint.tcp.port = port;
+
+#define REDIS_OPTIONS_SET_UNIX(opts, path) \
+    (opts)->type = REDIS_CONN_UNIX;        \
+    (opts)->endpoint.unix_socket = path;
 
 /* Context for a connection to Redis */
 typedef struct redisContext {
@@ -147,6 +189,7 @@ typedef struct redisContext {
 
 } redisContext;
 
+redisContext *redisConnectWithOptions(const redisOptions *options);
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
