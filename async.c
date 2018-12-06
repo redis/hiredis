@@ -168,56 +168,52 @@ static void __redisAsyncCopyError(redisAsyncContext *ac) {
     ac->errstr = c->errstr;
 }
 
-redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
+redisAsyncContext *redisAsyncConnectWithOptions(const redisOptions *options) {
+    redisOptions myOptions = *options;
     redisContext *c;
     redisAsyncContext *ac;
 
-    c = redisConnectNonBlock(ip,port);
-    if (c == NULL)
+    myOptions.options |= REDIS_OPT_NONBLOCK;
+    c = redisConnectWithOptions(&myOptions);
+    if (c == NULL) {
         return NULL;
-
+    }
     ac = redisAsyncInitialize(c);
     if (ac == NULL) {
         redisFree(c);
         return NULL;
     }
-
     __redisAsyncCopyError(ac);
     return ac;
+}
+
+redisAsyncContext *redisAsyncConnect(const char *ip, int port) {
+    redisOptions options = {0};
+    REDIS_OPTIONS_SET_TCP(&options, ip, port);
+    return redisAsyncConnectWithOptions(&options);
 }
 
 redisAsyncContext *redisAsyncConnectBind(const char *ip, int port,
                                          const char *source_addr) {
-    redisContext *c = redisConnectBindNonBlock(ip,port,source_addr);
-    redisAsyncContext *ac = redisAsyncInitialize(c);
-    __redisAsyncCopyError(ac);
-    return ac;
+    redisOptions options = {0};
+    REDIS_OPTIONS_SET_TCP(&options, ip, port);
+    options.endpoint.tcp.source_addr = source_addr;
+    return redisAsyncConnectWithOptions(&options);
 }
 
 redisAsyncContext *redisAsyncConnectBindWithReuse(const char *ip, int port,
                                                   const char *source_addr) {
-    redisContext *c = redisConnectBindNonBlockWithReuse(ip,port,source_addr);
-    redisAsyncContext *ac = redisAsyncInitialize(c);
-    __redisAsyncCopyError(ac);
-    return ac;
+    redisOptions options = {0};
+    REDIS_OPTIONS_SET_TCP(&options, ip, port);
+    options.options |= REDIS_OPT_REUSEADDR;
+    options.endpoint.tcp.source_addr = source_addr;
+    return redisAsyncConnectWithOptions(&options);
 }
 
 redisAsyncContext *redisAsyncConnectUnix(const char *path) {
-    redisContext *c;
-    redisAsyncContext *ac;
-
-    c = redisConnectUnixNonBlock(path);
-    if (c == NULL)
-        return NULL;
-
-    ac = redisAsyncInitialize(c);
-    if (ac == NULL) {
-        redisFree(c);
-        return NULL;
-    }
-
-    __redisAsyncCopyError(ac);
-    return ac;
+    redisOptions options = {0};
+    REDIS_OPTIONS_SET_UNIX(&options, path);
+    return redisAsyncConnectWithOptions(&options);
 }
 
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn) {
