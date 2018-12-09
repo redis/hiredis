@@ -50,22 +50,28 @@ STLIBSUFFIX=a
 DYLIB_MINOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_SONAME)
 DYLIB_MAJOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR)
 DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
-DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
+DYLIB_MAKE_CMD=$(CC) -shared -Wl,-soname,$(DYLIB_MINOR_NAME) -o $(DYLIBNAME)
 STLIBNAME=$(LIBNAME).$(STLIBSUFFIX)
 STLIB_MAKE_CMD=$(AR) rcs $(STLIBNAME)
 
-USE_SSL:=1
+# Platform-specific overrides
+uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+
+USE_SSL?=1
 
 ifdef USE_SSL
 	# This is the prefix of openssl on my system. This should be the sane default
 	# based on the platform
-	OPENSSL_PREFIX?=/usr/local/opt/openssl
-	CFLAGS+=-I$(OPENSSL_PREFIX)/include -DHIREDIS_SSL
-	LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+	ifeq ($(uname_S),Linux)
+		CFLAGS+=-DHIREDIS_SSL
+		LDFLAGS+=-lssl -lcrypto
+	else
+		OPENSSL_PREFIX?=/usr/local/opt/openssl
+		CFLAGS+=-I$(OPENSSL_PREFIX)/include -DHIREDIS_SSL
+		LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+	endif
 endif
 
-# Platform-specific overrides
-uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 ifeq ($(uname_S),SunOS)
   REAL_LDFLAGS+= -ldl -lnsl -lsocket
   DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
@@ -89,7 +95,7 @@ sslio.o: sslio.c sslio.h hiredis.h
 test.o: test.c fmacros.h hiredis.h read.h sds.h
 
 $(DYLIBNAME): $(OBJ)
-	$(DYLIB_MAKE_CMD) $(OBJ)
+	$(DYLIB_MAKE_CMD) $(OBJ) $(REAL_LDFLAGS)
 
 $(STLIBNAME): $(OBJ)
 	$(STLIB_MAKE_CMD) $(OBJ)
@@ -99,25 +105,25 @@ static: $(STLIBNAME)
 
 # Binaries:
 hiredis-example-libevent: examples/example-libevent.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -levent $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -levent $(STLIBNAME) $(REAL_LDFLAGS)
 
 hiredis-example-libevent-ssl: examples/example-libevent-ssl.c adapters/libevent.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -levent $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -levent $(STLIBNAME) $(REAL_LDFLAGS)
 
 hiredis-example-libev: examples/example-libev.c adapters/libev.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -lev $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -lev $(STLIBNAME) $(REAL_LDFLAGS)
 
 hiredis-example-glib: examples/example-glib.c adapters/glib.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< $(shell pkg-config --cflags --libs glib-2.0) $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(shell pkg-config --cflags --libs glib-2.0) $(STLIBNAME) $(REAL_LDFLAGS)
 
 hiredis-example-ivykis: examples/example-ivykis.c adapters/ivykis.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -livykis $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -livykis $(STLIBNAME) $(REAL_LDFLAGS)
 
 hiredis-example-macosx: examples/example-macosx.c adapters/macosx.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< -framework CoreFoundation $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -framework CoreFoundation $(STLIBNAME) $(REAL_LDFLAGS)
 
 hiredis-example-ssl: examples/example-ssl.c $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(STLIBNAME) $(REAL_LDFLAGS)
 
 ifndef AE_DIR
 hiredis-example-ae:
@@ -134,7 +140,7 @@ hiredis-example-libuv:
 	@false
 else
 hiredis-example-libuv: examples/example-libuv.c adapters/libuv.h $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. -I$(LIBUV_DIR)/include $< $(LIBUV_DIR)/.libs/libuv.a -lpthread -lrt $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. -I$(LIBUV_DIR)/include $< $(LIBUV_DIR)/.libs/libuv.a -lpthread -lrt $(STLIBNAME) $(REAL_LDFLAGS)
 endif
 
 ifeq ($(and $(QT_MOC),$(QT_INCLUDE_DIR),$(QT_LIBRARY_DIR)),)
@@ -151,14 +157,14 @@ hiredis-example-qt: examples/example-qt.cpp adapters/qt.h $(STLIBNAME)
 endif
 
 hiredis-example: examples/example.c $(STLIBNAME)
-	$(CC) -o examples/$@ $(REAL_CFLAGS) $(REAL_LDFLAGS) -I. $< $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(STLIBNAME) $(REAL_LDFLAGS)
 
 examples: $(EXAMPLES)
 
 hiredis-test: test.o $(STLIBNAME)
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) $(REAL_CFLAGS) -o $@ $(REAL_LDFLAGS) $< $(STLIBNAME)
+	$(CC) $(REAL_CFLAGS) -o $@ $< $(STLIBNAME) $(REAL_LDFLAGS)
 
 test: hiredis-test
 	./hiredis-test
@@ -191,11 +197,14 @@ $(PKGCONFNAME): hiredis.h
 	@echo Description: Minimalistic C client library for Redis. >> $@
 	@echo Version: $(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(HIREDIS_PATCH) >> $@
 	@echo Libs: -L\$${libdir} -lhiredis >> $@
+ifdef USE_SSL
+	@echo Libs.private: lssl -lcrypto >> $@
+endif
 	@echo Cflags: -I\$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
 
 install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_INCLUDE_PATH)/adapters $(INSTALL_LIBRARY_PATH)
-	$(INSTALL) hiredis.h async.h read.h sds.h $(INSTALL_INCLUDE_PATH)
+	$(INSTALL) hiredis.h async.h read.h sds.h sslio.h $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) adapters/*.h $(INSTALL_INCLUDE_PATH)/adapters
 	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIBNAME)
