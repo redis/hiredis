@@ -591,21 +591,14 @@ static redisContext *redisContextInit(const redisOptions *options) {
     if (c == NULL)
         return NULL;
 
-    c->err = 0;
-    c->errstr[0] = '\0';
     c->obuf = sdsempty();
-    c->flags = 0;
-    c->tcp.host = NULL;
-    c->tcp.source_addr = NULL;
-    c->unix_sock.path = NULL;
-    c->timeout = NULL;
     c->reader = redisReaderCreate();
 
     if (c->obuf == NULL || c->reader == NULL) {
         redisFree(c);
         return NULL;
     }
-
+    (void)options; /* options are used in other functions */
     return c;
 }
 
@@ -753,7 +746,8 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
 }
 
 redisContext *redisConnectFd(int fd) {
-    redisOptions options = {REDIS_CONN_USERFD};
+    redisOptions options = {0};
+    options.type = REDIS_CONN_USERFD;
     options.endpoint.fd = fd;
     return redisConnectWithOptions(&options);
 }
