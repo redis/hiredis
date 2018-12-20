@@ -207,7 +207,7 @@ redisContext *redisConnectFd(int fd);
  * executed on the connection.
  */
 int redisSecureConnection(redisContext *c, const char *capath, const char *certpath,
-                          const char *keypath);
+                          const char *keypath, const char *servername);
 
 /**
  * Reconnect the given context using the saved information.

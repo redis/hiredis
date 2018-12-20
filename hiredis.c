@@ -753,8 +753,8 @@ redisContext *redisConnectFd(int fd) {
 }
 
 int redisSecureConnection(redisContext *c, const char *caPath,
-                          const char *certPath, const char *keyPath) {
-    return redisSslCreate(c, caPath, certPath, keyPath);
+                          const char *certPath, const char *keyPath, const char *servername) {
+    return redisSslCreate(c, caPath, certPath, keyPath, servername);
 }
 
 /* Set read/write timeout on a blocking socket. */

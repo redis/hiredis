@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    if (redisSecureConnection(c, ca, cert, key) != REDIS_OK) {
+    if (redisSecureConnection(c, ca, cert, key, "sni") != REDIS_OK) {
         printf("Couldn't initialize SSL!\n");
         printf("Error: %s\n", c->errstr);
         redisFree(c);

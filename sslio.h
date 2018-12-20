@@ -12,8 +12,8 @@ static inline void redisFreeSsl(redisSsl *ssl) {
     (void)ssl;
 }
 static inline int redisSslCreate(struct redisContext *c, const char *ca,
-                          const char *cert, const char *key) {
-    (void)c;(void)ca;(void)cert;(void)key;
+                          const char *cert, const char *key, const char *servername) {
+    (void)c;(void)ca;(void)cert;(void)key;(void)servername;
     return REDIS_ERR;
 }
 static inline int redisSslRead(struct redisContext *c, char *s, size_t n) {
@@ -55,7 +55,7 @@ struct redisContext;
 
 void redisFreeSsl(redisSsl *);
 int redisSslCreate(struct redisContext *c, const char *caPath,
-                   const char *certPath, const char *keyPath);
+                   const char *certPath, const char *keyPath, const char *servername);
 
 int redisSslRead(struct redisContext *c, char *buf, size_t bufcap);
 int redisSslWrite(struct redisContext *c);

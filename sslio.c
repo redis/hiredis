@@ -87,7 +87,7 @@ void redisFreeSsl(redisSsl *ssl){
 }
 
 int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
-                   const char *keypath) {
+                   const char *keypath, const char *servername) {
     assert(!c->ssl);
     c->ssl = calloc(1, sizeof(*c->ssl));
     static int isInit = 0;
@@ -130,6 +130,12 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
     if (!s->ssl) {
         __redisSetError(c, REDIS_ERR, "Couldn't create new SSL instance");
         return REDIS_ERR;
+    }
+    if (servername) {
+        if (!SSL_set_tlsext_host_name(s->ssl, servername)) {
+            __redisSetError(c, REDIS_ERR, "Couldn't set server name indication");
+            return REDIS_ERR;
+        }
     }
 
     SSL_set_fd(s->ssl, c->fd);

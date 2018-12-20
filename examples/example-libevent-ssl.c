@@ -57,7 +57,7 @@ int main (int argc, char **argv) {
         printf("Error: %s\n", c->errstr);
         return 1;
     }
-    if (redisSecureConnection(&c->c, caCert, cert, certKey) != REDIS_OK) {
+    if (redisSecureConnection(&c->c, caCert, cert, certKey, "sni") != REDIS_OK) {
         printf("SSL Error!\n");
         exit(1);
     }
