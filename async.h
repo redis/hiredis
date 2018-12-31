@@ -128,8 +128,13 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac);
 void redisAsyncRead(redisAsyncContext *ac);
 void redisAsyncWrite(redisAsyncContext *ac);
 
-/* Command functions for an async context. Write the command to the
- * output buffer and register the provided callback. */
+/* Append functions for an async context. Write the command to the output buffer and register the provided callback. */
+int redisvAsyncAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, va_list ap);
+int redisAsyncAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, ...);
+int redisAsyncAppendArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
+int redisAsyncFormattedAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len);
+
+/* Command functions for an async context. Append the command and trigger WRITE-EVENT */
 int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, va_list ap);
 int redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, ...);
 int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
