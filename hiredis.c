@@ -638,15 +638,15 @@ void redisFreeCommand(char *cmd) {
     free(cmd);
 }
 
-void __redisSetError(redisContext *c, int type, const char *format, ...) {
-    va_list args;
+void __redisSetError(redisContext *c, int type, const char *str) {
+    size_t len;
 
     c->err = type;
-    if (format != NULL) {
-        va_start(args, format);
-        /* We ignore return value since SetError has no return code */
-        (void) vsnprintf(c->errstr, sizeof(c->errstr), format, args);
-        va_end(args);
+    if (str != NULL) {
+        len = strlen(str);
+        len = len < (sizeof(c->errstr)-1) ? len : (sizeof(c->errstr)-1);
+        memcpy(c->errstr,str,len);
+        c->errstr[len] = '\0';
     } else {
         /* Only REDIS_ERR_IO may lack a description! */
         assert(type == REDIS_ERR_IO);

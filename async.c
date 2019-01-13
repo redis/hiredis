@@ -29,7 +29,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "fmacros.h"
 #include <stdlib.h>
 #include <string.h>
@@ -53,14 +52,14 @@ int __redisAppendCommand(redisContext *, const char *, size_t);
 
 /* Functions managing dictionary of callbacks for pub/sub. */
 static unsigned int callbackHash(const void *key) {
-    return dictGenHashFunction((const unsigned char *)key, sdslen((const sds)key));
+    return dictGenHashFunction(key, sdslen((const sds) key));
 }
 
 static void *callbackValDup(void *privdata, const void *src) {
     redisCallback *dup;
     ((void) privdata);
 
-    if (NULL != (dup = (redisCallback *)malloc(sizeof(*dup))))
+    if (NULL != (dup = malloc(sizeof(*dup))))
         memcpy(dup, src, sizeof(*dup));
 
     return dup;
@@ -100,7 +99,7 @@ static dictType callbackDict = {
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac;
 
-    ac = (redisAsyncContext *)realloc(c,sizeof(redisAsyncContext));
+    ac = realloc(c,sizeof(redisAsyncContext));
     if (ac == NULL)
         return NULL;
 
@@ -144,6 +143,16 @@ static void __redisAsyncCopyError(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     ac->err = c->err;
     ac->errstr = c->errstr;
+}
+
+static void __redisAsyncSetError(redisAsyncContext *ctx, int err_type, const char *msg) {
+    /* Set the errstr if not already set */
+    if (NULL == ctx->errstr) {
+        ctx->errstr = ctx->c.errstr;
+    }
+
+    ctx->err = err_type;
+    __redisSetError(&ctx->c, err_type, msg);
 }
 
 redisAsyncContext *redisAsyncConnectWithOptions(const redisOptions *options) {
@@ -328,7 +337,8 @@ void __redisAsyncDisconnect(redisAsyncContext *ac) {
 
     if (ac->err == 0) {
         /* For clean disconnects, there should be no pending callbacks. */
-        assert(__redisShiftCallback(&ac->replies,NULL) == REDIS_ERR);
+        int ret = __redisShiftCallback(&ac->replies,NULL);
+        assert(ret == REDIS_ERR);
     } else {
         /* Disconnection is caused by an error, make sure that pending
          * callbacks cannot call new commands. */
@@ -587,8 +597,6 @@ void redisAsyncHandleWrite(redisAsyncContext *ac) {
     c->funcs->async_write(ac);
 }
 
-void __redisSetError(redisContext *c, int type, const char *str);
-
 void redisAsyncHandleTimeout(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     redisCallback cb;
@@ -599,7 +607,7 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
     }
 
     if (!c->err) {
-        __redisSetError(c, REDIS_ERR_TIMEOUT, "Timeout");
+        __redisAsyncSetError(ac, REDIS_ERR_TIMEOUT, "Timeout");
     }
 
     if (!(c->flags & REDIS_CONNECTED) && ac->onConnect) {
@@ -659,8 +667,7 @@ static int __redisAsyncAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *
 
     /* Find out which command will be appended. */
     if (NULL == (p = nextArgument(cmd,&cstr,&clen))) {
-        __redisSetError(c, REDIS_ERR_PROTOCOL, "Invalid command format");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac, REDIS_ERR_PROTOCOL, "Invalid command format");
         return REDIS_ERR;
     }
 
@@ -676,9 +683,9 @@ static int __redisAsyncAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *
     /* Make sure we can append command before making it's callback - Delegate error */
     if (REDIS_OK != (ret = __redisAppendCommand(c,cmd,len))) return ret;
 
-#define SAFE_PUSHCALLBACK(cb_list) \
+#define PUSH_CALLBACK(cb_list) \
     if (REDIS_OK != (ret = __redisPushCallback(&ac->cb_list, &cb))) { \
-        __redisSetError(c, ret, "PushCallback failure"); \
+        __redisAsyncSetError(ac, ret, "PushCallback failure"); \
         goto oom_error; \
     }
 
@@ -688,7 +695,7 @@ static int __redisAsyncAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *
         /* Add every channel/pattern to the list of subscription callbacks. */
         while (NULL != (p = nextArgument(p,&astr,&alen))) {
             if (NULL == (sname = sdsnewlen(astr,alen))) {
-                __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+                __redisAsyncSetError(ac, REDIS_ERR_OOM, "Out of memory");
                 goto oom_error;
             }
 
@@ -719,25 +726,28 @@ static int __redisAsyncAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *
     } else if(strncasecmp(cstr,"monitor\r\n",9) == 0) {
         /* Set monitor flag and push callback */
         c->flags |= REDIS_MONITORING;
-        SAFE_PUSHCALLBACK(replies)
+        PUSH_CALLBACK(replies)
     } else {
         if (c->flags & REDIS_SUBSCRIBED) {
             /* This will likely result in an error reply, but it needs to be
              * received and passed to the callback. */
-            SAFE_PUSHCALLBACK(sub.invalid)
+            PUSH_CALLBACK(sub.invalid)
         } else {
-            SAFE_PUSHCALLBACK(replies)
+            PUSH_CALLBACK(replies)
         }
     }
-#undef SAFE_PUSHCALLBACK
+#undef PUSH_CALLBACK
 
     return REDIS_OK;
 
 oom_error:
-    /* Rollback the obuf [size still allocated] */
+    /* Rollback the obuf data */
     clen = sdslen(c->obuf) - len;
     sdssetlen(c->obuf, clen);
     c->obuf[clen] = '\0';
+
+    /* Free unused obuf space */
+    c->obuf = sdsRemoveFreeSpace(c->obuf);
 
     /* Return error occured */
     __redisAsyncCopyError(ac);
@@ -752,16 +762,13 @@ int redisvAsyncAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata
 
     /* We don't want to pass -1 or -2 to future functions as a length. */
     if (-1 == len) {
-        __redisSetError(&ac->c,REDIS_ERR_OOM,"Out of memory");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac,REDIS_ERR_OOM,"Out of memory");
         return REDIS_ERR;
     } else if (-2 == len) {
-        __redisSetError(&ac->c,REDIS_ERR_OTHER,"Invalid format string");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac,REDIS_ERR_OTHER,"Invalid format string");
         return REDIS_ERR;
     } else if (0 > len) {
-        __redisSetError(&ac->c,REDIS_ERR_OTHER,"Unknown format error");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac,REDIS_ERR_OTHER,"Unknown format error");
         return REDIS_ERR;
     }
 
@@ -788,12 +795,10 @@ int redisAsyncAppendArgv(   redisAsyncContext *ac,
     len = redisFormatSdsCommandArgv(&cmd, argc, argv, argvlen);
 
     if (-1 == len) {
-        __redisSetError(&ac->c,REDIS_ERR_OOM,"Out of memory");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac,REDIS_ERR_OOM,"Out of memory");
         return REDIS_ERR;
     } else if (0 > len) {
-        __redisSetError(&ac->c,REDIS_ERR_OTHER,"Unknown format error");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac,REDIS_ERR_OTHER,"Unknown format error");
         return REDIS_ERR;
     }
 
@@ -828,17 +833,14 @@ int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdat
     len = redisvFormatCommand(&cmd,format,ap);
 
     /* We don't want to pass -1 or -2 to future functions as a length. */
-    if (len == -1) {
-        __redisSetError(&ac->c,REDIS_ERR_OOM,"Out of memory");
-        __redisAsyncCopyError(ac);
+    if (-1 == len) {
+        __redisAsyncSetError(ac,REDIS_ERR_OOM,"Out of memory");
         return REDIS_ERR;
-    } else if (len == -2) {
-        __redisSetError(&ac->c,REDIS_ERR_OTHER,"Invalid format string");
-        __redisAsyncCopyError(ac);
+    } else if (-2 == len) {
+        __redisAsyncSetError(ac,REDIS_ERR_OTHER,"Invalid format string");
         return REDIS_ERR;
     } else if (0 > len) {
-        __redisSetError(&ac->c,REDIS_ERR_OTHER,"Unknown format error");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac,REDIS_ERR_OTHER,"Unknown format error");
         return REDIS_ERR;
     }
 
@@ -863,12 +865,10 @@ int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *priv
     len = redisFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
 
     if (-1 == len) {
-        __redisSetError(&ac->c,REDIS_ERR_OOM,"Out of memory");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac,REDIS_ERR_OOM,"Out of memory");
         return REDIS_ERR;
     } else if (0 > len) {
-        __redisSetError(&ac->c,REDIS_ERR_OTHER,"Unknown format error");
-        __redisAsyncCopyError(ac);
+        __redisAsyncSetError(ac,REDIS_ERR_OTHER,"Unknown format error");
         return REDIS_ERR;
     }
 
