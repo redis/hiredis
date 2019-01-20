@@ -618,6 +618,7 @@ void redisFree(redisContext *c) {
     if (c->ssl) {
         redisFreeSsl(c->ssl);
     }
+    free(c);
 }
 
 int redisFreeKeepFd(redisContext *c) {

@@ -48,10 +48,10 @@ static void redisLibeventHandler(int fd, short event, void *arg) {
     if (event & EV_TIMEOUT) {
         redisAsyncHandleTimeout(e->context);
     }
-    if (e->context && (event & EV_READ)) {
+    if ((event & EV_READ) && e->context) {
         redisAsyncHandleRead(e->context);
     }
-    if (e->context && (event & EV_WRITE)) {
+    if ((event & EV_WRITE) && e->context) {
         redisAsyncHandleWrite(e->context);
     }
 }
@@ -107,7 +107,6 @@ static void redisLibeventSetTimeout(void *privdata, struct timeval tv) {
     short flags = e->flags;
     e->flags = 0;
     e->tv = tv;
-    event_del(e->ev);
     redisLibeventUpdate(e, flags, 0);
 }
 
