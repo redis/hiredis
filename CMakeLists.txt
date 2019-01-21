@@ -46,12 +46,12 @@ INSTALL(FILES hiredis.h read.h sds.h async.h
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
-# Add tests: Currently, I don't know how to make the tests actually run
-# without hanging!
 ENABLE_TESTING()
 ADD_EXECUTABLE(hiredis-test
     test.c)
 TARGET_LINK_LIBRARIES(hiredis-test hiredis)
+ADD_TEST(NAME hiredis-test
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test.sh)
 
 # Add examples
 IF(ENABLE_EXAMPLES)
