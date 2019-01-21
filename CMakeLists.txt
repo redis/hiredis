@@ -18,7 +18,8 @@ getVersionBit(HIREDIS_MAJOR)
 getVersionBit(HIREDIS_MINOR)
 getVersionBit(HIREDIS_PATCH)
 
-MESSAGE("Detected version: ${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
+SET(VERSION "${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
+MESSAGE("Detected version: ${VERSION}")
 
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR})
 
@@ -32,13 +33,18 @@ ADD_LIBRARY(hiredis SHARED
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES
-    VERSION "${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
+    VERSION "${VERSION}")
+
+CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
 INSTALL(TARGETS hiredis
     DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
 INSTALL(FILES hiredis.h read.h sds.h async.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
+
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 # Add tests: Currently, I don't know how to make the tests actually run
 # without hanging!
