@@ -2,6 +2,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 INCLUDE(GNUInstallDirs)
 PROJECT(redisearch)
 
+SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
+
 # Get the version numbers
 MACRO(getVersionBit name)
 
@@ -46,5 +48,6 @@ ADD_EXECUTABLE(hiredis-test
 TARGET_LINK_LIBRARIES(hiredis-test hiredis)
 
 # Add examples
-ADD_SUBDIRECTORY(examples)
-
+IF(ENABLE_EXAMPLES)
+  ADD_SUBDIRECTORY(examples)
+ENDIF(ENABLE_EXAMPLES)
