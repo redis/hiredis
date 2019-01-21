@@ -22,4 +22,4 @@ bind 127.0.0.1
 unixsocket ${SOCK_FILE}
 EOF
 
-./hiredis-test -h 127.0.0.1 -p ${REDIS_PORT} -s ${SOCK_FILE}
+${TEST_PREFIX:-} ./hiredis-test -h 127.0.0.1 -p ${REDIS_PORT} -s ${SOCK_FILE}
