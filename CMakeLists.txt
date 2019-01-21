@@ -1,25 +1,22 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 INCLUDE(GNUInstallDirs)
-PROJECT(redisearch)
 
-SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
-
-# Get the version numbers
 MACRO(getVersionBit name)
-
-EXECUTE_PROCESS(
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-    COMMAND grep "${name}" hiredis.h COMMAND awk "{print $3}"
-    OUTPUT_VARIABLE "${name}"
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  SET(VERSION_REGEX "^#define ${name} (.+)$")
+  FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/hiredis.h"
+    VERSION_BIT REGEX ${VERSION_REGEX})
+  STRING(REGEX REPLACE ${VERSION_REGEX} "\\1" ${name} "${VERSION_BIT}")
 ENDMACRO(getVersionBit)
 
 getVersionBit(HIREDIS_MAJOR)
 getVersionBit(HIREDIS_MINOR)
 getVersionBit(HIREDIS_PATCH)
-
 SET(VERSION "${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
 MESSAGE("Detected version: ${VERSION}")
+
+PROJECT(hiredis VERSION "${VERSION}")
+
+SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR})
 
