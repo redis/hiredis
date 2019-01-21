@@ -37,7 +37,7 @@ SET_TARGET_PROPERTIES(hiredis
 INSTALL(TARGETS hiredis
     DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
-INSTALL(FILES hiredis.h read.h sds.h
+INSTALL(FILES hiredis.h read.h sds.h async.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
 
 # Add tests: Currently, I don't know how to make the tests actually run
