@@ -11,6 +11,7 @@ ENDMACRO(getVersionBit)
 getVersionBit(HIREDIS_MAJOR)
 getVersionBit(HIREDIS_MINOR)
 getVersionBit(HIREDIS_PATCH)
+getVersionBit(HIREDIS_SONAME)
 SET(VERSION "${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
 MESSAGE("Detected version: ${VERSION}")
 
@@ -30,7 +31,7 @@ ADD_LIBRARY(hiredis SHARED
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES
-    VERSION "${VERSION}")
+    VERSION "${HIREDIS_SONAME}")
 
 CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
