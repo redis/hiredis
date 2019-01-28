@@ -500,6 +500,7 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
         return REDIS_ERR;
 
     sa = (struct sockaddr_un*)(c->saddr = malloc(sizeof(struct sockaddr_un)));
+    c->addrlen = sizeof(struct sockaddr_un);
     sa->sun_family = AF_UNIX;
     strncpy(sa->sun_path,path,sizeof(sa->sun_path)-1);
     if (connect(c->fd, (struct sockaddr*)sa, sizeof(*sa)) == -1) {
