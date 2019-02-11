@@ -34,26 +34,49 @@
 #include "../hiredis.h"
 #include "../async.h"
 
+#define REDIS_LIBEVENT_DELETED 0x01
+#define REDIS_LIBEVENT_ENTERED 0x02
+
 typedef struct redisLibeventEvents {
     redisAsyncContext *context;
     struct event *ev, *tmr;
     struct event_base *base;
     struct timeval tv;
     short flags;
+    short state;
 } redisLibeventEvents;
+
+static void redisLibeventDestroy(redisLibeventEvents *e) {
+  free(e);
+}
 
 static void redisLibeventHandler(int fd, short event, void *arg) {
     ((void)fd);
     redisLibeventEvents *e = (redisLibeventEvents*)arg;
-    if (event & EV_TIMEOUT) {
+    e->state |= REDIS_LIBEVENT_ENTERED;
+
+    #define CHECK_DELETED() if (e->state & REDIS_LIBEVENT_DELETED) {\
+      redisLibeventDestroy(e);\
+      return; \
+    }
+
+    if ((event & EV_TIMEOUT) && (e->state & REDIS_LIBEVENT_DELETED) == 0) {
         redisAsyncHandleTimeout(e->context);
+        CHECK_DELETED();
     }
-    if ((event & EV_READ) && e->context) {
+
+    if ((event & EV_READ) && e->context && (e->state & REDIS_LIBEVENT_DELETED) == 0) {
         redisAsyncHandleRead(e->context);
+        CHECK_DELETED();
     }
-    if ((event & EV_WRITE) && e->context) {
+
+    if ((event & EV_WRITE) && e->context && (e->state & REDIS_LIBEVENT_DELETED) == 0) {
         redisAsyncHandleWrite(e->context);
+        CHECK_DELETED();
     }
+
+    e->state &= ~REDIS_LIBEVENT_ENTERED;
+    #undef CHECK_DELETED
 }
 
 static void redisLibeventUpdate(void *privdata, short flag, int isRemove) {
@@ -98,8 +121,18 @@ static void redisLibeventDelWrite(void *privdata) {
 
 static void redisLibeventCleanup(void *privdata) {
     redisLibeventEvents *e = (redisLibeventEvents*)privdata;
+    if (!e) {
+      return;
+    }
+    event_del(e->ev);
     event_free(e->ev);
-    free(e);
+    e->ev = NULL;
+
+    if (e->state & REDIS_LIBEVENT_ENTERED) {
+      e->state |= REDIS_LIBEVENT_DELETED;
+    } else {
+      free(e);
+    }
 }
 
 static void redisLibeventSetTimeout(void *privdata, struct timeval tv) {
