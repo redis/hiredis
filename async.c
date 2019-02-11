@@ -144,6 +144,7 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     ac->ev.addWrite = NULL;
     ac->ev.delWrite = NULL;
     ac->ev.cleanup = NULL;
+    ac->ev.scheduleTimer = NULL;
 
     ac->onConnect = NULL;
     ac->onDisconnect = NULL;
