@@ -47,7 +47,7 @@ typedef struct redisLibeventEvents {
 } redisLibeventEvents;
 
 static void redisLibeventDestroy(redisLibeventEvents *e) {
-  free(e);
+    free(e);
 }
 
 static void redisLibeventHandler(int fd, short event, void *arg) {
@@ -56,8 +56,8 @@ static void redisLibeventHandler(int fd, short event, void *arg) {
     e->state |= REDIS_LIBEVENT_ENTERED;
 
     #define CHECK_DELETED() if (e->state & REDIS_LIBEVENT_DELETED) {\
-      redisLibeventDestroy(e);\
-      return; \
+        redisLibeventDestroy(e);\
+        return; \
     }
 
     if ((event & EV_TIMEOUT) && (e->state & REDIS_LIBEVENT_DELETED) == 0) {
@@ -122,16 +122,16 @@ static void redisLibeventDelWrite(void *privdata) {
 static void redisLibeventCleanup(void *privdata) {
     redisLibeventEvents *e = (redisLibeventEvents*)privdata;
     if (!e) {
-      return;
+        return;
     }
     event_del(e->ev);
     event_free(e->ev);
     e->ev = NULL;
 
     if (e->state & REDIS_LIBEVENT_ENTERED) {
-      e->state |= REDIS_LIBEVENT_DELETED;
+        e->state |= REDIS_LIBEVENT_DELETED;
     } else {
-      free(e);
+        redisLibeventDestroy(e);
     }
 }
 
