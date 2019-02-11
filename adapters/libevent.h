@@ -98,7 +98,7 @@ static void redisLibeventUpdate(void *privdata, short flag, int isRemove) {
     }
 
     event_del(e->ev);
-    event_assign(e->ev, e->base, e->context->c.fd, e->flags,
+    event_assign(e->ev, e->base, e->context->c.fd, e->flags | EV_PERSIST,
                  redisLibeventHandler, privdata);
     event_add(e->ev, tv);
 }
