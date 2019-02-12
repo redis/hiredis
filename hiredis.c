@@ -618,7 +618,7 @@ void redisFree(redisContext *c) {
     if (c->ssl) {
         redisFreeSsl(c->ssl);
     }
-    memset(0xff, c, sizeof(*c));
+    memset(c, 0xff, sizeof(*c));
     free(c);
 }
 
