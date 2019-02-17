@@ -198,7 +198,7 @@ $(PKGCONFNAME): hiredis.h
 	@echo Version: $(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(HIREDIS_PATCH) >> $@
 	@echo Libs: -L\$${libdir} -lhiredis >> $@
 ifdef USE_SSL
-	@echo Libs.private: lssl -lcrypto >> $@
+	@echo Libs.private: -lssl -lcrypto >> $@
 endif
 	@echo Cflags: -I\$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
 
