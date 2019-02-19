@@ -39,7 +39,7 @@
 
 typedef struct redisLibeventEvents {
     redisAsyncContext *context;
-    struct event *ev, *tmr;
+    struct event *ev;
     struct event_base *base;
     struct timeval tv;
     short flags;
@@ -152,7 +152,7 @@ static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisLibeventEvents*)malloc(sizeof(*e));
+    e = (redisLibeventEvents*)calloc(1, sizeof(*e));
     e->context = ac;
 
     /* Register functions to start/stop listening for events */
@@ -166,10 +166,7 @@ static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
 
     /* Initialize and install read/write events */
     e->ev = event_new(base, c->fd, EV_READ | EV_WRITE, redisLibeventHandler, e);
-    e->flags = 0;
     e->base = base;
-    e->tv.tv_sec = 0;
-    e->tv.tv_usec = 0;
     return REDIS_OK;
 }
 #endif
