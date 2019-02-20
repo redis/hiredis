@@ -57,7 +57,7 @@ STLIB_MAKE_CMD=$(AR) rcs $(STLIBNAME)
 # Platform-specific overrides
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 
-USE_SSL?=1
+USE_SSL?=0
 
 ifdef USE_SSL
 	# This is the prefix of openssl on my system. This should be the sane default
