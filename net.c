@@ -502,7 +502,6 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
     sa = (struct sockaddr_un*)(c->saddr = malloc(sizeof(struct sockaddr_un)));
     c->addrlen = sizeof(struct sockaddr_un);
     sa->sun_family = AF_UNIX;
-    c->addrlen = sizeof(*sa);
     strncpy(sa->sun_path, path, sizeof(sa->sun_path) - 1);
     if (connect(c->fd, (struct sockaddr*)sa, sizeof(*sa)) == -1) {
         if (errno == EINPROGRESS && !blocking) {
