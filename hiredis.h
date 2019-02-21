@@ -77,6 +77,12 @@
 /* Flag that is set when this connection is done through SSL */
 #define REDIS_SSL 0x100
 
+/**
+ * Flag that indicates the user does not want the context to
+ * be automatically freed upon error
+ */
+#define REDIS_NO_AUTO_FREE 0x200
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
@@ -120,6 +126,12 @@ struct redisSsl;
 
 #define REDIS_OPT_NONBLOCK 0x01
 #define REDIS_OPT_REUSEADDR 0x02
+
+/**
+ * Don't automatically free the async object on a connection failure,
+ * or other implicit conditions. Only free on an explicit call to disconnect() or free()
+ */
+#define REDIS_OPT_NOAUTOFREE 0x04
 
 typedef struct {
     /*

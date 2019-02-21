@@ -668,6 +668,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
     if (options->options & REDIS_OPT_REUSEADDR) {
         c->flags |= REDIS_REUSEADDR;
     }
+    if (options->options & REDIS_OPT_NOAUTOFREE) {
+      c->flags |= REDIS_NO_AUTO_FREE;
+    }
 
     if (options->type == REDIS_CONN_TCP) {
         redisContextConnectBindTcp(c, options->endpoint.tcp.ip,

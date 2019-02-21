@@ -361,7 +361,9 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
 
     /* For non-clean disconnects, __redisAsyncFree() will execute pending
      * callbacks with a NULL-reply. */
-    __redisAsyncFree(ac);
+    if (!(c->flags & REDIS_NO_AUTO_FREE)) {
+      __redisAsyncFree(ac);
+    }
 }
 
 /* Tries to do a clean disconnect from Redis, meaning it stops new commands
@@ -373,6 +375,9 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
 void redisAsyncDisconnect(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     c->flags |= REDIS_DISCONNECTING;
+
+    /** unset the auto-free flag here, because disconnect undoes this */
+    c->flags &= ~REDIS_NO_AUTO_FREE;
     if (!(c->flags & REDIS_IN_CALLBACK) && ac->replies.head == NULL)
         __redisAsyncDisconnect(ac);
 }
