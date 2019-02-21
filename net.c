@@ -54,6 +54,14 @@
 #include "net.h"
 #include "sds.h"
 
+#ifdef SOCK_CLOEXEC
+/* sock_cloexec is initialized to SOCK_CLOEXEC and cleared to zero if
+ * socket(2) ever fails with EINVAL when SOCK_CLOEXEC is set. */
+static int sock_cloexec = SOCK_CLOEXEC;
+#else
+static int sock_cloexec = 0;
+#endif
+
 /* Defined in hiredis.c */
 void __redisSetError(redisContext *c, int type, const char *str);
 
@@ -296,8 +304,10 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
     int blocking = (c->flags & REDIS_BLOCK);
     int reuseaddr = (c->flags & REDIS_REUSEADDR);
+    int set_cloexec = (c->flags & REDIS_CLOEXEC);
     int reuses = 0;
     long timeout_msec = -1;
+    int socket_type;
 
     servinfo = NULL;
     c->connection_type = REDIS_CONN_TCP;
@@ -360,8 +370,39 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
 addrretry:
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        socket_type = p->ai_socktype;
+        if (set_cloexec) {
+            socket_type |= sock_cloexec;
+        }
+
+        s = socket(p->ai_family, socket_type, p->ai_protocol);
+        /* If we attempted to open the socket with SOCK_CLOEXEC and
+         * errno == EINVAL, that means setting it on socket creation
+         * is not supported. We clear sock_cloexec so it doesn't do
+         * anything the next time we use it, and try to create it
+         * without SOCK_CLOEXEC. */
+        if (s == -1 && (socket_type & sock_cloexec) && errno == EINVAL) {
+            socket_type &= ~sock_cloexec;
+            sock_cloexec = 0;
+            s = socket(p->ai_family, socket_type, p->ai_protocol);
+        }
+
+        if (s == -1)
             continue;
+
+        /* If creating the socket with SOCK_CLOEXEC failed, we need to set
+         * FD_CLOEXEC on it ASAP in order to minimize the possibility that
+         * another thread in the running program will fork and inherit the
+         * file descriptor, so we do this right after checking if the socket
+         * has been created. Note that we're being optmistic here and there's
+         * no guarantees that we will be able to set it in time. */
+        if (set_cloexec && !sock_cloexec) {
+            if (fcntl(s, F_SETFD, FD_CLOEXEC) == -1) {
+                __redisSetErrorFromErrno(c, REDIS_ERR_IO, "fcntl(F_SETFD)");
+                redisContextCloseFd(c);
+                return REDIS_ERR;
+            }
+        }
 
         c->fd = s;
         if (redisSetBlocking(c,0) != REDIS_OK)

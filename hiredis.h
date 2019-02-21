@@ -74,6 +74,9 @@
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
 #define REDIS_REUSEADDR 0x80
 
+/* Flag that is set when we should set FD_CLOEXEC when opening the socket */
+#define REDIS_CLOEXEC 0x100
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
@@ -146,6 +149,9 @@ redisContext *redisConnectBindNonBlock(const char *ip, int port,
                                        const char *source_addr);
 redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
                                                 const char *source_addr);
+redisContext *redisConnectCloseOnExec(const char *ip, int port);
+redisContext *redisConnectWithTimeoutCloseOnExec(const char *ip, int port, const struct timeval tv);
+redisContext *redisConnectNonBlockCloseOnExec(const char *ip, int port);
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);

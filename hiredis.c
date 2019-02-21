@@ -712,6 +712,47 @@ redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
     return c;
 }
 
+redisContext *redisConnectCloseOnExec(const char *ip, int port) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL) {
+        return NULL;
+    }
+
+    c->flags |= REDIS_BLOCK;
+    c->flags |= REDIS_CLOEXEC;
+    redisContextConnectTcp(c,ip,port,NULL);
+    return c;
+}
+
+redisContext *redisConnectWithTimeoutCloseOnExec(const char *ip, int port, const struct timeval tv) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+        return NULL;
+
+    c->flags |= REDIS_BLOCK;
+    c->flags |= REDIS_CLOEXEC;
+    redisContextConnectTcp(c,ip,port,&tv);
+    return c;
+}
+
+redisContext *redisConnectNonBlockCloseOnExec(const char *ip, int port) {
+    redisContext *c;
+
+    c = redisContextInit();
+    if (c == NULL)
+        return NULL;
+
+    c->flags &= ~REDIS_BLOCK;
+    c->flags |= REDIS_CLOEXEC;
+    redisContextConnectTcp(c,ip,port,NULL);
+    return c;
+}
+
+
 redisContext *redisConnectUnix(const char *path) {
     redisContext *c;
 
