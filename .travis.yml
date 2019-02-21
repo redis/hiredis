@@ -28,13 +28,14 @@ env:
   - BITS="64"
 
 script:
-  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+  - EXTRA_CMAKE_OPTS="-DENABLE_EXAMPLES:BOOL=ON -DHIREDIS_SSL:BOOL=ON";
+    if [ "$TRAVIS_OS_NAME" == "osx" ]; then
       if [ "$BITS" == "32" ]; then
         CFLAGS="-m32 -Werror";
         CXXFLAGS="-m32 -Werror";
         LDFLAGS="-m32";
+        EXTRA_CMAKE_OPTS=;
       else
-        EXTRA_CMAKE_OPTS="-DENABLE_EXAMPLES:BOOL=ON";
         CFLAGS="-Werror";
         CXXFLAGS="-Werror";
       fi;
@@ -44,8 +45,8 @@ script:
         CFLAGS="-m32 -Werror";
         CXXFLAGS="-m32 -Werror";
         LDFLAGS="-m32";
+        EXTRA_CMAKE_OPTS=;
       else
-        EXTRA_CMAKE_OPTS="-DENABLE_EXAMPLES:BOOL=ON";
         CFLAGS="-Werror";
         CXXFLAGS="-Werror";
       fi;

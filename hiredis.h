@@ -74,6 +74,15 @@
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
 #define REDIS_REUSEADDR 0x80
 
+/* Flag that is set when this connection is done through SSL */
+#define REDIS_SSL 0x100
+
+/**
+ * Flag that indicates the user does not want the context to
+ * be automatically freed upon error
+ */
+#define REDIS_NO_AUTO_FREE 0x200
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
@@ -109,8 +118,58 @@ void redisFreeSdsCommand(sds cmd);
 
 enum redisConnectionType {
     REDIS_CONN_TCP,
-    REDIS_CONN_UNIX
+    REDIS_CONN_UNIX,
+    REDIS_CONN_USERFD
 };
+
+struct redisSsl;
+
+#define REDIS_OPT_NONBLOCK 0x01
+#define REDIS_OPT_REUSEADDR 0x02
+
+/**
+ * Don't automatically free the async object on a connection failure,
+ * or other implicit conditions. Only free on an explicit call to disconnect() or free()
+ */
+#define REDIS_OPT_NOAUTOFREE 0x04
+
+typedef struct {
+    /*
+     * the type of connection to use. This also indicates which
+     * `endpoint` member field to use
+     */
+    int type;
+    /* bit field of REDIS_OPT_xxx */
+    int options;
+    /* timeout value. if NULL, no timeout is used */
+    const struct timeval *timeout;
+    union {
+        /** use this field for tcp/ip connections */
+        struct {
+            const char *source_addr;
+            const char *ip;
+            int port;
+        } tcp;
+        /** use this field for unix domain sockets */
+        const char *unix_socket;
+        /**
+         * use this field to have hiredis operate an already-open
+         * file descriptor */
+        int fd;
+    } endpoint;
+} redisOptions;
+
+/**
+ * Helper macros to initialize options to their specified fields.
+ */
+#define REDIS_OPTIONS_SET_TCP(opts, ip_, port_) \
+    (opts)->type = REDIS_CONN_TCP; \
+    (opts)->endpoint.tcp.ip = ip_; \
+    (opts)->endpoint.tcp.port = port_;
+
+#define REDIS_OPTIONS_SET_UNIX(opts, path) \
+    (opts)->type = REDIS_CONN_UNIX;        \
+    (opts)->endpoint.unix_socket = path;
 
 /* Context for a connection to Redis */
 typedef struct redisContext {
@@ -137,8 +196,12 @@ typedef struct redisContext {
     /* For non-blocking connect */
     struct sockadr *saddr;
     size_t addrlen;
+    /* For SSL communication */
+    struct redisSsl *ssl;
+
 } redisContext;
 
+redisContext *redisConnectWithOptions(const redisOptions *options);
 redisContext *redisConnect(const char *ip, int port);
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv);
 redisContext *redisConnectNonBlock(const char *ip, int port);
@@ -150,6 +213,13 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 redisContext *redisConnectFd(int fd);
+
+/**
+ * Secure the connection using SSL. This should be done before any command is
+ * executed on the connection.
+ */
+int redisSecureConnection(redisContext *c, const char *capath, const char *certpath,
+                          const char *keypath, const char *servername);
 
 /**
  * Reconnect the given context using the saved information.
