@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 INCLUDE(GNUInstallDirs)
 PROJECT(hiredis)
 
-OPTION(HIREDIS_SSL "Link against OpenSSL" ON)
+OPTION(HIREDIS_SSL "Link against OpenSSL" OFF)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
