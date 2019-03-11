@@ -60,6 +60,7 @@
     } while(0)
 #define _EL_CLEANUP(ctx) do { \
         if ((ctx)->ev.cleanup) (ctx)->ev.cleanup((ctx)->ev.data); \
+        ctx->ev.cleanup = NULL; \
     } while(0);
 
 static void refreshTimeout(redisAsyncContext *ctx) {
@@ -358,6 +359,10 @@ static void __redisAsyncDisconnect(redisAsyncContext *ac) {
          * callbacks cannot call new commands. */
         c->flags |= REDIS_DISCONNECTING;
     }
+
+    /* cleanup event library on disconnect.
+     * this is safe to call multiple times */
+    _EL_CLEANUP(ac);
 
     /* For non-clean disconnects, __redisAsyncFree() will execute pending
      * callbacks with a NULL-reply. */
@@ -697,6 +702,12 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
     while (__redisShiftCallback(&ac->replies, &cb) == REDIS_OK) {
         __redisRunCallback(ac, &cb, NULL);
     }
+
+    /**
+     * TODO: Don't automatically sever the connection,
+     * rather, allow to ignore <x> responses before the queue is clear
+     */
+    __redisAsyncDisconnect(ac);
 }
 
 /* Sets a pointer to the first argument and its length starting at p. Returns
