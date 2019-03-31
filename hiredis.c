@@ -620,9 +620,9 @@ void redisFree(redisContext *c) {
     free(c);
 }
 
-int redisFreeKeepFd(redisContext *c) {
-    int fd = c->fd;
-    c->fd = -1;
+redisFD redisFreeKeepFd(redisContext *c) {
+    redisFD fd = c->fd;
+    c->fd = REDIS_INVALID_FD;
     redisFree(c);
     return fd;
 }
@@ -746,7 +746,7 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
     return redisConnectWithOptions(&options);
 }
 
-redisContext *redisConnectFd(int fd) {
+redisContext *redisConnectFd(redisFD fd) {
     redisOptions options = {0};
     options.type = REDIS_CONN_USERFD;
     options.endpoint.fd = fd;

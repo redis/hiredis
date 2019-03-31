@@ -58,9 +58,9 @@
 void __redisSetError(redisContext *c, int type, const char *str);
 
 void redisNetClose(redisContext *c) {
-    if (c && c->fd >= 0) {
+    if (c && c->fd != REDIS_INVALID_FD) {
         close(c->fd);
-        c->fd = -1;
+        c->fd = REDIS_INVALID_FD;
     }
 }
 
@@ -117,8 +117,8 @@ static int redisSetReuseAddr(redisContext *c) {
 }
 
 static int redisCreateSocket(redisContext *c, int type) {
-    int s;
-    if ((s = socket(type, SOCK_STREAM, 0)) == -1) {
+    redisFD s;
+    if ((s = socket(type, SOCK_STREAM, 0)) == REDIS_INVALID_FD) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
         return REDIS_ERR;
     }
@@ -158,7 +158,7 @@ static int redisSetBlocking(redisContext *c, int blocking) {
 
 int redisKeepAlive(redisContext *c, int interval) {
     int val = 1;
-    int fd = c->fd;
+    redisFD fd = c->fd;
 
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1){
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
@@ -322,7 +322,8 @@ int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
 static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
                                    const struct timeval *timeout,
                                    const char *source_addr) {
-    int s, rv, n;
+    redisFD s;
+    int rv, n;
     char _port[6];  /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
     int blocking = (c->flags & REDIS_BLOCK);
@@ -391,7 +392,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
 addrretry:
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == -1)
+        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == REDIS_INVALID_FD)
             continue;
 
         c->fd = s;
