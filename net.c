@@ -57,11 +57,42 @@
 /* Defined in hiredis.c */
 void __redisSetError(redisContext *c, int type, const char *str);
 
-static void redisContextCloseFd(redisContext *c) {
+void redisNetClose(redisContext *c) {
     if (c && c->fd >= 0) {
         close(c->fd);
         c->fd = -1;
     }
+}
+
+int redisNetRead(redisContext *c, char *buf, size_t bufcap) {
+    int nread = read(c->fd, buf, bufcap);
+    if (nread == -1) {
+        if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+            /* Try again later */
+            return 0;
+        } else {
+            __redisSetError(c, REDIS_ERR_IO, NULL);
+            return -1;
+        }
+    } else if (nread == 0) {
+        __redisSetError(c, REDIS_ERR_EOF, "Server closed the connection");
+        return -1;
+    } else {
+        return nread;
+    }
+}
+
+int redisNetWrite(redisContext *c) {
+    int nwritten = write(c->fd, c->obuf, sdslen(c->obuf));
+    if (nwritten < 0) {
+        if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+            /* Try again later */
+        } else {
+            __redisSetError(c, REDIS_ERR_IO, NULL);
+            return -1;
+        }
+    }
+    return nwritten;
 }
 
 static void __redisSetErrorFromErrno(redisContext *c, int type, const char *prefix) {
@@ -79,7 +110,7 @@ static int redisSetReuseAddr(redisContext *c) {
     int on = 1;
     if (setsockopt(c->fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-        redisContextCloseFd(c);
+        redisNetClose(c);
         return REDIS_ERR;
     }
     return REDIS_OK;
@@ -108,7 +139,7 @@ static int redisSetBlocking(redisContext *c, int blocking) {
      * interrupted by a signal. */
     if ((flags = fcntl(c->fd, F_GETFL)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(F_GETFL)");
-        redisContextCloseFd(c);
+        redisNetClose(c);
         return REDIS_ERR;
     }
 
@@ -119,7 +150,7 @@ static int redisSetBlocking(redisContext *c, int blocking) {
 
     if (fcntl(c->fd, F_SETFL, flags) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(F_SETFL)");
-        redisContextCloseFd(c);
+        redisNetClose(c);
         return REDIS_ERR;
     }
     return REDIS_OK;
@@ -170,7 +201,7 @@ static int redisSetTcpNoDelay(redisContext *c) {
     int yes = 1;
     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
-        redisContextCloseFd(c);
+        redisNetClose(c);
         return REDIS_ERR;
     }
     return REDIS_OK;
@@ -212,12 +243,12 @@ static int redisContextWaitReady(redisContext *c, long msec) {
 
         if ((res = poll(wfd, 1, msec)) == -1) {
             __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
-            redisContextCloseFd(c);
+            redisNetClose(c);
             return REDIS_ERR;
         } else if (res == 0) {
             errno = ETIMEDOUT;
             __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-            redisContextCloseFd(c);
+            redisNetClose(c);
             return REDIS_ERR;
         }
 
@@ -230,7 +261,7 @@ static int redisContextWaitReady(redisContext *c, long msec) {
     }
 
     __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
-    redisContextCloseFd(c);
+    redisNetClose(c);
     return REDIS_ERR;
 }
 
@@ -410,7 +441,7 @@ addrretry:
 
         if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
-                redisContextCloseFd(c);
+                redisNetClose(c);
                 continue;
             } else if (errno == EINPROGRESS) {
                 if (blocking) {
@@ -424,7 +455,7 @@ addrretry:
                 if (++reuses >= REDIS_CONNECT_RETRIES) {
                     goto error;
                 } else {
-                    redisContextCloseFd(c);
+                    redisNetClose(c);
                     goto addrretry;
                 }
             } else {

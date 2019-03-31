@@ -34,7 +34,6 @@
 #include "fmacros.h"
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
@@ -605,8 +604,7 @@ static redisContext *redisContextInit(const redisOptions *options) {
 void redisFree(redisContext *c) {
     if (c == NULL)
         return;
-    if (c->fd > 0)
-        close(c->fd);
+    redisNetClose(c);
 
     sdsfree(c->obuf);
     redisReaderFree(c->reader);
@@ -633,9 +631,7 @@ int redisReconnect(redisContext *c) {
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
-    if (c->fd > 0) {
-        close(c->fd);
-    }
+    redisNetClose(c);
 
     sdsfree(c->obuf);
     redisReaderFree(c->reader);
@@ -776,24 +772,6 @@ int redisEnableKeepAlive(redisContext *c) {
     return REDIS_OK;
 }
 
-static int rawRead(redisContext *c, char *buf, size_t bufcap) {
-    int nread = read(c->fd, buf, bufcap);
-    if (nread == -1) {
-        if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
-            /* Try again later */
-            return 0;
-        } else {
-            __redisSetError(c, REDIS_ERR_IO, NULL);
-            return -1;
-        }
-    } else if (nread == 0) {
-        __redisSetError(c, REDIS_ERR_EOF, "Server closed the connection");
-        return -1;
-    } else {
-        return nread;
-    }
-}
-
 /* Use this function to handle a read event on the descriptor. It will try
  * and read some bytes from the socket and feed them to the reply parser.
  *
@@ -808,7 +786,7 @@ int redisBufferRead(redisContext *c) {
         return REDIS_ERR;
 
     nread = c->flags & REDIS_SSL ?
-        redisSslRead(c, buf, sizeof(buf)) : rawRead(c, buf, sizeof(buf));
+        redisSslRead(c, buf, sizeof(buf)) : redisNetRead(c, buf, sizeof(buf));
     if (nread > 0) {
         if (redisReaderFeed(c->reader, buf, nread) != REDIS_OK) {
             __redisSetError(c, c->reader->err, c->reader->errstr);
@@ -819,19 +797,6 @@ int redisBufferRead(redisContext *c) {
         return REDIS_ERR;
     }
     return REDIS_OK;
-}
-
-static int rawWrite(redisContext *c) {
-    int nwritten = write(c->fd, c->obuf, sdslen(c->obuf));
-    if (nwritten < 0) {
-        if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
-            /* Try again later */
-        } else {
-            __redisSetError(c, REDIS_ERR_IO, NULL);
-            return -1;
-        }
-    }
-    return nwritten;
 }
 
 /* Write the output buffer to the socket.
@@ -850,7 +815,7 @@ int redisBufferWrite(redisContext *c, int *done) {
         return REDIS_ERR;
 
     if (sdslen(c->obuf) > 0) {
-        int nwritten = (c->flags & REDIS_SSL) ? redisSslWrite(c) : rawWrite(c);
+        int nwritten = (c->flags & REDIS_SSL) ? redisSslWrite(c) : redisNetWrite(c);
         if (nwritten < 0) {
             return REDIS_ERR;
         } else if (nwritten > 0) {
