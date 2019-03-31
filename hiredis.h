@@ -133,8 +133,21 @@ struct redisSsl;
  */
 #define REDIS_OPT_NOAUTOFREE 0x04
 
+/* In Unix systems a file descriptor is a regular signed int, with -1
+ * representing an invalid descriptor. In Windows it is a SOCKET
+ * (32- or 64-bit unsigned integer depending on the architecture), where
+ * all bits set (~0) is INVALID_SOCKET.  */
+#ifndef _WIN32
 typedef int redisFD;
 #define REDIS_INVALID_FD -1
+#else
+#ifdef _WIN64
+typedef unsigned long long redisFD; /* SOCKET = 64-bit UINT_PTR */
+#else
+typedef unsigned long redisFD;      /* SOCKET = 32-bit UINT_PTR */
+#endif
+#define REDIS_INVALID_FD ((redisFD)(~0)) /* INVALID_SOCKET */
+#endif
 
 typedef struct {
     /*

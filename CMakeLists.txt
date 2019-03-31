@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.4.0)
 INCLUDE(GNUInstallDirs)
 PROJECT(hiredis)
 
@@ -31,11 +31,15 @@ ADD_LIBRARY(hiredis SHARED
     net.c
     read.c
     sds.c
+    sockcompat.c
     sslio.c)
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES
     VERSION "${HIREDIS_SONAME}")
+IF(WIN32 OR MINGW)
+    TARGET_LINK_LIBRARIES(hiredis PRIVATE ws2_32)
+ENDIF()
 
 CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
@@ -60,13 +64,13 @@ IF(HIREDIS_SSL)
     TARGET_LINK_LIBRARIES(hiredis ${OPENSSL_LIBRARIES})
 ENDIF()
 
-ENABLE_TESTING()
-ADD_EXECUTABLE(hiredis-test test.c)
-
-
-TARGET_LINK_LIBRARIES(hiredis-test hiredis)
-ADD_TEST(NAME hiredis-test
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test.sh)
+IF(NOT (WIN32 OR MINGW))
+    ENABLE_TESTING()
+    ADD_EXECUTABLE(hiredis-test test.c)
+    TARGET_LINK_LIBRARIES(hiredis-test hiredis)
+    ADD_TEST(NAME hiredis-test
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test.sh)
+ENDIF()
 
 # Add examples
 IF(ENABLE_EXAMPLES)

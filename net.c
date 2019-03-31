@@ -34,25 +34,18 @@
 
 #include "fmacros.h"
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
-#include <netdb.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <poll.h>
 #include <limits.h>
 #include <stdlib.h>
 
 #include "net.h"
 #include "sds.h"
+#include "sockcompat.h"
+#include "win32.h"
 
 /* Defined in hiredis.c */
 void __redisSetError(redisContext *c, int type, const char *str);
@@ -132,6 +125,7 @@ static int redisCreateSocket(redisContext *c, int type) {
 }
 
 static int redisSetBlocking(redisContext *c, int blocking) {
+#ifndef _WIN32
     int flags;
 
     /* Set the socket nonblocking.
@@ -153,6 +147,14 @@ static int redisSetBlocking(redisContext *c, int blocking) {
         redisNetClose(c);
         return REDIS_ERR;
     }
+#else
+    u_long mode = blocking ? 0 : 1;
+    if (ioctl(c->fd, FIONBIO, &mode) == -1) {
+        __redisSetErrorFromErrno(c, REDIS_ERR_IO, "ioctl(FIONBIO)");
+        redisNetClose(c);
+        return REDIS_ERR;
+    }
+#endif /* _WIN32 */
     return REDIS_OK;
 }
 
@@ -503,6 +505,7 @@ int redisContextConnectBindTcp(redisContext *c, const char *addr, int port,
 }
 
 int redisContextConnectUnix(redisContext *c, const char *path, const struct timeval *timeout) {
+#ifndef _WIN32
     int blocking = (c->flags & REDIS_BLOCK);
     struct sockaddr_un *sa;
     long timeout_msec = -1;
@@ -550,4 +553,10 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
 
     c->flags |= REDIS_CONNECTED;
     return REDIS_OK;
+#else
+    /* We currently do not support Unix sockets for Windows. */
+    /* TODO(m): https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/ */
+    errno = EPROTONOSUPPORT;
+    return REDIS_ERR;
+#endif /* _WIN32 */
 }
