@@ -434,22 +434,22 @@ static void test_free_null(void) {
     test_cond(reply == NULL);
 }
 
+#define HIREDIS_BAD_DOMAIN "idontexist-noreally.com"
 static void test_blocking_connection_errors(void) {
     redisContext *c;
     struct addrinfo hints = {.ai_family = AF_INET};
     struct addrinfo *ai_tmp = NULL;
-    const char *bad_domain = "idontexist.com";
 
-    int rv = getaddrinfo(bad_domain, "6379", &hints, &ai_tmp);
+    int rv = getaddrinfo(HIREDIS_BAD_DOMAIN, "6379", &hints, &ai_tmp);
     if (rv != 0) {
         // Address does *not* exist
         test("Returns error when host cannot be resolved: ");
         // First see if this domain name *actually* resolves to NXDOMAIN
-        c = redisConnect("dontexist.com", 6379);
+        c = redisConnect(HIREDIS_BAD_DOMAIN, 6379);
         test_cond(
             c->err == REDIS_ERR_OTHER &&
             (strcmp(c->errstr, "Name or service not known") == 0 ||
-             strcmp(c->errstr, "Can't resolve: sadkfjaskfjsa.com") == 0 ||
+             strcmp(c->errstr, "Can't resolve: " HIREDIS_BAD_DOMAIN) == 0 ||
              strcmp(c->errstr,
                     "nodename nor servname provided, or not known") == 0 ||
              strcmp(c->errstr, "No address associated with hostname") == 0 ||
