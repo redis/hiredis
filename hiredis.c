@@ -593,6 +593,7 @@ static redisContext *redisContextInit(const redisOptions *options) {
 
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
+    c->fd = REDIS_INVALID_FD;
 
     if (c->obuf == NULL || c->reader == NULL) {
         redisFree(c);
@@ -682,6 +683,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
     } else {
         // Unknown type - FIXME - FREE
         return NULL;
+    }
+    if (options->timeout != NULL && (c->flags & REDIS_BLOCK) && c->fd != REDIS_INVALID_FD) {
+        redisContextSetTimeout(c, *options->timeout);
     }
     return c;
 }
