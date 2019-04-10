@@ -18,8 +18,12 @@ int main(int argc, char **argv) {
     const char *key = argv[4];
     const char *ca = argc > 4 ? argv[5] : NULL;
 
-    struct timeval timeout = { 1, 500000 }; // 1.5 seconds
-    c = redisConnectWithTimeout(hostname, port, timeout);
+    struct timeval tv = { 1, 500000 }; // 1.5 seconds
+    redisOptions options = {0};
+    REDIS_OPTIONS_SET_TCP(&options, hostname, port);
+    options.timeout = &tv;
+    c = redisConnectWithOptions(&options);
+
     if (c == NULL || c->err) {
         if (c) {
             printf("Connection error: %s\n", c->errstr);
