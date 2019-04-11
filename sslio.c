@@ -4,6 +4,7 @@
 #include <assert.h>
 #ifdef HIREDIS_SSL
 #include <pthread.h>
+#include <errno.h>
 
 void __redisSetError(redisContext *c, int type, const char *str);
 
@@ -184,6 +185,28 @@ int redisSslRead(redisContext *c, char *buf, size_t bufcap) {
         return -1;
     } else {
         int err = SSL_get_error(c->ssl->ssl, nread);
+        if (c->flags & REDIS_BLOCK) {
+            /**
+             * In blocking mode, we should never end up in a situation where
+             * we get an error without it being an actual error, except
+             * in the case of EINTR, which can be spuriously received from
+             * debuggers or whatever.
+             */
+            if (errno == EINTR) {
+                return 0;
+            } else {
+                const char *msg = NULL;
+                if (errno == EAGAIN) {
+                    msg = "Timed out";
+                }
+                __redisSetError(c, REDIS_ERR_IO, msg);
+                return -1;
+            }
+        }
+
+        /**
+         * We can very well get an EWOULDBLOCK/EAGAIN, however
+         */
         if (maybeCheckWant(c->ssl, err)) {
             return 0;
         } else {
@@ -203,7 +226,7 @@ int redisSslWrite(redisContext *c) {
         c->ssl->lastLen = len;
 
         int err = SSL_get_error(c->ssl->ssl, rv);
-        if (maybeCheckWant(c->ssl, err)) {
+        if ((c->flags & REDIS_BLOCK) == 0 && maybeCheckWant(c->ssl, err)) {
             return 0;
         } else {
             __redisSetError(c, REDIS_ERR_IO, NULL);
