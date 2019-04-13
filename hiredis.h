@@ -35,7 +35,11 @@
 #define __HIREDIS_H
 #include "read.h"
 #include <stdarg.h> /* for va_list */
+#ifndef _WIN32
 #include <sys/time.h> /* for struct timeval */
+#else
+#include <winsock2.h>
+#endif
 #include <stdint.h> /* uintXX_t, etc */
 #include "sds.h" /* for sds */
 
