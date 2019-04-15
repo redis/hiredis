@@ -685,7 +685,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
         return NULL;
     }
     if (options->timeout != NULL && (c->flags & REDIS_BLOCK) && c->fd != REDIS_INVALID_FD) {
-        redisContextSetTimeout(c, *options->timeout);
+        if (!(options->options & REDIS_OPT_NORDWRTIMEOUT)) {
+            redisContextSetTimeout(c, *options->timeout);
+        }
     }
     return c;
 }
@@ -703,6 +705,7 @@ redisContext *redisConnectWithTimeout(const char *ip, int port, const struct tim
     redisOptions options = {0};
     REDIS_OPTIONS_SET_TCP(&options, ip, port);
     options.timeout = &tv;
+    options.options |= REDIS_OPT_NORDWRTIMEOUT;
     return redisConnectWithOptions(&options);
 }
 

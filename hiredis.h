@@ -133,6 +133,13 @@ struct redisSsl;
  */
 #define REDIS_OPT_NOAUTOFREE 0x04
 
+/**
+ * When using connectWithOptions, have the timeout only apply to the
+ * initial connect, not subsequent read/write attempts. This option
+ * is here to support the legacy connectWithTimeout()
+ */
+#define REDIS_OPT_NORDWRTIMEOUT 0x08
+
 /* In Unix systems a file descriptor is a regular signed int, with -1
  * representing an invalid descriptor. In Windows it is a SOCKET
  * (32- or 64-bit unsigned integer depending on the architecture), where
