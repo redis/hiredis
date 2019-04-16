@@ -7,63 +7,6 @@
 
 using namespace hiredis;
 
-class ClientError : public std::runtime_error {
-public:
-    ClientError() : std::runtime_error("hiredis error") {
-    }
-    ClientError(const char *s) : std::runtime_error(s) {
-    }
-};
-
-class ConnectError : public ClientError {
-public:
-    ConnectError() : ClientError(){}
-    ConnectError(const redisOptions& options) {
-        if (options.type == REDIS_CONN_TCP) {
-            endpoint = options.endpoint.tcp.ip;
-            endpoint += ":";
-            endpoint += options.endpoint.tcp.port;
-        } else if (options.type == REDIS_CONN_UNIX) {
-            endpoint = "unix://";
-            endpoint += options.endpoint.unix_socket;
-        }
-    }
-    virtual const char *what() const noexcept override{
-        return endpoint.c_str();
-    }
-private:
-    std::string endpoint;
-};
-
-class IOError : public ClientError {};
-class TimeoutError : public ClientError {};
-class SSLError : public ClientError {};
-
-class CommandError : public ClientError {
-public:
-    CommandError(const redisReply *r) {
-        errstr = r->str;
-    }
-    virtual const char *what() const noexcept override {
-        return errstr.c_str();
-    }
-private:
-    std::string errstr;
-};
-
-void errorFromCode(int code) {
-    switch (code) {
-    case REDIS_ERR_IO:
-    case REDIS_ERR_EOF:
-    case REDIS_ERR_PROTOCOL:
-        throw IOError();
-    case REDIS_ERR_TIMEOUT:
-        throw TimeoutError();
-    default:
-        throw ClientError();
-    }
-}
-
 class Client {
 public:
     operator redisContext*() {
@@ -107,7 +50,7 @@ public:
     void flushdb() {
         redisReply *p = cmd("FLUSHDB");
         if (p == NULL) {
-            errorFromCode(ctx->err);
+            ClientError::throwCode(ctx->err);
         }
         if (p->type == REDIS_REPLY_ERROR) {
             auto pp = CommandError(p);
@@ -136,7 +79,7 @@ private:
         int err = ctx->err;
         redisFree(ctx);
         ctx = NULL;
-        errorFromCode(err);
+        ClientError::throwCode(err);
     }
     void connectOrThrow(const redisOptions& options) {
         ctx = redisConnectWithOptions(&options);

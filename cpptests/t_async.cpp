@@ -22,24 +22,43 @@ struct CmdData {
 };
 
 struct AsyncClient {
-    AsyncClient(const redisOptions& options, event_base* b) {
+    void connectCommon(const redisOptions& orig, event_base *b, unsigned timeoutMs) {
+        redisOptions options = orig;
+        struct timeval tv = { 0 };
+        if (timeoutMs) {
+            tv.tv_usec = timeoutMs * 1000;
+            options.timeout = &tv;
+        }
+
         ac = redisAsyncConnectWithOptions(&options);
+        ac->data = this;
         redisLibeventAttach(ac, b);
         redisAsyncSetConnectCallback(ac, realConnectCb);
-        ac->data = this;
+
     }
 
-    AsyncClient(const ClientSettings& settings, event_base *b) {
+    AsyncClient(const redisOptions& options, event_base* b, unsigned timeoutMs = 0) {
+        connectCommon(options, b, timeoutMs);
+    }
+
+    AsyncClient(const ClientSettings& settings, event_base *b, unsigned timeoutMs = 0) {
         redisOptions options = { 0 };
-        ac = redisAsyncConnectWithOptions(&options);
-        redisLibeventAttach(ac, b);
-        redisAsyncSetConnectCallback(ac, realConnectCb);
+        settings.initOptions(options);
+        connectCommon(options, b, timeoutMs);
+
+        if (ac->c.err != REDIS_OK) {
+            ClientError::throwContext(&ac->c);
+        }
+
         if (settings.is_ssl()) {
-            redisSecureConnection(&ac->c,
+            printf("Securing async connection...\n");
+            int rc = redisSecureConnection(&ac->c,
                     settings.ssl_ca(), settings.ssl_cert(), settings.ssl_key(),
                     NULL);
+            if (rc != REDIS_OK) {
+                throw SSLError(ac->c.errstr);
+            }
         }
-        ac->data = this;
     }
 
     AsyncClient(redisAsyncContext *ac) : ac(ac) {
@@ -68,18 +87,21 @@ struct AsyncClient {
 
     void disconnect(DisconnectCallback cb) {
         disconncb = cb;
-        redisAsyncDisconnect(ac);
+        auto tmpac = ac;
+        ac = NULL;
+        redisAsyncDisconnect(tmpac);
     }
 
     void disconnect() {
-        redisAsyncDisconnect(ac);
+        auto tmpac = ac;
+        ac = NULL;
+        redisAsyncDisconnect(tmpac);
     }
 
     ConnectionCallback conncb;
     DisconnectCallback disconncb;
     redisAsyncContext *ac;
 };
-
 
 static void realConnectCb(const redisAsyncContext *ac, int status) {
     auto self = reinterpret_cast<AsyncClient*>(ac->data);
@@ -119,21 +141,24 @@ protected:
 };
 
 TEST_F(AsyncTest, testAsync) {
-    redisOptions options = {0};
-    struct timeval tv = {0};
-    tv.tv_sec = 1;
-    options.timeout = &tv;
-    settings_g.initOptions(options);
-    AsyncClient client(options, libevent);
+    AsyncClient client(settings_g, libevent, 1000);
 
-    client.onConnect([](AsyncClient*, bool status) {
-        printf("Status: %d\n", status);
+    bool gotConnect = false;
+    bool gotCommand = false;
+    client.onConnect([&](AsyncClient*, bool status) {
+        ASSERT_TRUE(status);
+        gotConnect = true;
     });
 
-    client.cmd([](AsyncClient *c, redisReply*){
-        printf("Got reply!\n");
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_STATUS, r->type);
+        ASSERT_STREQ("PONG", r->str);
         c->disconnect();
+        gotCommand = true;
     }, "PING");
-
     wait();
+
+    ASSERT_TRUE(gotConnect);
+    ASSERT_TRUE(gotCommand);
 }
