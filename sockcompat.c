@@ -197,7 +197,7 @@ int win32_getsockopt(SOCKET sockfd, int level, int optname, void *optval, sockle
             socklen_t dwlen = 0;
             ret = getsockopt(sockfd, level, optname, (char *)&timeout, &dwlen);
             tv->tv_sec = timeout / 1000;
-            tv->tv_usec = timeout * 1000;
+            tv->tv_usec = (timeout * 1000) % 1000000;
         } else {
             ret = WSAEFAULT;
         }
