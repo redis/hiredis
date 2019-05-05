@@ -191,11 +191,16 @@ int win32_connect(SOCKET sockfd, const struct sockaddr *addr, socklen_t addrlen)
 int win32_getsockopt(SOCKET sockfd, int level, int optname, void *optval, socklen_t *optlen) {
     int ret = 0;
     if ((level == SOL_SOCKET) && ((optname == SO_RCVTIMEO) || (optname == SO_SNDTIMEO))) {
-        struct timeval *tv = (struct timeval *)optval;
-        DWORD timeout = 0; socklen_t dwlen = 0;
-        ret = getsockopt(sockfd, level, optname, (char *)&timeout, &dwlen);
-        tv->tv_sec = timeout / 1000;
-        tv->tv_usec = timeout * 1000;
+        if (*optlen >= sizeof (struct timeval)) {
+            struct timeval *tv = (struct timeval *)optval;
+            DWORD timeout = 0;
+            socklen_t dwlen = 0;
+            ret = getsockopt(sockfd, level, optname, (char *)&timeout, &dwlen);
+            tv->tv_sec = timeout / 1000;
+            tv->tv_usec = timeout * 1000;
+        } else {
+            ret = WSAEFAULT;
+        }
         *optlen = sizeof (struct timeval);
     } else {
         ret = getsockopt(sockfd, level, optname, (char*)optval, optlen);
