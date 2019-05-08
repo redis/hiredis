@@ -6,3 +6,8 @@
 /*.a
 /*.pc
 *.dSYM
+/contrib/
+/.vscode/
+/CMakeFiles/
+*.cmake
+*.make

@@ -1,0 +1,7 @@
+#!/bin/bash
+# cpptests gtest
+
+mkdir contrib
+./get_gtest.sh 
+cmake CMakeLists.txt -DENABLE_TESTS=1
+make 
