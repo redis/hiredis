@@ -32,11 +32,8 @@
 #include "fmacros.h"
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
+#ifndef _MSC_VER
 #include <strings.h>
-#else
-#define strcasecmp stricmp
-#define strncasecmp  strnicmp
 #endif
 #include <assert.h>
 #include <ctype.h>
@@ -46,6 +43,7 @@
 #include "dict.c"
 #include "sds.h"
 #include "sslio.h"
+#include "win32.h"
 
 #define _EL_ADD_READ(ctx)                                         \
     do {                                                          \

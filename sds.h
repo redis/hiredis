@@ -34,7 +34,7 @@
 #define __SDS_H
 
 #define SDS_MAX_PREALLOC (1024*1024)
-#ifdef _WIN32
+#ifdef _MSC_VER
 #define __attribute__(x)
 #endif
 
