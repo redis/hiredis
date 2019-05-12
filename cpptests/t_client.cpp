@@ -104,14 +104,11 @@ protected:
     }
     virtual void TearDown() {
     //    if(reply != nullptr) { freeReplyObject(reply); }
-        free(cmd);
     }
 
     ClientSettings cs;    
     Client c;
     redisReply *reply;
-    char *cmd;
-    int len;
 };
 
 TEST_F(ClientTestTCP, testTimeout) {
@@ -129,10 +126,15 @@ TEST_F(ClientTestTCP, testTimeout) {
     c.flushdb();
 }
 
+// Not finished
 TEST_F(ClientTestTCP, testAppendFormattedCmd) {
+    char *cmd;
+    int len;
+
     len = redisFormatCommand(&cmd, "SET foo bar");
     ASSERT_TRUE(redisAppendFormattedCommand(*c, cmd, len) == REDIS_OK);
 //    assert(redisGetReply(*c, (void*)&reply) == REDIS_OK);
+    free(cmd);
 }
 
 TEST_F(ClientTestTCP, testBlockingConnection) {
@@ -155,7 +157,7 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
     freeReplyObject(reply);
 
     reply = castReply(redisCommand(*c,"SET %b %b","foo",
-                                    (size_t)3,"hello\x00world",(size_t)11));
+                (size_t)3,"hello\x00world",(size_t)11));
     freeReplyObject(reply);
     reply = castReply(redisCommand(*c,"GET foo"));
     ASSERT_TRUE(reply->type == REDIS_REPLY_STRING &&
@@ -195,4 +197,50 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
               reply->element[1]->type == REDIS_REPLY_STATUS &&
               strcasecmp(reply->element[1]->str,"pong") == 0);
     freeReplyObject(reply);
+}
+
+TEST_F(ClientTestTCP, testSuccesfulReconnect) {
+    struct timeval tv = { 0, 10000 };
+
+//  Successfully completes a command when the timeout is not exceeded
+    reply = castReply(redisCommand(*c,"SET foo fast"));
+    freeReplyObject(reply);
+    redisSetTimeout(*c, tv);
+    reply = castReply(redisCommand(*c, "GET foo"));
+    ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STRING && 
+                memcmp(reply->str, "fast", 4) == 0);
+    freeReplyObject(reply);
+}
+
+TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
+    ssize_t s;
+    const char *cmd = "DEBUG SLEEP 3\r\n";
+    struct timeval tv = { 0, 10000 };
+
+//  Does not return a reply when the command times out
+    s = write((*c)->fd, cmd, strlen(cmd));
+    tv.tv_sec = 0;
+    tv.tv_usec = 10000;
+    redisSetTimeout(*c, tv);
+    reply = castReply(redisCommand(*c, "GET foo"));
+    ASSERT_TRUE(s > 0 && reply == NULL && (*c)->err == REDIS_ERR_IO && strcmp((*c)->errstr, "Resource temporarily unavailable") == 0);
+    freeReplyObject(reply);
+
+//  Reconnect properly reconnects after a timeout
+    redisReconnect(*c);
+    reply = castReply(redisCommand(*c, "PING"));
+    ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+    freeReplyObject(reply);
+
+//  Reconnect properly uses owned parameters
+    char foo[4] = "foo";
+/**************** fails *****************
+    (*c)->tcp.host = foo;
+    (*c)->unix_sock.path = foo;
+/**************** fails *****************
+    redisReconnect(*c);
+    reply = castReply(redisCommand(*c, "PING"));
+    ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+    freeReplyObject(reply);    */
+    
 }

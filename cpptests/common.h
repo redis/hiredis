@@ -104,7 +104,6 @@ private:
     std::string errstr;
 };
 
-
 inline redisReply *castReply(void *reply) {
     return reinterpret_cast<redisReply*>(reply);
 }

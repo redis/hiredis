@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     settings->m_ssl_key_path = HIREDIS_TEST_SSL_KEY;
 #endif
 
-    for (size_t ii = 1; ii < argc; ++ii) {
+    for (int ii = 1; ii < argc; ++ii) {
         const char *ss = argv[ii];
         if (isArg(ss, "--unix")) {
             settings->setUnix(getKvValue(ss).c_str());
