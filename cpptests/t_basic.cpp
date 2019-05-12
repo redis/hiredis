@@ -3,12 +3,31 @@
 #include <vector>
 #include <cstdarg>
 #include <cstdio>
+#include <climits>          // LLONG_MAX
 
 #include "hiredis.h"
 
 class FormatterTest : public ::testing::Test {
 };
 
+class ReplyReaderTest : public ::testing::Test {
+protected:
+    redisReader *reader;
+    void *reply = nullptr;;
+    int ret;
+    int i;    
+    
+    virtual void SetUp() {
+        reader = redisReaderCreate();
+    }
+    virtual void TearDown() {
+        if(reply == nullptr) { freeReplyObject(reply); }
+        redisReaderFree(reader);
+    }
+};
+
+class DoubleFreeTest : public ::testing::Test {
+};
 
 static std::string formatCommand(const char *fmt, ...) {
     va_list ap;
@@ -126,3 +145,139 @@ TEST_F(FormatterTest, testArgs) {
     sdsfree(sds_cmd);    */
 }
 
+TEST_F(ReplyReaderTest, testErrorHandeling) {
+    redisReaderFeed(reader,(char*)"@foo\r\n",6);
+    ret = redisReaderGetReply(reader,NULL);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+        strcasecmp(reader->errstr,"Protocol error, got \"@\" as reply type byte") == 0)
+        << "Error handling";
+}
+
+TEST_F(ReplyReaderTest, testMemoryCleanup) {
+    redisReaderFeed(reader,(char*)"*2\r\n",4);
+    redisReaderFeed(reader,(char*)"$5\r\nhello\r\n",11);
+    redisReaderFeed(reader,(char*)"@foo\r\n",6);
+    ret = redisReaderGetReply(reader,NULL);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+        strcasecmp(reader->errstr,"Protocol error, got \"@\" as reply type byte") == 0)
+        << "Memory cleanup";
+}
+
+TEST_F(ReplyReaderTest, testMultiBulkGreater7) {
+    for (i = 0; i < 9; i++) {
+        redisReaderFeed(reader,(char*)"*1\r\n",4);
+    }
+
+    ret = redisReaderGetReply(reader,NULL);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+              strncasecmp(reader->errstr,"No support for",14) == 0)
+              << "Set error on nested multi bulks with depth > 7";
+}
+
+TEST_F(ReplyReaderTest, testCorrectParseLLONG_MAX) {
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ":9223372036854775807\r\n",22);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_OK &&
+            ((redisReply*)reply)->type == REDIS_REPLY_INTEGER &&
+            ((redisReply*)reply)->integer == LLONG_MAX);
+}
+
+TEST_F(ReplyReaderTest, testErrorGreaterLLONG_MAX) {
+    redisReaderFeed(reader, ":9223372036854775808\r\n",22);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad integer value") == 0);
+}
+
+TEST_F(ReplyReaderTest, testCorrectParseLLONG_MIN) {
+    redisReaderFeed(reader, ":-9223372036854775808\r\n",23);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_OK &&
+            ((redisReply*)reply)->type == REDIS_REPLY_INTEGER &&
+            ((redisReply*)reply)->integer == LLONG_MIN);
+}
+
+TEST_F(ReplyReaderTest, testErrorSmallerLLONG_MIN) {
+    redisReaderFeed(reader, ":-9223372036854775809\r\n",23);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad integer value") == 0);
+}
+
+TEST_F(ReplyReaderTest, testErrorArraySmallerThan1) {
+    redisReaderFeed(reader, "*-2\r\n+asdf\r\n",12);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Multi-bulk length out of range") == 0);
+}
+
+TEST_F(ReplyReaderTest, testErrorBulkSmallerThan1) {
+    redisReaderFeed(reader, "$-2\r\nasdf\r\n",11);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bulk string length out of range") == 0);
+ 
+}
+
+TEST_F(ReplyReaderTest, testErrorArrayGreaterINT_MAX) {
+    redisReaderFeed(reader, "*9223372036854775807\r\n+asdf\r\n",29);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+            strcasecmp(reader->errstr,"Multi-bulk length out of range") == 0);
+}
+
+#if LLONG_MAX > SIZE_MAX
+TEST_F(ReplyReaderTest, testErrorBulkSmallerThan1) {
+    redisReaderFeed(reader, "$9223372036854775807\r\nasdf\r\n",28);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_ERR &&
+            strcasecmp(reader->errstr,"Bulk string length out of range") == 0);
+}
+#endif
+
+TEST_F(ReplyReaderTest, testNullReplyFunc) {
+    reader->fn = NULL;
+    redisReaderFeed(reader,(char*)"+OK\r\n",5);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_OK && reply == (void*)REDIS_REPLY_STATUS);
+}
+
+TEST_F(ReplyReaderTest, testSingleNewlineTwoCalls) {
+    reader->fn = NULL;
+    redisReaderFeed(reader,(char*)"+OK\r",4);
+    ret = redisReaderGetReply(reader,&reply);
+    assert(ret == REDIS_OK && reply == NULL);
+    redisReaderFeed(reader,(char*)"\n",1);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_OK && reply == (void*)REDIS_REPLY_STATUS);
+}
+
+TEST_F(ReplyReaderTest, testNoResetAfterProtocolError) {
+    reader->fn = NULL;
+    redisReaderFeed(reader,(char*)"x",1);
+    ret = redisReaderGetReply(reader,&reply);
+    assert(ret == REDIS_ERR); //
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_ERR && reply == NULL);
+}
+
+/* Regression test for issue #45 on GitHub. */
+TEST_F(ReplyReaderTest, testNoEmptyAlloc4EmptyBulk) {
+    redisReaderFeed(reader,(char*)"*0\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    ASSERT_TRUE(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
+        ((redisReply*)reply)->elements == 0);
+}
+
+TEST_F(DoubleFreeTest, testDoubleFree) {
+    redisContext *redisCtx = NULL;
+    void *reply = NULL;
+
+    redisFree(redisCtx);
+    ASSERT_TRUE(redisCtx == NULL);
+
+    freeReplyObject(reply);
+    ASSERT_TRUE(reply == NULL);
+}
