@@ -9,6 +9,9 @@
 namespace hiredis {
 class ClientSettings {
 public:
+    ClientSettings() {}
+    ClientSettings(std::string connectType_, std::string str_);
+
     void applyEnv();
     void setHost(const char *s);
     void setUnix(const char *s);
@@ -64,7 +67,7 @@ class ConnectError : public ClientError {
 public:
     ConnectError() : ClientError(){}
     ConnectError(const redisOptions& options);
-    virtual const char *what() const noexcept override{
+    virtual const char *what() const noexcept override {
         return endpoint.c_str();
     }
 private:
@@ -73,14 +76,14 @@ private:
 
 class IOError : public ClientError {
 public:
-    IOError() : ClientError(){}
-    IOError(const char *s) : ClientError(s) {}
+    IOError() : ClientError() {}
+    IOError(const char *what) : ClientError(what) {}
 };
 
 class TimeoutError : public ClientError {
 public:
     TimeoutError() : ClientError("timed out") {}
-    TimeoutError(const char *s) : ClientError(s) {}
+    TimeoutError(const char *what) : ClientError(what) {}
 };
 
 class SSLError : public ClientError {
@@ -100,6 +103,11 @@ public:
 private:
     std::string errstr;
 };
+
+
+inline redisReply *castReply(void *reply) {
+    return reinterpret_cast<redisReply*>(reply);
+}
 
 }
 #endif
