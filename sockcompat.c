@@ -192,7 +192,7 @@ int win32_getsockopt(SOCKET sockfd, int level, int optname, void *optval, sockle
     int ret = 0;
     if ((level == SOL_SOCKET) && ((optname == SO_RCVTIMEO) || (optname == SO_SNDTIMEO))) {
         if (*optlen >= sizeof (struct timeval)) {
-            struct timeval *tv = (struct timeval *)optval;
+            struct timeval *tv = optval;
             DWORD timeout = 0;
             socklen_t dwlen = 0;
             ret = getsockopt(sockfd, level, optname, (char *)&timeout, &dwlen);
@@ -212,7 +212,7 @@ int win32_getsockopt(SOCKET sockfd, int level, int optname, void *optval, sockle
 int win32_setsockopt(SOCKET sockfd, int level, int optname, const void *optval, socklen_t optlen) {
     int ret = 0;
     if ((level == SOL_SOCKET) && ((optname == SO_RCVTIMEO) || (optname == SO_SNDTIMEO))) {
-        struct timeval *tv = (struct timeval *)optval;
+        struct timeval *tv = optval;
         DWORD timeout = tv->tv_sec * 1000 + tv->tv_usec / 1000;
         ret = setsockopt(sockfd, level, optname, (const char*)&timeout, sizeof(DWORD));
     } else {
