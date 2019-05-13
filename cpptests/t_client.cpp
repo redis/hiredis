@@ -2,10 +2,13 @@
 #include <cstdlib>
 #include <string>
 #include <cassert>
+#include <climits>
+#include <netdb.h>
 
+#include "hiredis.h"
 #include "common.h"
 
-using namespace hiredis;
+namespace hiredis {
 
 class Client {
 public:
@@ -27,6 +30,13 @@ public:
             secureConnection(settings);
         }
     }
+
+    Client& operator=(const Client &other_) {
+        ctx = other_.ctx;
+        return *this;
+    }
+
+    operator redisContext*() const { return ctx; }
 
     void secureConnection(const ClientSettings& settings) {
         if (redisSecureConnection(
@@ -81,6 +91,7 @@ private:
         ctx = NULL;
         ClientError::throwCode(err);
     }
+
     void connectOrThrow(const redisOptions& options) {
         ctx = redisConnectWithOptions(&options);
         if (!ctx) {
@@ -96,7 +107,7 @@ private:
 
 class ClientTestTCP : public ::testing::Test {
 public:
-    ClientTestTCP() : cs("tcp", ""), c(cs) {}
+    ClientTestTCP() : c(cs) {}
 
 protected:
     virtual void SetUp() {        
@@ -104,6 +115,7 @@ protected:
     }
     virtual void TearDown() {
     //    if(reply != nullptr) { freeReplyObject(reply); }
+        
     }
 
     ClientSettings cs;    
@@ -111,30 +123,15 @@ protected:
     redisReply *reply;
 };
 
-TEST_F(ClientTestTCP, testTimeout) {
-    redisOptions options = {0};
-    timeval tv = {0};
-    tv.tv_usec = 10000; // 10k micros, small enough
-    options.timeout = &tv;
-    // see https://tools.ietf.org/html/rfc5737
-    // this block of addresses is reserved for "documentation", and it
-    // would likely not connect, ever.
-    ASSERT_THROW(Client(options).nothing(), ClientError);
-
-    // Test the normal timeout
- //   Client c(settings_g);
-    c.flushdb();
-}
-
-// Not finished
 TEST_F(ClientTestTCP, testAppendFormattedCmd) {
     char *cmd;
     int len;
 
     len = redisFormatCommand(&cmd, "SET foo bar");
     ASSERT_TRUE(redisAppendFormattedCommand(*c, cmd, len) == REDIS_OK);
-//    assert(redisGetReply(*c, (void*)&reply) == REDIS_OK);
+    assert(redisGetReply(c, (void**)&reply) == REDIS_OK);
     free(cmd);
+    freeReplyObject(reply);
 }
 
 TEST_F(ClientTestTCP, testBlockingConnection) {
@@ -227,20 +224,119 @@ TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
     freeReplyObject(reply);
 
 //  Reconnect properly reconnects after a timeout
-    redisReconnect(*c);
-    reply = castReply(redisCommand(*c, "PING"));
+    redisReconnect(c);
+    reply = castReply(redisCommand(c, "PING"));
     ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
     freeReplyObject(reply);
 
 //  Reconnect properly uses owned parameters
-    char foo[4] = "foo";
+//    char foo[4] = "foo";
 /**************** fails *****************
     (*c)->tcp.host = foo;
     (*c)->unix_sock.path = foo;
-/**************** fails *****************
+**************** fails *****************
     redisReconnect(*c);
     reply = castReply(redisCommand(*c, "PING"));
     ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
     freeReplyObject(reply);    */
     
+}
+
+#define HIREDIS_BAD_DOMAIN "idontexist-noreally.com"
+TEST_F(ClientTestTCP, testBlockConnectionError) {
+//  Returns error when host cannot be resolved
+    struct addrinfo hints = { 0 };
+    hints.ai_family = AF_INET;
+    struct addrinfo *ai_tmp = NULL;
+    bool flag = false;
+
+    int rv = getaddrinfo(HIREDIS_BAD_DOMAIN, "6379", &hints, &ai_tmp);
+    if (rv != 0) {
+    // First see if this domain name *actually* resolves to NXDOMAIN
+        cs.setHost(HIREDIS_BAD_DOMAIN);
+        try { c = Client(cs); }
+        catch(...) { flag = true; }
+        ASSERT_TRUE(flag);
+        flag = false;
+    } else {
+        printf("Skipping NXDOMAIN test. Found evil ISP!\n");
+        freeaddrinfo(ai_tmp);
+    }
+
+//  Returns error when the port is not open
+    cs.setHost("localhost:1");
+    try { c = Client(cs); }
+    catch(...) { flag = true; }
+    ASSERT_TRUE(flag);
+    flag = false;
+ 
+//  Returns error when the unix_sock socket path doesn't accept connections
+    cs.setUnix("/tmp/idontexist.sock");
+    try { c = Client(cs); }
+    catch(...) { flag = true; }
+    ASSERT_TRUE(flag);
+}
+
+TEST_F(ClientTestTCP, testBlockingIO) {
+    void *_reply;
+    int major, minor;
+    {
+        /* Find out Redis version to determine the path for the next test */
+        const char *field = "redis_version:";
+        char *p, *eptr;
+
+        reply = castReply(redisCommand(*c,"INFO"));
+        p = strstr(reply->str,field);
+        major = strtol(p+strlen(field),&eptr,10);
+        p = eptr+1; /* char next to the first "." */
+        minor = strtol(p,&eptr,10);
+        freeReplyObject(reply);
+    }
+    reply = castReply(redisCommand(*c,"QUIT"));
+    if (major > 2 || (major == 2 && minor > 0)) {
+        /* > 2.0 returns OK on QUIT and read() should be issued once more
+         * to know the descriptor is at EOF. */
+        ASSERT_TRUE(strcasecmp(reply->str,"OK") == 0 &&
+            redisGetReply(c, &_reply) == REDIS_ERR);
+        freeReplyObject(reply);
+    } else {
+        ASSERT_TRUE(reply == NULL);
+    }
+
+    assert((*c)->err == REDIS_ERR_EOF &&
+        strcmp((*c)->errstr,"Server closed the connection") == 0);
+}
+
+TEST_F(ClientTestTCP, testBlockingIOTimeout) {
+//  Returns I/O error on socket timeout
+    void *_reply;
+
+    struct timeval tv = { 0, 1000 };
+    assert(redisSetTimeout(c,tv) == REDIS_OK);
+    ASSERT_TRUE(redisGetReply(c,&_reply) == REDIS_ERR &&
+        (*c)->err == REDIS_ERR_IO && errno == EAGAIN);
+}
+
+TEST_F(ClientTestTCP, testInvalidTimeoutErr) {
+//  Set error when an invalid timeout usec value is given to redisConnectWithTimeout
+    redisOptions options = { 0 };
+    struct timeval timeout = { 0, 10000001 };
+    bool flag = false;
+
+    options.type = REDIS_CONN_TCP;
+    options.endpoint.tcp.ip = "localhost";
+    options.endpoint.tcp.port = 6379;
+    options.timeout = &timeout;
+    
+    try { c = Client(options); }
+    catch(IOError e) { flag = true; }
+    ASSERT_TRUE(flag);
+    flag = false;
+
+    timeout = { (((LONG_MAX) - 999) / 1000) + 1, 0 };
+    try { c = Client(options); }
+    catch(IOError e) { flag = true; }
+    ASSERT_TRUE(flag);
+}
+
 }
