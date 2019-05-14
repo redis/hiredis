@@ -450,6 +450,7 @@ static void test_blocking_connection_errors(void) {
             c->err == REDIS_ERR_OTHER &&
             (strcmp(c->errstr, "Name or service not known") == 0 ||
              strcmp(c->errstr, "Can't resolve: " HIREDIS_BAD_DOMAIN) == 0 ||
+             strcmp(c->errstr, "Name does not resolve") == 0 ||
              strcmp(c->errstr,
                     "nodename nor servname provided, or not known") == 0 ||
              strcmp(c->errstr, "No address associated with hostname") == 0 ||
