@@ -13,7 +13,7 @@ ENDMACRO(getVersionBit)
 
 IF (${CMAKE_C_COMPILER_ID} MATCHES "GNU" OR ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -ftest-coverage -fprofile-arcs")
 ENDIF()
 
 getVersionBit(HIREDIS_MAJOR)
