@@ -32,7 +32,7 @@ public:
     }
 
     Client& operator=(const Client &other_) {
-        ctx = other_.ctx;
+        memcpy(ctx, other_.ctx, sizeof(redisContext));
         return *this;
     }
 
