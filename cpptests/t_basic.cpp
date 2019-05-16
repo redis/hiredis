@@ -59,19 +59,19 @@ static std::string formatCommand(const char *fmt, ...) {
 
 TEST_F(FormatterTest, testFormatCommands) {
     auto expected = "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
-    ASSERT_EQ(expected, formatCommand("SET foo bar"))
+    ASSERT_STREQ(expected, formatCommand("SET foo bar").c_str())
         << "No interpolation";
 
     expected = "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
-    ASSERT_EQ(expected, formatCommand("SET %s %s", "foo", "bar"))
+    ASSERT_STREQ(expected, formatCommand("SET %s %s", "foo", "bar").c_str())
         << "interpolation";
 
     expected = "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n";
-    ASSERT_EQ(expected, formatCommand("SET %s %s", "foo", ""))
+    ASSERT_STREQ(expected, formatCommand("SET %s %s", "foo", "").c_str())
         << "empty string";
 
     expected = "*3\r\n$3\r\nSET\r\n$0\r\n\r\n$3\r\nfoo\r\n";
-    ASSERT_EQ(expected, formatCommand("SET %s %s","","foo"))
+    ASSERT_STREQ(expected, formatCommand("SET %s %s","","foo").c_str())
         << "an empty string in between proper interpolations";
 
     // NULL terminator requires special care
@@ -81,11 +81,11 @@ TEST_F(FormatterTest, testFormatCommands) {
     ASSERT_TRUE(cmp == 0) << "%%b string interpolation";
 
     expected = "*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n";
-    ASSERT_EQ(expected, formatCommand("SET %b %b","foo",(size_t)3,"",(size_t)0))
+    ASSERT_STREQ(expected, formatCommand("SET %b %b","foo",(size_t)3,"",(size_t)0).c_str())
         << "%%b and an empty string";
 
     expected =  "*3\r\n$3\r\nSET\r\n$1\r\n%\r\n$1\r\n%\r\n";
-    ASSERT_EQ(expected, formatCommand("SET %% %%"))
+    ASSERT_STREQ(expected, formatCommand("SET %% %%").c_str())
         << "literal %%";
 }
 
@@ -183,8 +183,8 @@ TEST_F(ReplyReaderTest, testCorrectParseLLONG_MAX) {
 TEST_F(ReplyReaderTest, testErrorGreaterLLONG_MAX) {
     redisReaderFeed(reader, ":9223372036854775808\r\n", 22);
     ret = redisReaderGetReply(reader,&reply);
-    ASSERT_TRUE(ret == REDIS_ERR &&
-              strcasecmp(reader->errstr,"Bad integer value") == 0);
+    ASSERT_TRUE(ret == REDIS_ERR);
+    ASSERT_STREQ(reader->errstr,"Bad integer value");
 }
 
 TEST_F(ReplyReaderTest, testCorrectParseLLONG_MIN) {
@@ -198,38 +198,38 @@ TEST_F(ReplyReaderTest, testCorrectParseLLONG_MIN) {
 TEST_F(ReplyReaderTest, testErrorSmallerLLONG_MIN) {
     redisReaderFeed(reader, ":-9223372036854775809\r\n", 23);
     ret = redisReaderGetReply(reader,&reply);
-    ASSERT_TRUE(ret == REDIS_ERR &&
-              strcasecmp(reader->errstr,"Bad integer value") == 0);
+    ASSERT_TRUE(ret == REDIS_ERR);
+    ASSERT_STREQ(reader->errstr,"Bad integer value");
 }
 
 TEST_F(ReplyReaderTest, testErrorArraySmallerThan1) {
     redisReaderFeed(reader, "*-2\r\n+asdf\r\n", 12);
     ret = redisReaderGetReply(reader,&reply);
-    ASSERT_TRUE(ret == REDIS_ERR &&
-              strcasecmp(reader->errstr,"Multi-bulk length out of range") == 0);
+    ASSERT_TRUE(ret == REDIS_ERR);
+    ASSERT_STREQ(reader->errstr,"Multi-bulk length out of range");
 }
 
 TEST_F(ReplyReaderTest, testErrorBulkSmallerThan1) {
     redisReaderFeed(reader, "$-2\r\nasdf\r\n", 11);
     ret = redisReaderGetReply(reader,&reply);
-    ASSERT_TRUE(ret == REDIS_ERR &&
-              strcasecmp(reader->errstr,"Bulk string length out of range") == 0);
+    ASSERT_TRUE(ret == REDIS_ERR);
+    ASSERT_STREQ(reader->errstr,"Bulk string length out of range");
  
 }
 
 TEST_F(ReplyReaderTest, testErrorArrayGreaterINT_MAX) {
     redisReaderFeed(reader, "*9223372036854775807\r\n+asdf\r\n", 29);
     ret = redisReaderGetReply(reader,&reply);
-    ASSERT_TRUE(ret == REDIS_ERR &&
-            strcasecmp(reader->errstr,"Multi-bulk length out of range") == 0);
+    ASSERT_TRUE(ret == REDIS_ERR);
+    ASSERT_STREQ(reader->errstr,"Multi-bulk length out of range");
 }
 
 #if LLONG_MAX > SIZE_MAX
 TEST_F(ReplyReaderTest, testErrorBulkSmallerThan1) {
     redisReaderFeed(reader, "$9223372036854775807\r\nasdf\r\n", 28);
     ret = redisReaderGetReply(reader,&reply);
-    ASSERT_TRUE(ret == REDIS_ERR &&
-            strcasecmp(reader->errstr,"Bulk string length out of range") == 0);
+    ASSERT_TRUE(ret == REDIS_ERR);
+    ASSERT_STREQ(reader->errstr,"Bulk string length out of range");
 }
 #endif
 

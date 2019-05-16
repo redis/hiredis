@@ -136,26 +136,26 @@ TEST_F(ClientTestTCP, testAppendFormattedCmd) {
 
 TEST_F(ClientTestTCP, testBlockingConnection) {
     reply = castReply(redisCommand(c,"PING"));
-    ASSERT_TRUE(reply->type == REDIS_REPLY_STATUS && 
-                strcasecmp(reply->str,"pong") == 0);
+    ASSERT_TRUE(reply->type == REDIS_REPLY_STATUS);
+    ASSERT_STRCASEEQ(reply->str,"pong");
     freeReplyObject(reply);
 
     reply = castReply(redisCommand(c,"SET foo bar"));
-    ASSERT_TRUE(reply->type == REDIS_REPLY_STATUS &&
-                strcasecmp(reply->str,"ok") == 0);
+    ASSERT_TRUE(reply->type == REDIS_REPLY_STATUS);
+    ASSERT_STRCASEEQ(reply->str,"ok");
     freeReplyObject(reply);
 
-    reply = castReply(redisCommand(c,"SET %s %s","foo",
-                                    "hello world"));
+    reply = castReply(redisCommand(c,"SET %s %s","foo", "hello world"));
     freeReplyObject(reply);
 
     reply = castReply(redisCommand(c,"GET foo"));
-    ASSERT_TRUE(reply->type == REDIS_REPLY_STRING &&
-                strcmp(reply->str,"hello world") == 0);
+    ASSERT_TRUE(reply->type == REDIS_REPLY_STRING);
+    ASSERT_STRCASEEQ(reply->str,"hello world");
     freeReplyObject(reply);
 
     reply = castReply(redisCommand(c,"SET %b %b","foo",
                 (size_t)3,"hello\x00world",(size_t)11));
+    ASSERT_STRCASEEQ(reply->str,"OK");
     freeReplyObject(reply);
 
     reply = castReply(redisCommand(c,"GET foo"));
@@ -187,14 +187,14 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
     freeReplyObject(castReply(redisCommand(c,"LRANGE mylist 0 -1")));
     freeReplyObject(castReply(redisCommand(c,"PING")));
     reply = (castReply(redisCommand(c,"EXEC")));
-    ASSERT_TRUE(reply->type == REDIS_REPLY_ARRAY &&
-              reply->elements == 2 &&
-              reply->element[0]->type == REDIS_REPLY_ARRAY &&
-              reply->element[0]->elements == 2 &&
-              !memcmp(reply->element[0]->element[0]->str,"bar",3) &&
-              !memcmp(reply->element[0]->element[1]->str,"foo",3) &&
-              reply->element[1]->type == REDIS_REPLY_STATUS &&
-              strcasecmp(reply->element[1]->str,"pong") == 0);
+    ASSERT_TRUE(reply->type == REDIS_REPLY_ARRAY);
+    ASSERT_TRUE(reply->elements == 2);
+    ASSERT_TRUE(reply->element[0]->type == REDIS_REPLY_ARRAY);
+    ASSERT_TRUE(reply->element[0]->elements == 2);
+    ASSERT_FALSE(memcmp(reply->element[0]->element[0]->str,"bar",3));
+    ASSERT_FALSE(memcmp(reply->element[0]->element[1]->str,"foo",3));
+    ASSERT_TRUE(reply->element[1]->type == REDIS_REPLY_STATUS);
+    ASSERT_STRCASEEQ(reply->element[1]->str,"pong");
     freeReplyObject(reply);
 }
 
@@ -222,13 +222,15 @@ TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
     tv.tv_usec = 10000;
     redisSetTimeout(c, tv);
     reply = castReply(redisCommand(c, "GET foo"));
-    ASSERT_TRUE(s > 0 && reply == NULL && (*c)->err == REDIS_ERR_IO && strcmp((*c)->errstr, "Resource temporarily unavailable") == 0);
+    ASSERT_TRUE(s > 0 && reply == NULL && (*c)->err == REDIS_ERR_IO);
+    ASSERT_STREQ((*c)->errstr, "Resource temporarily unavailable");
     freeReplyObject(reply);
 
 //  Reconnect properly reconnects after a timeout
     redisReconnect(c);
     reply = castReply(redisCommand(c, "PING"));
-    ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+    ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    ASSERT_STREQ(reply->str, "PONG");
     freeReplyObject(reply);
 
 //  Reconnect properly uses owned parameters
@@ -239,7 +241,8 @@ TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
 **************** fails *****************
     redisReconnect(c);
     reply = castReply(redisCommand(c, "PING"));
-    ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+    ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    ASSERT_STREQ(reply->str, "PONG");
     freeReplyObject(reply);    */
     
 }
@@ -298,8 +301,8 @@ TEST_F(ClientTestTCP, testBlockingIO) {
     if (major > 2 || (major == 2 && minor > 0)) {
         /* > 2.0 returns OK on QUIT and read() should be issued once more
          * to know the descriptor is at EOF. */
-        ASSERT_TRUE(strcasecmp(reply->str,"OK") == 0 &&
-            redisGetReply(c, &_reply) == REDIS_ERR);
+        ASSERT_STREQ(reply->str,"OK");
+        ASSERT_TRUE(redisGetReply(c, &_reply) == REDIS_ERR);
         freeReplyObject(reply);
     } else {
         ASSERT_TRUE(reply == NULL);
