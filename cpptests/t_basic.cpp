@@ -6,6 +6,7 @@
 #include <climits>          // LLONG_MAX
 
 #include "hiredis.h"
+#include "c_tests.c"
 
 class FormatterTest : public ::testing::Test {
 };
@@ -26,7 +27,7 @@ protected:
     }
 };
 
-class DoubleFreeTest : public ::testing::Test {
+class OtherTest : public ::testing::Test {
 };
 
 static std::string formatCommand(const char *fmt, ...) {
@@ -268,7 +269,7 @@ TEST_F(ReplyReaderTest, testNoEmptyAlloc4EmptyBulk) {
         ((redisReply*)reply)->elements == 0);
 }
 
-TEST_F(DoubleFreeTest, testDoubleFree) {
+TEST_F(OtherTest, testDoubleFree) {
     redisContext *redisCtx = NULL;
     void *reply = NULL;
 
@@ -277,4 +278,9 @@ TEST_F(DoubleFreeTest, testDoubleFree) {
 
     freeReplyObject(reply);
     ASSERT_TRUE(reply == NULL);
+}
+
+TEST_F(OtherTest, testCTests) {
+    int res = runHiredisCTests();   
+    ASSERT_FALSE(res);
 }
