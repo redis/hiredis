@@ -34,7 +34,7 @@ struct AsyncClient {
         ac->data = this;
         redisLibeventAttach(ac, b);
         redisAsyncSetConnectCallback(ac, realConnectCb);
-
+        redisAsyncSetDisconnectCallback(ac, realDisconnectCb);
     }
 
     AsyncClient(const redisOptions& options, event_base* b, unsigned timeoutMs = 0) {
@@ -61,7 +61,10 @@ struct AsyncClient {
         }
     }
 
-    AsyncClient(redisAsyncContext *ac) : ac(ac) {
+    AsyncClient(redisAsyncContext *ac, event_base *b) : ac(ac) {
+        ac->data = this;
+        redisLibeventAttach(ac, b);
+        redisAsyncSetConnectCallback(ac, realConnectCb);
         redisAsyncSetDisconnectCallback(ac, realDisconnectCb);
     }
 
@@ -76,13 +79,19 @@ struct AsyncClient {
             redisAsyncDisconnect(tmpac);
         }
     }
-
-    void cmd(CommandCallback cb, const char *fmt, ...) {
+    
+    template<typename... Args>
+    void cmd(CommandCallback cb, const char *fmt, Args ... args) {
         auto data = new CmdData {this, cb };
-        va_list ap;
-        va_start(ap, fmt);
-        redisvAsyncCommand(ac, realCommandCb, data, fmt, ap);
-        va_end(ap);
+    //    va_list ap;
+    //    va_start(ap, fmt);
+        redisAsyncCommand(ac, realCommandCb, data, fmt, args...); //for coverage purposes
+    //    va_end(ap);
+    }
+
+    void cmdFormatted(CommandCallback cb, const char *cmd, size_t len) {
+        auto data = new CmdData {this, cb };
+        redisAsyncFormattedCommand(ac, realCommandCb, data, cmd, len); //for coverage purposes
     }
 
     void disconnect(DisconnectCallback cb) {
@@ -158,7 +167,137 @@ TEST_F(AsyncTest, testAsync) {
         gotCommand = true;
     }, "PING");
     wait();
+    ASSERT_TRUE(gotConnect);
+    ASSERT_TRUE(gotCommand);
+}
 
+TEST_F(AsyncTest, testAsync1) {
+    AsyncClient client(settings_g, libevent, 1000);
+
+    bool gotConnect = false;
+    bool gotCommand = false;
+    client.onConnect([&](AsyncClient*, bool status) {
+        ASSERT_TRUE(status);
+        gotConnect = true;
+    });
+
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_STATUS, r->type);
+        ASSERT_STREQ("OK", r->str);
+        c->disconnect();
+        gotCommand = true;
+    }, "SET foo bar");
+    wait();
+    ASSERT_TRUE(gotConnect);
+    ASSERT_TRUE(gotCommand);
+}
+
+TEST_F(AsyncTest, testAsync2) {
+    /* possible bug?? 
+    redisAsyncContext *ac = redisAsyncConnectBind("localhost", 6379, "gtestname");
+    AsyncClient client(ac, libevent); */
+
+    AsyncClient client(settings_g, libevent, 1000);
+
+    bool gotConnect = false;
+    bool gotCommand = false;
+    client.onConnect([&](AsyncClient*, bool status) {
+        ASSERT_TRUE(status);
+        gotConnect = true;
+    });
+
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_STATUS, r->type);
+        ASSERT_STREQ("OK", r->str);
+        c->disconnect();
+        gotCommand = true;
+    }, "SET %s %s","foo", "hello world");
+    wait();
+    ASSERT_TRUE(gotConnect);
+    ASSERT_TRUE(gotCommand);
+}
+
+TEST_F(AsyncTest, testConTypes) {
+    redisAsyncContext *ac = redisAsyncConnect("localhost", 6379);
+    ASSERT_TRUE(ac->c.tcp.port == 6379);
+    AsyncClient client(ac, libevent);
+
+    bool gotConnect = false;
+    bool gotCommand = false;
+    client.onConnect([&](AsyncClient*, bool status) {
+        ASSERT_TRUE(status);
+        gotConnect = true;
+    });
+
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_STATUS, r->type);
+        ASSERT_STREQ("OK", r->str);
+        c->disconnect();
+        gotCommand = true;
+    }, "SET %s %s","foo", "hello world");
+    wait();
+    ASSERT_TRUE(gotConnect);
+    ASSERT_TRUE(gotCommand);
+}
+
+TEST_F(AsyncTest, testConTimeout) {
+    redisAsyncContext *ac = redisAsyncConnect("localhost", 6379);
+    AsyncClient client(ac, libevent);
+    redisAsyncHandleTimeout(ac);
+    ASSERT_EQ(ac->err, REDIS_ERR_TIMEOUT);
+}
+
+/*
+TEST_F(AsyncTest, testFormattedCmd) {
+    AsyncClient client(settings_g, libevent, 1000);
+    
+    bool gotConnect = false;
+    bool gotCommand = false;
+    client.onConnect([&](AsyncClient*, bool status) {
+        ASSERT_TRUE(status);
+        gotConnect = true;
+    });
+
+    const char *str = "$ SET foo bar\r";
+    client.cmdFormatted([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_STATUS, r->type);
+        ASSERT_STREQ("OK", r->str);
+        c->disconnect();
+        gotCommand = true;
+    }, str,3);
+    wait();
+    ASSERT_TRUE(gotConnect);
+    ASSERT_TRUE(gotCommand);
+} */
+
+TEST_F(AsyncTest, testSetTimeout) {
+    redisAsyncContext *ac = redisAsyncConnect("localhost", 6379);
+    ASSERT_TRUE(ac->c.timeout == NULL);
+    struct timeval tv = { 0, 1000 };
+    redisAsyncSetTimeout(ac,tv);
+    ASSERT_TRUE(ac->c.timeout->tv_usec == 1000);
+
+    AsyncClient client(ac, libevent);
+
+    bool gotConnect = false;
+    bool gotCommand = false;
+    client.onConnect([&](AsyncClient*, bool status) {
+        ASSERT_TRUE(status);
+        gotConnect = true;
+    });
+
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_STATUS, r->type);
+        ASSERT_STREQ("OK", r->str);
+        c->disconnect();
+        gotCommand = true;
+    }, "SET %s %s","foo", "hello world");
+    wait();
     ASSERT_TRUE(gotConnect);
     ASSERT_TRUE(gotCommand);
 }
