@@ -107,19 +107,28 @@ private:
 
 class RedisReply {
 public:
-    RedisReply() {}
+    RedisReply() 
+        : reply(nullptr) {}
     RedisReply(void *other_) 
         : reply(reinterpret_cast<redisReply*>(other_)) {}
     ~RedisReply() { Destroy(); }
 
     void operator=(redisReply* other_) { reply = other_; }
-    void operator=(void* other_) { reply = reinterpret_cast<redisReply*>(other_); }
+    void operator=(void* other_) { 
+        this->Destroy();
+        reply = reinterpret_cast<redisReply*>(other_); 
+    }
 
     operator redisReply*() const { return reply; }
     redisReply *operator->() { return reply; }
 //    redisReply **operator&() { return &reply; }
 
-    void Destroy() { freeReplyObject(reply); reply = NULL; }
+    void Destroy() { 
+        if(reply != nullptr) {
+            freeReplyObject(reply); 
+            reply = nullptr; 
+        }
+    }
 
 private:
     redisReply *reply;

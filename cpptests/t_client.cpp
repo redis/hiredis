@@ -107,19 +107,19 @@ private:
 
 class ClientTestTCP : public ::testing::Test {
 public:
-    ClientTestTCP() : c(cs) {}
+    ClientTestTCP() : c(cs), reply(nullptr) {}
 
 protected:
     virtual void SetUp() {        
         c.flushdb();
     }
     virtual void TearDown() {
-        if(reply == nullptr) { freeReplyObject(reply); }
+        reply.Destroy();
     }
 
     ClientSettings cs;    
     Client c;
-    redisReply *reply; // TODO: replace with RedisReply class
+    RedisReply reply;
 };
 
 TEST_F(ClientTestTCP, testAppendFormattedCmd) {
@@ -130,47 +130,46 @@ TEST_F(ClientTestTCP, testAppendFormattedCmd) {
     ASSERT_TRUE(redisAppendFormattedCommand(c, cmd, len) == REDIS_OK);
     assert(redisGetReply(c, (void**)&reply) == REDIS_OK);
     free(cmd);
-    freeReplyObject(reply);
 }
 
 TEST_F(ClientTestTCP, testBlockingConnection) {
-    reply = castReply(redisCommand(c,"PING"));
+    reply = redisCommand(c,"PING");
     ASSERT_TRUE(reply->type == REDIS_REPLY_STATUS);
     ASSERT_STRCASEEQ(reply->str,"pong");
-    freeReplyObject(reply);
+    reply.Destroy();
 
-    reply = castReply(redisCommand(c,"SET foo bar"));
+    reply = redisCommand(c,"SET foo bar");
     ASSERT_TRUE(reply->type == REDIS_REPLY_STATUS);
     ASSERT_STRCASEEQ(reply->str,"ok");
-    freeReplyObject(reply);
+    reply.Destroy();
 
-    reply = castReply(redisCommand(c,"SET %s %s","foo", "hello world"));
-    freeReplyObject(reply);
-
+    reply = redisCommand(c,"SET %s %s","foo", "hello world");
+    reply.Destroy();
+    
     reply = castReply(redisCommand(c,"GET foo"));
     ASSERT_TRUE(reply->type == REDIS_REPLY_STRING);
     ASSERT_STRCASEEQ(reply->str,"hello world");
-    freeReplyObject(reply);
-
+    reply.Destroy();
+    
     reply = castReply(redisCommand(c,"SET %b %b","foo",
                 (size_t)3,"hello\x00world",(size_t)11));
     ASSERT_STRCASEEQ(reply->str,"OK");
-    freeReplyObject(reply);
-
+    reply.Destroy();
+    
     reply = castReply(redisCommand(c,"GET foo"));
     ASSERT_TRUE(reply->type == REDIS_REPLY_STRING &&
                 memcmp(reply->str,"hello\x00world",11) == 0);
     ASSERT_TRUE(reply->len == 11);
-    freeReplyObject(reply);
-
+    reply.Destroy();
+    
     reply = castReply(redisCommand(c,"GET nokey"));
     ASSERT_TRUE(reply->type == REDIS_REPLY_NIL);
-    freeReplyObject(reply);
-
+    reply.Destroy();
+    
     reply = castReply(redisCommand(c,"INCR mycounter"));
     ASSERT_TRUE(reply->type == REDIS_REPLY_INTEGER && reply->integer == 1);
-    freeReplyObject(reply);
-
+    reply.Destroy();
+    
     freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
     freeReplyObject(redisCommand(c,"LPUSH mylist bar"));
     reply = castReply(redisCommand(c,"LRANGE mylist 0 -1"));
@@ -178,8 +177,8 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
               reply->elements == 2 &&
               !memcmp(reply->element[0]->str,"bar",3) &&
               !memcmp(reply->element[1]->str,"foo",3));
-    freeReplyObject(reply);
-
+    reply.Destroy();
+    
     /* m/e with multi bulk reply *before* other reply.
      * specifically test ordering of reply items to parse. */
     freeReplyObject(redisCommand(c,"MULTI"));
@@ -194,20 +193,18 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
     ASSERT_FALSE(memcmp(reply->element[0]->element[1]->str,"foo",3));
     ASSERT_TRUE(reply->element[1]->type == REDIS_REPLY_STATUS);
     ASSERT_STRCASEEQ(reply->element[1]->str,"pong");
-    freeReplyObject(reply);
 }
 
 TEST_F(ClientTestTCP, testSuccesfulReconnect) {
     struct timeval tv = { 0, 10000 };
 
 //  Successfully completes a command when the timeout is not exceeded
-    reply = castReply(redisCommand(c,"SET foo fast"));
-    freeReplyObject(reply);
+    reply = redisCommand(c,"SET foo fast");
+    reply.Destroy();
     redisSetTimeout(c, tv);
-    reply = castReply(redisCommand(c, "GET foo"));
+    reply = redisCommand(c, "GET foo");
     ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STRING && 
                 memcmp(reply->str, "fast", 4) == 0);
-    freeReplyObject(reply);
 }
 
 TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
@@ -220,17 +217,16 @@ TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
     tv.tv_sec = 0;
     tv.tv_usec = 10000;
     redisSetTimeout(c, tv);
-    reply = castReply(redisCommand(c, "GET foo"));
+    reply = redisCommand(c, "GET foo");
     ASSERT_TRUE(s > 0 && reply == NULL && (*c)->err == REDIS_ERR_IO);
     ASSERT_STREQ((*c)->errstr, "Resource temporarily unavailable");
-    freeReplyObject(reply);
+    reply.Destroy();
 
 //  Reconnect properly reconnects after a timeout
     redisReconnect(c);
-    reply = castReply(redisCommand(c, "PING"));
+    reply = redisCommand(c, "PING");
     ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS);
     ASSERT_STREQ(reply->str, "PONG");
-    freeReplyObject(reply);
 
 //  Reconnect properly uses owned parameters
 //    char foo[4] = "foo";
@@ -282,27 +278,26 @@ TEST_F(ClientTestTCP, testBlockConnectionError) {
 }
 
 TEST_F(ClientTestTCP, testBlockingIO) {
-    void *_reply;
     int major, minor;
     {
         /* Find out Redis version to determine the path for the next test */
         const char *field = "redis_version:";
         char *p, *eptr;
 
-        reply = castReply(redisCommand(c,"INFO"));
+        reply = redisCommand(c,"INFO");
         p = strstr(reply->str,field);
         major = strtol(p+strlen(field),&eptr,10);
         p = eptr+1; /* char next to the first "." */
         minor = strtol(p,&eptr,10);
-        freeReplyObject(reply);
+        reply.Destroy();
     }
-    reply = castReply(redisCommand(c,"QUIT"));
+    reply = redisCommand(c,"QUIT");
     if (major > 2 || (major == 2 && minor > 0)) {
         /* > 2.0 returns OK on QUIT and read() should be issued once more
          * to know the descriptor is at EOF. */
         ASSERT_STREQ(reply->str,"OK");
-        ASSERT_TRUE(redisGetReply(c, &_reply) == REDIS_ERR);
-        freeReplyObject(reply);
+        ASSERT_TRUE(redisGetReply(c, (void **)&reply) == REDIS_ERR);
+        reply.Destroy();
     } else {
         ASSERT_TRUE(reply == NULL);
     }
@@ -313,11 +308,9 @@ TEST_F(ClientTestTCP, testBlockingIO) {
 
 TEST_F(ClientTestTCP, testBlockingIOTimeout) {
 //  Returns I/O error on socket timeout
-    void *_reply;
-
     struct timeval tv = { 0, 1000 };
     assert(redisSetTimeout(c,tv) == REDIS_OK);
-    ASSERT_TRUE(redisGetReply(c,&_reply) == REDIS_ERR &&
+    ASSERT_TRUE(redisGetReply(c, (void **)&reply) == REDIS_ERR &&
         (*c)->err == REDIS_ERR_IO && errno == EAGAIN);
 }
 
