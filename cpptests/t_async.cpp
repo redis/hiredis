@@ -280,6 +280,10 @@ TEST_F(AsyncTest, testSetTimeout) {
     struct timeval tv = { 0, 1000 };
     redisAsyncSetTimeout(ac,tv);
     ASSERT_TRUE(ac->c.timeout->tv_usec == 1000);
+    tv = { 0, 1000 };
+    redisAsyncSetTimeout(ac,tv);
+    ASSERT_TRUE(ac->c.timeout->tv_usec == 1000);
+
 
     AsyncClient client(ac, libevent);
 
