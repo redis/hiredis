@@ -146,33 +146,32 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
     reply = redisCommand(c,"SET %s %s","foo", "hello world");
     reply.Destroy();
     
-    reply = castReply(redisCommand(c,"GET foo"));
+    reply = redisCommand(c,"GET foo");
     ASSERT_TRUE(reply->type == REDIS_REPLY_STRING);
     ASSERT_STRCASEEQ(reply->str,"hello world");
     reply.Destroy();
     
-    reply = castReply(redisCommand(c,"SET %b %b","foo",
-                (size_t)3,"hello\x00world",(size_t)11));
+    reply = redisCommand(c,"SET %b %b","foo", (size_t)3,"hello\x00world",(size_t)11);
     ASSERT_STRCASEEQ(reply->str,"OK");
     reply.Destroy();
     
-    reply = castReply(redisCommand(c,"GET foo"));
+    reply = redisCommand(c,"GET foo");
     ASSERT_TRUE(reply->type == REDIS_REPLY_STRING &&
                 memcmp(reply->str,"hello\x00world",11) == 0);
     ASSERT_TRUE(reply->len == 11);
     reply.Destroy();
     
-    reply = castReply(redisCommand(c,"GET nokey"));
+    reply = redisCommand(c,"GET nokey");
     ASSERT_TRUE(reply->type == REDIS_REPLY_NIL);
     reply.Destroy();
     
-    reply = castReply(redisCommand(c,"INCR mycounter"));
+    reply = redisCommand(c,"INCR mycounter");
     ASSERT_TRUE(reply->type == REDIS_REPLY_INTEGER && reply->integer == 1);
     reply.Destroy();
     
     freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
     freeReplyObject(redisCommand(c,"LPUSH mylist bar"));
-    reply = castReply(redisCommand(c,"LRANGE mylist 0 -1"));
+    reply = redisCommand(c,"LRANGE mylist 0 -1");
     ASSERT_TRUE(reply->type == REDIS_REPLY_ARRAY &&
               reply->elements == 2 &&
               !memcmp(reply->element[0]->str,"bar",3) &&
@@ -184,7 +183,7 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
     freeReplyObject(redisCommand(c,"MULTI"));
     freeReplyObject(redisCommand(c,"LRANGE mylist 0 -1"));
     freeReplyObject(redisCommand(c,"PING"));
-    reply = castReply(redisCommand(c,"EXEC"));
+    reply = redisCommand(c,"EXEC");
     ASSERT_TRUE(reply->type == REDIS_REPLY_ARRAY);
     ASSERT_TRUE(reply->elements == 2);
     ASSERT_TRUE(reply->element[0]->type == REDIS_REPLY_ARRAY);
@@ -235,7 +234,7 @@ TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
     (*c)->unix_sock.path = foo;
 **************** fails *****************
     redisReconnect(c);
-    reply = castReply(redisCommand(c, "PING"));
+    reply = redisCommand(c, "PING");
     ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS);
     ASSERT_STREQ(reply->str, "PONG");
     freeReplyObject(reply);    */
