@@ -43,6 +43,7 @@ public:
 
     std::string m_hostname = "localhost";
     uint16_t m_port = 6379;
+    std::string m_unix;
 
     int m_mode = REDIS_CONN_TCP;
     const char *m_ssl_cert_path = NULL;
@@ -102,6 +103,26 @@ public:
     }
 private:
     std::string errstr;
+};
+
+class RedisReply {
+public:
+    RedisReply() {}
+    RedisReply(void *other_) 
+        : reply(reinterpret_cast<redisReply*>(other_)) {}
+    ~RedisReply() { Destroy(); }
+
+    void operator=(redisReply* other_) { reply = other_; }
+    void operator=(void* other_) { reply = reinterpret_cast<redisReply*>(other_); }
+
+    operator redisReply*() const { return reply; }
+    redisReply *operator->() { return reply; }
+//    redisReply **operator&() { return &reply; }
+
+    void Destroy() { freeReplyObject(reply); reply = NULL; }
+
+private:
+    redisReply *reply;
 };
 
 inline redisReply *castReply(void *reply) {

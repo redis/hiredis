@@ -49,25 +49,25 @@ public:
         }
     }
 
-    redisReply *cmd(const char *fmt, ...) {
+    RedisReply cmd(const char *fmt, ...) {
         va_list ap;
         va_start(ap, fmt);
-        void *p = redisvCommand(ctx, fmt, ap);
+        RedisReply p = redisvCommand(ctx, fmt, ap);
         va_end(ap);
-        return castReply(p);
+        return p;
     }
 
     void flushdb() {
-        redisReply *p = cmd("FLUSHDB");
+        RedisReply p = cmd("FLUSHDB");
         if (p == NULL) {
             ClientError::throwCode(ctx->err);
         }
         if (p->type == REDIS_REPLY_ERROR) {
             auto pp = CommandError(p);
-            freeReplyObject(p);
+        //    freeReplyObject(p);
             throw pp;
         }
-        freeReplyObject(p);
+      //  freeReplyObject(p);
     }
 
     ~Client() {
@@ -114,13 +114,12 @@ protected:
         c.flushdb();
     }
     virtual void TearDown() {
-    //    if(reply != nullptr) { freeReplyObject(reply); }
-        
+        if(reply == nullptr) { freeReplyObject(reply); }
     }
 
     ClientSettings cs;    
     Client c;
-    redisReply *reply;
+    redisReply *reply; // TODO: replace with RedisReply class
 };
 
 TEST_F(ClientTestTCP, testAppendFormattedCmd) {
@@ -172,8 +171,8 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
     ASSERT_TRUE(reply->type == REDIS_REPLY_INTEGER && reply->integer == 1);
     freeReplyObject(reply);
 
-    freeReplyObject(castReply(redisCommand(c,"LPUSH mylist foo")));
-    freeReplyObject(castReply(redisCommand(c,"LPUSH mylist bar")));
+    freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
+    freeReplyObject(redisCommand(c,"LPUSH mylist bar"));
     reply = castReply(redisCommand(c,"LRANGE mylist 0 -1"));
     ASSERT_TRUE(reply->type == REDIS_REPLY_ARRAY &&
               reply->elements == 2 &&
@@ -183,10 +182,10 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
 
     /* m/e with multi bulk reply *before* other reply.
      * specifically test ordering of reply items to parse. */
-    freeReplyObject(castReply(redisCommand(c,"MULTI")));
-    freeReplyObject(castReply(redisCommand(c,"LRANGE mylist 0 -1")));
-    freeReplyObject(castReply(redisCommand(c,"PING")));
-    reply = (castReply(redisCommand(c,"EXEC")));
+    freeReplyObject(redisCommand(c,"MULTI"));
+    freeReplyObject(redisCommand(c,"LRANGE mylist 0 -1"));
+    freeReplyObject(redisCommand(c,"PING"));
+    reply = castReply(redisCommand(c,"EXEC"));
     ASSERT_TRUE(reply->type == REDIS_REPLY_ARRAY);
     ASSERT_TRUE(reply->elements == 2);
     ASSERT_TRUE(reply->element[0]->type == REDIS_REPLY_ARRAY);
@@ -213,7 +212,7 @@ TEST_F(ClientTestTCP, testSuccesfulReconnect) {
 
 TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
     ssize_t s;
-    const char *cmd = "DEBUG SLEEP 3\r\n";
+    const char *cmd = "DEBUG SLEEP 1\r\n"; // TODO: change back to 3 in future
     struct timeval tv = { 0, 10000 };
 
 //  Does not return a reply when the command times out
