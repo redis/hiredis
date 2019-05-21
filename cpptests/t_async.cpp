@@ -83,10 +83,7 @@ struct AsyncClient {
     template<typename... Args>
     void cmd(CommandCallback cb, const char *fmt, Args ... args) {
         auto data = new CmdData {this, cb };
-    //    va_list ap;
-    //    va_start(ap, fmt);
         redisAsyncCommand(ac, realCommandCb, data, fmt, args...); //for coverage purposes
-    //    va_end(ap);
     }
 
     void cmdFormatted(CommandCallback cb, const char *cmd, size_t len) {
