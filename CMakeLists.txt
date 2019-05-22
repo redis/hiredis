@@ -1,5 +1,11 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.4.0)
 INCLUDE(GNUInstallDirs)
+
+# suppresses error
+set(PROJECT_VERSION "0")
+set(PROJECT_VERSION_MAJOR "0")
+set(PROJECT_VERSION_MINOR "0")
+set(PROJECT_VERSION_PATCH "0")
 PROJECT(hiredis)
 
 OPTION(HIREDIS_SSL "Link against OpenSSL" OFF)
@@ -12,8 +18,8 @@ MACRO(getVersionBit name)
 ENDMACRO(getVersionBit)
 
 IF (${CMAKE_C_COMPILER_ID} MATCHES "GNU" OR ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -ftest-coverage -fprofile-arcs")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -ftest-coverage -fprofile-arcs")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -fprofile-arcs -ftest-coverage ${GCC_COVERAGE_COMPILE_FLAGS}")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -fprofile-arcs -ftest-coverage ${GCC_COVERAGE_COMPILE_FLAGS}")
 ENDIF()
 
 getVersionBit(HIREDIS_MAJOR)
@@ -84,4 +90,6 @@ ENDIF(ENABLE_EXAMPLES)
 IF(ENABLE_TESTS)
     ADD_SUBDIRECTORY(contrib/gtest)
     ADD_SUBDIRECTORY(cpptests)
+    SET(GCC_COVERAGE_COMPILE_FLAGS "-g -fprofile-arcs -ftest-coverage")
+    SET(GCC_COVERAGE_LINK_FLAGS "-lgcov")
 ENDIF()
