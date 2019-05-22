@@ -10,6 +10,12 @@
 
 namespace hiredis {
 
+static void checkCtxAndRelease(redisContext **ctx) {
+    ASSERT_TRUE(*ctx);
+    redisFree(*ctx);
+    *ctx = NULL; 
+}
+
 class Client {
 public:
     redisContext* operator*() {
@@ -141,8 +147,7 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
     ASSERT_TRUE(reply->type == REDIS_REPLY_STATUS);
     ASSERT_STRCASEEQ(reply->str,"ok");
 
-    reply = redisCommand(c,"SET %s %s","foo", "hello world");
-    
+    reply = redisCommand(c,"SET %s %s","foo", "hello world");    
     reply = redisCommand(c,"GET foo");
     ASSERT_TRUE(reply->type == REDIS_REPLY_STRING);
     ASSERT_STRCASEEQ(reply->str,"hello world");
@@ -185,6 +190,12 @@ TEST_F(ClientTestTCP, testBlockingConnection) {
     ASSERT_STRCASEEQ(reply->element[1]->str,"pong");
 }
 
+TEST_F(ClientTestTCP, testErrorReply) {
+    reply = redisCommand(c,"PONG");
+    ASSERT_TRUE(reply->type == REDIS_REPLY_ERROR);
+    ASSERT_STRCASEEQ(reply->str,"ERR unknown command 'PONG'");
+}
+
 TEST_F(ClientTestTCP, testSuccesfulReconnect) {
     struct timeval tv = { 0, 10000 };
 
@@ -215,19 +226,6 @@ TEST_F(ClientTestTCP, testBlockingConnectionTimeout) {
     reply = redisCommand(c, "PING");
     ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS);
     ASSERT_STREQ(reply->str, "PONG");
-
-//  Reconnect properly uses owned parameters
-//    char foo[4] = "foo";
-/**************** fails *****************
-    (*c)->tcp.host = foo;
-    (*c)->unix_sock.path = foo;
-**************** fails *****************
-    redisReconnect(c);
-    reply = redisCommand(c, "PING");
-    ASSERT_TRUE(reply != NULL && reply->type == REDIS_REPLY_STATUS);
-    ASSERT_STREQ(reply->str, "PONG");
-    freeReplyObject(reply);    */
-    
 }
 
 #define HIREDIS_BAD_DOMAIN "idontexist-noreally.com"
@@ -320,6 +318,88 @@ TEST_F(ClientTestTCP, testInvalidTimeoutErr) {
     try { c = Client(options); }
     catch(IOError e) { flag = true; }
     ASSERT_TRUE(flag);
+}
+
+class ClientTestConnections : public ::testing::Test {
+public:
+    ClientTestConnections() {}
+
+protected:
+    virtual void SetUp() {     
+    }
+    virtual void TearDown() {
+    }
+
+    RedisReply reply;
+};
+
+TEST_F(ClientTestConnections, testBlocking) {
+    redisContext *ctx = NULL;
+    ctx = redisConnect("localhost", 6379);
+    checkCtxAndRelease(&ctx);
+
+    struct timeval tv = { 0, 10000 };
+    ctx = redisConnectWithTimeout("localhost", 6379, tv);
+    checkCtxAndRelease(&ctx);
+    
+    ctx = redisConnectUnix("8.8.8.8");
+    ASSERT_TRUE(ctx);
+}
+
+TEST_F(ClientTestConnections, testNonBlocking) {
+    redisContext *ctx = NULL;
+    ctx = redisConnectNonBlock("localhost", 6379);
+    checkCtxAndRelease(&ctx);
+
+    ctx = redisConnectBindNonBlock("localhost", 6379, "8.8.8.8");
+    checkCtxAndRelease(&ctx);
+
+    ctx = redisConnectBindNonBlockWithReuse("localhost", 6379, "8.8.8.8");
+    ASSERT_TRUE(ctx);
+}
+
+TEST_F(ClientTestConnections, testUnix) {
+    redisContext *ctx = NULL;
+    struct timeval tv = { 0, 10000 };
+    ctx = redisConnectUnixWithTimeout("localhost", tv);
+    checkCtxAndRelease(&ctx);
+
+    ctx = redisConnectUnixNonBlock("localhost");
+    checkCtxAndRelease(&ctx);
+
+    ctx = redisConnectFd(1980);
+    ASSERT_TRUE(ctx);
+    ASSERT_EQ(ctx->fd, 1980);
+    ASSERT_EQ(1980, redisFreeKeepFd(ctx));
+}
+
+TEST_F(ClientTestConnections, testKeepAlive) {
+    redisContext *ctx = NULL;
+    ctx = redisConnectNonBlock("localhost", 6379);
+    ASSERT_TRUE(redisEnableKeepAlive(ctx) == REDIS_OK);
+    redisFree(ctx);
+}
+
+TEST_F(ClientTestConnections, testNoAutoFree) {
+    redisContext *ctx = NULL;
+    redisOptions options = { 0 };
+    options.options |= REDIS_OPT_NOAUTOFREE;
+    options.endpoint.tcp.ip = "localhost";
+    options.endpoint.tcp.port = 6379;
+    
+    ctx = redisConnectWithOptions(&options);
+    checkCtxAndRelease(&ctx);   
+}
+
+TEST_F(ClientTestConnections, testNoAutoFre1e) {
+    redisContext *ctx = NULL;
+    redisOptions options = { 0 };
+    options.options |= REDIS_OPT_NOAUTOFREE;
+    options.endpoint.tcp.ip = "localhost";
+    options.endpoint.tcp.port = 6379;
+    
+    ctx = redisConnectWithOptions(&options);
+    checkCtxAndRelease(&ctx);  
 }
 
 }

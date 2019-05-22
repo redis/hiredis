@@ -44,16 +44,16 @@ static std::string formatCommand(const char *fmt, ...) {
 #define INTEGER_WIDTH_TEST(fmt, type) do {                                                \
     type value = 123;                                                                     \
     len = redisFormatCommand(&cmd,"key:%08" fmt " str:%s", value, "hello");               \
-    ASSERT_TRUE(strncmp(cmd,"*2\r\n$12\r\nkey:00000123\r\n$9\r\nstr:hello\r\n",len) == 0 && \
-        len == 4+5+(12+2)+4+(9+2)) << "(" << #type << ")";                                \
+    ASSERT_STREQ(cmd,"*2\r\n$12\r\nkey:00000123\r\n$9\r\nstr:hello\r\n");                 \
+    ASSERT_TRUE(len == 4+5+(12+2)+4+(9+2)) << "(" << #type << ")";                        \
     free(cmd);                                                                            \
 } while(0)
 
 #define FLOAT_WIDTH_TEST(type) do {                                                       \
     type value = 123.0;                                                                   \
     len = redisFormatCommand(&cmd,"key:%08.3f str:%s", value, "hello");                   \
-    ASSERT_TRUE(strncmp(cmd,"*2\r\n$12\r\nkey:0123.000\r\n$9\r\nstr:hello\r\n",len) == 0 && \
-        len == 4+5+(12+2)+4+(9+2)) << "(" << #type << ")";                                \
+    ASSERT_STREQ(cmd,"*2\r\n$12\r\nkey:0123.000\r\n$9\r\nstr:hello\r\n");                 \
+    ASSERT_TRUE(len == 4+5+(12+2)+4+(9+2)) << "(" << #type << ")";                        \
     free(cmd);                                                                            \
 } while(0)
 
@@ -121,29 +121,29 @@ TEST_F(FormatterTest, testArgs) {
 
     char *cmd;
     int len;
-//    sds sds_cmd;
+    sds sds_cmd;
 
     len = redisFormatCommandArgv(&cmd,argc,argv,NULL);
     ASSERT_STREQ(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n");
     ASSERT_TRUE(len == 4+4+(3+2)+4+(3+2)+4+(3+2)) << "passing argc/argv without lengths";
-    free(cmd);
+    redisFreeCommand(cmd);
 
     len = redisFormatCommandArgv(&cmd,argc,argv,lens);
     ASSERT_STREQ(cmd, "*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n");
     ASSERT_TRUE(len == 4+4+(3+2)+4+(7+2)+4+(3+2)) << "passing argc/argv with lengths";
-    free(cmd);
-/*
+    redisFreeCommand(cmd);
+
     sds_cmd = sdsempty();
     len = redisFormatSdsCommandArgv(&sds_cmd,argc,argv,NULL);
     ASSERT_TRUE(strncmp(sds_cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(3+2)) << "passing argc/argv with lengths";
-    sdsfree(sds_cmd);
+    redisFreeSdsCommand(sds_cmd);
 
     sds_cmd = sdsempty();
     len = redisFormatSdsCommandArgv(&sds_cmd,argc,argv,lens);
     ASSERT_TRUE(strncmp(sds_cmd,"*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(7+2)+4+(3+2)) << "sds by passing argc/argv with length";
-    sdsfree(sds_cmd);    */
+    redisFreeSdsCommand(sds_cmd);    
 }
 
 TEST_F(ReplyReaderTest, testErrorHandling) {
@@ -278,6 +278,27 @@ TEST_F(OtherTest, testDoubleFree) {
 
     freeReplyObject(reply);
     ASSERT_TRUE(reply == NULL);
+}
+
+TEST_F(OtherTest, testAppendCmd) {
+    redisContext *ctx = redisConnectNonBlock("localhost", 6379);
+    ASSERT_TRUE(redisAppendCommand(ctx, "SET %s %s", "foo", "bar") == REDIS_OK);
+}
+
+TEST_F(OtherTest, testAppendArgv) {
+    redisContext *ctx = redisConnectNonBlock("localhost", 6379);
+    char *argv[3];
+    size_t argvlen[3];
+    int argc = 3;
+
+    argv[0] = (char *)"HMSET";
+    argvlen[0] = 5;
+    argv[1] = (char *)"key";
+    argvlen[1] = 3;
+    argv[2] = (char *)"x";
+    argvlen[2] = 1;
+
+    ASSERT_TRUE(redisCommandArgv(ctx, argc, (const char **)argv, argvlen) == REDIS_OK);
 }
 
 TEST_F(OtherTest, testCTests) {

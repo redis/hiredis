@@ -1,4 +1,3 @@
-#include "fmacros.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +14,7 @@
 #include "hiredis.h"
 #include "net.h"
 #include "sds.h"
+//#include "fmacros.h"
 
 enum connection_type {
     CONN_TCP,
@@ -174,7 +174,7 @@ static void test_format_commands(void) {
     /* Vararg width depends on the type. These tests make sure that the
      * width is correctly determined using the format and subsequent varargs
      * can correctly be interpolated. */
-#define INTEGER_WIDTH_TEST(fmt, type) do {                                                \
+#define INTEGER_WIDTH_TEST_(fmt, type) do {                                                \
     type value = 123;                                                                     \
     test("Format command with printf-delegation (" #type "): ");                          \
     len = redisFormatCommand(&cmd,"key:%08" fmt " str:%s", value, "hello");               \
@@ -183,7 +183,7 @@ static void test_format_commands(void) {
     free(cmd);                                                                            \
 } while(0)
 
-#define FLOAT_WIDTH_TEST(type) do {                                                       \
+#define FLOAT_WIDTH_TEST_(type) do {                                                       \
     type value = 123.0;                                                                   \
     test("Format command with printf-delegation (" #type "): ");                          \
     len = redisFormatCommand(&cmd,"key:%08.3f str:%s", value, "hello");                   \
@@ -192,18 +192,18 @@ static void test_format_commands(void) {
     free(cmd);                                                                            \
 } while(0)
 
-    INTEGER_WIDTH_TEST("d", int);
-    INTEGER_WIDTH_TEST("hhd", char);
-    INTEGER_WIDTH_TEST("hd", short);
-    INTEGER_WIDTH_TEST("ld", long);
-    INTEGER_WIDTH_TEST("lld", long long);
-    INTEGER_WIDTH_TEST("u", unsigned int);
-    INTEGER_WIDTH_TEST("hhu", unsigned char);
-    INTEGER_WIDTH_TEST("hu", unsigned short);
-    INTEGER_WIDTH_TEST("lu", unsigned long);
-    INTEGER_WIDTH_TEST("llu", unsigned long long);
-    FLOAT_WIDTH_TEST(float);
-    FLOAT_WIDTH_TEST(double);
+    INTEGER_WIDTH_TEST_("d", int);
+    INTEGER_WIDTH_TEST_("hhd", char);
+    INTEGER_WIDTH_TEST_("hd", short);
+    INTEGER_WIDTH_TEST_("ld", long);
+    INTEGER_WIDTH_TEST_("lld", long long);
+    INTEGER_WIDTH_TEST_("u", unsigned int);
+    INTEGER_WIDTH_TEST_("hhu", unsigned char);
+    INTEGER_WIDTH_TEST_("hu", unsigned short);
+    INTEGER_WIDTH_TEST_("lu", unsigned long);
+    INTEGER_WIDTH_TEST_("llu", unsigned long long);
+    FLOAT_WIDTH_TEST_(float);
+    FLOAT_WIDTH_TEST_(double);
 
     test("Format command with invalid printf format: ");
     len = redisFormatCommand(&cmd,"key:%08p %b",(void*)1234,"foo",(size_t)3);
@@ -227,7 +227,7 @@ static void test_format_commands(void) {
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(7+2)+4+(3+2));
     free(cmd);
-/*
+
     sds sds_cmd;
 
     sds_cmd = sdsempty();
@@ -242,7 +242,7 @@ static void test_format_commands(void) {
     len = redisFormatSdsCommandArgv(&sds_cmd,argc,argv,lens);
     test_cond(strncmp(sds_cmd,"*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(7+2)+4+(3+2));
-    sdsfree(sds_cmd);*/
+    sdsfree(sds_cmd);
 }
 
 static void test_append_formatted_commands(struct config config) {
