@@ -1,12 +1,13 @@
 
 #!/bin/sh
 set -e
-rm -f ./CMakeFiles/hiredis.dir/*.gcda ./cpptests/CMakeFiles/hiredis.dir/*.gcda
 make -f ./Makefile || exit
+lcov -b . -d . -z > /dev/null
 ./cpptests/hiredis-gtest || exit
-gcov -c -b ./CMakeFiles/hiredis.dir/*.* ./cpptests/CMakeFiles/hiredis.dir/*.* 
-lcov -b ./ -c -d . --output-file main_coverage.info --no-external \
-    --remove /home/ariel/redis/hiredis/adapters	/home/ariel/redis/hiredis/cpptests	\
-    include/gtest	include/gtest/internal	src	
-genhtml main_coverage.info --output-directory coverage
+gcov -c -b ./CMakeFiles/hiredis.dir/*.*  > /dev/null 2>&1
+lcov -b ./ -c -d . --output-file initial_coverage.info --no-external > /dev/null 2>&1
+lcov -r initial_coverage.info "*gtest*" "*cpptests*" "*adapter*" -o final_coverage.info > /dev/null 2>&1
+lcov -r final_coverage.info "*sds*" "*net*" "*read*" "*sslio*" "*dict*" -o final_coverage.info > /dev/null 2>&1
+lcov -l final_coverage.info
+#genhtml final_coverage.info --output-directory coverage
 #xdg-open coverage/index.html 
