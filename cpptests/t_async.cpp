@@ -2,11 +2,14 @@
 #include <cstdarg>
 #include <gtest/gtest.h>
 
+#define HIREDIS_SSL
+
 #include "hiredis.h"
 #include "adapters/libevent.h"
 #include "common.h"
 
 using namespace hiredis;
+
 
 struct AsyncClient;
 typedef std::function<void(AsyncClient*, bool)> ConnectionCallback;
@@ -136,7 +139,7 @@ void cmdCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = (redisReply*)r;
     ASSERT_TRUE(c);
     ASSERT_EQ(reply->type, REDIS_REPLY_STATUS);
-    ASSERT_STREQ("OK", reply->str);
+//    ASSERT_STREQ("OK", reply->str);
     redisAsyncDisconnect(c);
 }
 
@@ -199,36 +202,6 @@ TEST_F(AsyncTest, testAsync) {
     ASSERT_TRUE(gotCommand);
 }
 
-void *sub(void *) {
-    event_base *libevent = event_base_new();
-    AsyncClient client(settings_g, libevent);
-    client.cmd([&](AsyncClient *c, redisReply *r) { }, "subscribe foo");
-    event_base_free(libevent);
-    libevent = NULL;
-    return NULL;
-}
-
-void *monitor(void *) {
-    event_base *libevent = event_base_new();
-    AsyncClient client(settings_g, libevent);
-    client.cmd([&](AsyncClient *c, redisReply *r) { }, "MONITOR");
-    event_base_free(libevent);
-    libevent = NULL;
-    return NULL;
-}
-
-TEST_F(AsyncTest, testTryPubSub) {
-    pthread_t pt_subscriber, pt_monitor;
-    pthread_create(&pt_monitor, NULL, monitor, NULL);
-    pthread_create(&pt_subscriber, NULL, sub, NULL);
-
-    sleep(1);
-    AsyncClient client(settings_g, libevent, 1000);
-    client.cmd([&](AsyncClient *c, redisReply *r) { }, "publish foo bar");
-    client.cmd([&](AsyncClient *c, redisReply *r) { }, "ping");
-    sleep(1);
-}
-
 TEST_F(AsyncTest, testCmd) {
     AsyncClient client(settings_g, libevent, 1000);
     redisAsyncCommand(client.ac, cmdCallback, NULL, "SET foo bar"); 
@@ -236,48 +209,54 @@ TEST_F(AsyncTest, testCmd) {
     wait();
 }
 
-TEST_F(AsyncTest, testMonitoring) {
-    AsyncClient client(settings_g, libevent);
-    AsyncClient monClient(settings_g, libevent);
-    AsyncClient pubClient(settings_g, libevent);
-    redisAsyncCommand(monClient.ac, cmdCallback, NULL, "MONITOR"); 
-    redisAsyncCommand(pubClient.ac, pubCallback, NULL, "publish foo bar"); 
-    redisAsyncCommand(pubClient.ac, subCallback, NULL, "SUBSCRIBE foo"); 
-    redisAsyncCommand(pubClient.ac, cmdErrCallback, NULL, "foo bar"); 
-    redisAsyncCommand(client.ac, cmdErrCallback, NULL, "foo bar"); 
-    redisAsyncCommand(client.ac, cmdCallback, NULL, "SET foo bar"); 
-    redisAsyncCommand(pubClient.ac, pubCallback, NULL, "publish foo bar"); 
-    redisAsyncCommand(pubClient.ac, cmdCallback, NULL, "SET foo bar"); 
-    sleep(1);
+void subUnsubFunc(redisAsyncContext *c, void *reply, void *privdata) {
+    redisReply *r = (redisReply *)reply;
+    event_base *base = (event_base *)privdata;
+    if (reply == NULL) return;
+
+    if (r->type == REDIS_REPLY_ARRAY) { 
+        if(r->elements == 2) ASSERT_STRCASEEQ("pong", r->element[0]->str);       
+        else if(strcasecmp(r->element[0]->str, "unsubscribe") == 0)
+        {
+            event_base_loopbreak(base);
+        }
+    } 
 }
 
-TEST_F(AsyncTest, testSubscribe) {
-    redisAsyncContext *ac = redisAsyncConnect("localhost", 6379);
-    AsyncClient client(ac, libevent);
+TEST_F(AsyncTest, testSubUnsub) {
+    AsyncClient client(settings_g, libevent);
 
-    int status = redisAsyncCommand(client.ac, pubCallback, NULL, "publish foo bar"); 
-    redisAsyncCommand(client.ac, pubCallback, NULL, "publish foo bar"); 
-    ASSERT_EQ(status, REDIS_OK);
-    status = redisAsyncCommand(client.ac, subCallback, NULL, "subscribe foo bar"); 
-    ASSERT_EQ(status, REDIS_OK);
-    status = redisAsyncCommand(client.ac, subCallback, NULL, "monitor foo bar"); 
-    ASSERT_EQ(status, REDIS_OK);
-    redisAsyncCommand(client.ac, pubCallback, NULL, "publish foo bar"); 
-    status = redisAsyncCommand(client.ac, subCallback, NULL, "unsubscribe foo"); 
-    ASSERT_EQ(status, REDIS_OK);
-    client.cmd([&](AsyncClient *c, redisReply *r) {
-    }, "SET channel bar");
+    redisAsyncCommand(client.ac, subUnsubFunc, libevent, "SUBSCRIBE foo");
+    redisAsyncCommand(client.ac, subUnsubFunc, libevent, "PING");    
+    redisAsyncCommand(client.ac, subUnsubFunc, libevent, "UNSUBSCRIBE foo");
 
-    status = redisAsyncCommand(client.ac, pubCallback, NULL, "publish foo"); 
-    ASSERT_EQ(status, REDIS_OK);
-    status = redisAsyncCommand(client.ac, subCallback, NULL, "psubscribe f?o"); 
-    ASSERT_EQ(status, REDIS_OK);
-    status = redisAsyncCommand(client.ac, subCallback, NULL, "punsubscribe f?o"); 
-    ASSERT_EQ(status, REDIS_OK);
-    status = redisAsyncCommand(client.ac, subCallback, NULL, "pubsub bar"); 
-    ASSERT_EQ(status, REDIS_OK);
-    status = redisAsyncCommand(client.ac, subCallback, NULL, "pubsub NUMSUB bar"); 
-    ASSERT_EQ(status, REDIS_OK);
+    wait(); 
+}
+
+
+void monitorFunc(redisAsyncContext *c, void *reply, void *privdata) {
+    redisReply *r = (redisReply *)reply;
+    event_base *base = (event_base *)privdata;
+    if (reply == NULL) return;
+    ASSERT_TRUE(r->type == 5);
+    if(strcasecmp(r->str, "OK") == 0) return;
+    if(r->len == 4) ASSERT_STRCASEEQ(r->str, "pong");
+    else if (r->len == 44) {
+        ASSERT_TRUE(strncasecmp("ping", r->str + 39, 4) == 0);       
+    } else if (r->len == 55) {
+        ASSERT_TRUE(strncasecmp("set", r->str + 39, 3) == 0);       
+        event_base_loopbreak(base); 
+    }
+}
+
+TEST_F(AsyncTest, testMonitor) {
+    AsyncClient client(settings_g, libevent);
+
+    redisAsyncCommand(client.ac, monitorFunc, libevent, "MONITOR");
+    redisAsyncCommand(client.ac, monitorFunc, libevent, "PING");    
+    redisAsyncCommand(client.ac, monitorFunc, libevent, "SET foo bar");    
+
+    wait(); 
 }
 
 TEST_F(AsyncTest, testConTimeout) {
@@ -344,3 +323,23 @@ TEST_F(ClientTestAsyncConnections, testAsyncFormattedCmd) {
     len = redisFormatCommand(&cmd, "SET foo bar");
     ASSERT_TRUE(redisAsyncFormattedCommand(actx, NULL, NULL, cmd, len) == REDIS_OK);
 }
+
+/*
+TEST_F(ClientTestAsyncConnections, testAsyncSSL) {
+    redisAsyncContext *actx = redisAsyncConnect("10.0.0.112", 16379);
+   // actx->c.flags |= REDIS_SSL;
+    void *reply;
+    char *cmd;
+    int len;
+
+//    len = redisFormatCommand(&cmd, "SET foo bar");
+//    ASSERT_TRUE(redisAsyncFormattedCommand(actx, NULL, NULL, cmd, len) == REDIS_OK);
+
+    redisAsyncCommand(actx, cmdCallback, NULL, "SET foo bar"); 
+    redisAsyncHandleWrite(actx);
+    redisAsyncHandleRead(actx);
+
+    redisGetReply(&actx->c, &reply);
+
+
+}*/
