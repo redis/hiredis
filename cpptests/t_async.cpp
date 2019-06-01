@@ -147,7 +147,7 @@ void cmdErrCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = (redisReply*)r;
     ASSERT_TRUE(c);
     ASSERT_EQ(reply->type, REDIS_REPLY_ERROR);
-    ASSERT_STREQ("ERR", reply->str);
+    ASSERT_TRUE(strncasecmp("ERR", reply->str, 3) == 0);
     redisAsyncDisconnect(c);
 }
 
@@ -206,6 +206,12 @@ TEST_F(AsyncTest, testCmd) {
     AsyncClient client(settings_g, libevent, 1000);
     redisAsyncCommand(client.ac, cmdCallback, NULL, "SET foo bar"); 
     redisAsyncCommand(client.ac, cmdCallback, NULL, "SET %s %s", "foo", "hello world"); 
+    wait();
+}
+
+TEST_F(AsyncTest, testGetFirst) {
+    AsyncClient client(settings_g, libevent, 1000);
+    redisAsyncCommand(client.ac, cmdErrCallback, NULL, "GET foo bar"); 
     wait();
 }
 
