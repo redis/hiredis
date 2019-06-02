@@ -143,6 +143,21 @@ void cmdCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisAsyncDisconnect(c);
 }
 
+void strCallback(redisAsyncContext *c, void *r, void *privdata) {
+    redisReply *reply = (redisReply*)r;
+    ASSERT_TRUE(c);
+    ASSERT_EQ(reply->type, REDIS_REPLY_STRING);
+    printf("%s\n", reply->str);
+    redisAsyncDisconnect(c);
+}
+
+void nilCallback(redisAsyncContext *c, void *r, void *privdata) {
+    redisReply *reply = (redisReply*)r;
+    ASSERT_TRUE(c);
+    ASSERT_EQ(reply->type, REDIS_REPLY_NIL);
+    redisAsyncDisconnect(c);
+}
+
 void cmdErrCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = (redisReply*)r;
     ASSERT_TRUE(c);
@@ -211,7 +226,7 @@ TEST_F(AsyncTest, testCmd) {
 
 TEST_F(AsyncTest, testGetFirst) {
     AsyncClient client(settings_g, libevent, 1000);
-    redisAsyncCommand(client.ac, cmdErrCallback, NULL, "GET foo bar"); 
+    redisAsyncCommand(client.ac, nilCallback, NULL, "GET xyzzy"); 
     wait();
 }
 
