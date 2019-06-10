@@ -8,7 +8,7 @@ set(PROJECT_VERSION_MINOR "0")
 set(PROJECT_VERSION_PATCH "0")
 PROJECT(hiredis)
 
-OPTION(HIREDIS_SSL "Link against OpenSSL" OFF)
+OPTION(HIREDIS_SSL "Link against OpenSSL" ON) 
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")

@@ -25,4 +25,4 @@ unixsocket ${SOCK_FILE}
 unixsocketperm 700
 EOF
 
-${TEST_PREFIX:-} ./hiredis-gtest
+${TEST_PREFIX:-} ./cpptests/hiredis-gtest

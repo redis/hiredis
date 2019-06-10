@@ -25,6 +25,11 @@ struct CmdData {
     CommandCallback cb;
 };
 
+struct privData {
+    AsyncClient *c;
+    redisReply *r;
+};
+
 struct AsyncClient {
     void connectCommon(const redisOptions& orig, event_base *b, unsigned timeoutMs) {
         redisOptions options = orig;
@@ -78,7 +83,7 @@ struct AsyncClient {
 
     ~AsyncClient() {
         if (ac != NULL) {
-            auto tmpac = ac;
+            redisAsyncContext *tmpac = ac;
             ac = NULL;
             redisAsyncDisconnect(tmpac);
         }
@@ -103,9 +108,11 @@ struct AsyncClient {
     }
 
     void disconnect() {
-        auto tmpac = ac;
-        ac = NULL;
-        redisAsyncDisconnect(tmpac);
+        if(ac != NULL) {
+            auto tmpac = ac;
+            ac = NULL;
+            redisAsyncDisconnect(tmpac);
+        }
     }
 
     ConnectionCallback conncb;
@@ -137,46 +144,11 @@ static void realCommandCb(redisAsyncContext *ac, void *r, void *ctx) {
 
 void cmdCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = (redisReply*)r;
+    AsyncClient *client = reinterpret_cast<AsyncClient*>(privdata);
     ASSERT_TRUE(c);
     ASSERT_EQ(reply->type, REDIS_REPLY_STATUS);
-//    ASSERT_STREQ("OK", reply->str);
-    redisAsyncDisconnect(c);
-}
-
-void strCallback(redisAsyncContext *c, void *r, void *privdata) {
-    redisReply *reply = (redisReply*)r;
-    ASSERT_TRUE(c);
-    ASSERT_EQ(reply->type, REDIS_REPLY_STRING);
-    printf("%s\n", reply->str);
-    redisAsyncDisconnect(c);
-}
-
-void nilCallback(redisAsyncContext *c, void *r, void *privdata) {
-    redisReply *reply = (redisReply*)r;
-    ASSERT_TRUE(c);
-    ASSERT_EQ(reply->type, REDIS_REPLY_NIL);
-    redisAsyncDisconnect(c);
-}
-
-void cmdErrCallback(redisAsyncContext *c, void *r, void *privdata) {
-    redisReply *reply = (redisReply*)r;
-    ASSERT_TRUE(c);
-    ASSERT_EQ(reply->type, REDIS_REPLY_ERROR);
-    ASSERT_TRUE(strncasecmp("ERR", reply->str, 3) == 0);
-    redisAsyncDisconnect(c);
-}
-
-void subCallback(redisAsyncContext *c, void *r, void *privdata) {
-    redisReply *reply = (redisReply*)r;
-    ASSERT_TRUE(c);
-    ASSERT_EQ(reply->type, REDIS_REPLY_ARRAY);
-    ASSERT_TRUE(reply->elements == 3);
-}
-
-void pubCallback(redisAsyncContext *c, void *r, void *privdata) {
-    ASSERT_TRUE(c);
-    ASSERT_TRUE(r);
-    redisAsyncDisconnect(c);
+    ASSERT_STREQ("OK", reply->str);
+    client->disconnect();
 }
 
 class AsyncTest : public ::testing::Test {
@@ -193,7 +165,6 @@ protected:
     }
     event_base *libevent;
 };
-
 
 TEST_F(AsyncTest, testAsync) {
     AsyncClient client(settings_g, libevent, 1000);
@@ -219,22 +190,50 @@ TEST_F(AsyncTest, testAsync) {
 
 TEST_F(AsyncTest, testCmd) {
     AsyncClient client(settings_g, libevent, 1000);
-    redisAsyncCommand(client.ac, cmdCallback, NULL, "SET foo bar"); 
-    redisAsyncCommand(client.ac, cmdCallback, NULL, "SET %s %s", "foo", "hello world"); 
+
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_STATUS, r->type);
+        ASSERT_STREQ("OK", r->str);
+    }, "SET foo bar");
+
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_STATUS, r->type);
+        ASSERT_STREQ("OK", r->str);
+        c->disconnect();
+    }, "SET %s %s", "foo", "hello world");
     wait();
 }
 
 TEST_F(AsyncTest, testGetFirst) {
     AsyncClient client(settings_g, libevent, 1000);
-    redisAsyncCommand(client.ac, nilCallback, NULL, "GET xyzzy"); 
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_NIL, r->type);
+        ASSERT_STREQ(NULL, r->str);
+        c->disconnect();
+    }, "GET xyzzy");
+    wait();
+}
+
+TEST_F(AsyncTest, testError) {
+    AsyncClient client(settings_g, libevent, 1000);
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r != NULL);
+        ASSERT_EQ(REDIS_REPLY_ERROR, r->type);
+        ASSERT_STREQ( r->str, 
+            "ERR unknown command `PONG`, with args beginning with: ");
+        c->disconnect();
+    }, "PONG");
     wait();
 }
 
 void subUnsubFunc(redisAsyncContext *c, void *reply, void *privdata) {
     redisReply *r = (redisReply *)reply;
     event_base *base = (event_base *)privdata;
+    ASSERT_EQ(c->err, 0);
     if (reply == NULL) return;
-
     if (r->type == REDIS_REPLY_ARRAY) { 
         if(r->elements == 2) ASSERT_STRCASEEQ("pong", r->element[0]->str);       
         else if(strcasecmp(r->element[0]->str, "unsubscribe") == 0)
@@ -244,7 +243,7 @@ void subUnsubFunc(redisAsyncContext *c, void *reply, void *privdata) {
     } 
 }
 
-TEST_F(AsyncTest, testSubUnsub) {
+TEST_F(AsyncTest, testSubUnsub1) {
     AsyncClient client(settings_g, libevent);
 
     redisAsyncCommand(client.ac, subUnsubFunc, libevent, "SUBSCRIBE foo");
@@ -254,6 +253,23 @@ TEST_F(AsyncTest, testSubUnsub) {
     wait(); 
 }
 
+void subPongFunc(redisAsyncContext *c, void *reply, void *privdata) {
+    AsyncClient *self = reinterpret_cast<AsyncClient*>(c->data);
+    if(c->err != 0) {
+        ASSERT_STREQ("ERR unknown command `PONG`, with args beginning with: ",
+            c->errstr);
+        self->disconnect();
+    }
+}
+
+TEST_F(AsyncTest, testSubUnsub2) {
+    AsyncClient client(settings_g, libevent);
+
+    redisAsyncCommand(client.ac, subPongFunc, &client, "SUBSCRIBE foo");
+    redisAsyncCommand(client.ac, subPongFunc, &client, "PONG");    
+
+    wait(); 
+}
 
 void monitorFunc(redisAsyncContext *c, void *reply, void *privdata) {
     redisReply *r = (redisReply *)reply;
@@ -281,10 +297,15 @@ TEST_F(AsyncTest, testMonitor) {
 }
 
 TEST_F(AsyncTest, testConTimeout) {
-    redisAsyncContext *ac = redisAsyncConnect("localhost", 6379);
-    AsyncClient client(ac, libevent);
-    redisAsyncHandleTimeout(ac);
-    ASSERT_EQ(ac->err, REDIS_ERR_TIMEOUT);
+    AsyncClient client(settings_g, libevent, 100);
+    client.cmd([&](AsyncClient *c, redisReply *r) { }, "DEBUG SLEEP 1");
+    client.cmd([&](AsyncClient *c, redisReply *r) { 
+        ASSERT_TRUE(r == NULL);
+        ASSERT_EQ(REDIS_REPLY_ERROR, r->type);
+        ASSERT_STREQ(NULL, r->str);
+        ASSERT_EQ(c->ac->err, REDIS_ERR_TIMEOUT);
+        redisAsyncHandleTimeout(client.ac);
+    }, "PING");
 }
 
 TEST_F(AsyncTest, testSetTimeout) {
@@ -299,7 +320,7 @@ TEST_F(AsyncTest, testSetTimeout) {
 
 
     AsyncClient client(ac, libevent);
-    redisAsyncCommand(client.ac, cmdCallback, NULL, "SET foo bar"); 
+    redisAsyncCommand(client.ac, cmdCallback, &client, "SET foo bar"); 
 }
 
 class ClientTestAsyncConnections : public ::testing::Test {
@@ -353,8 +374,8 @@ TEST_F(ClientTestAsyncConnections, testAsyncSSL) {
     char *cmd;
     int len;
 
-//    len = redisFormatCommand(&cmd, "SET foo bar");
-//    ASSERT_TRUE(redisAsyncFormattedCommand(actx, NULL, NULL, cmd, len) == REDIS_OK);
+    len = redisFormatCommand(&cmd, "SET foo bar");
+    ASSERT_TRUE(redisAsyncFormattedCommand(actx, NULL, NULL, cmd, len) == REDIS_OK);
 
     redisAsyncCommand(actx, cmdCallback, NULL, "SET foo bar"); 
     redisAsyncHandleWrite(actx);

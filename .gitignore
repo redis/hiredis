@@ -8,6 +8,11 @@
 *.dSYM
 /contrib/
 /.vscode/
+/build/
+/coverage/
 /CMakeFiles/
+*/CMakeFiles/
 *.cmake
 *.make
+*.html
+*.gc*
