@@ -6,7 +6,7 @@ INCLUDE_DIRECTORIES(${LIBEVENT_INCLUDES})
 ADD_EXECUTABLE(hiredis-gtest sds.cpp t_basic.cpp t_client.cpp t_async.cpp
     common.cpp main.cpp)
 TARGET_LINK_LIBRARIES(hiredis-gtest gtest hiredis event)
-ADD_TEST(NAME hiredis-test COMMAND hiredis-test)
+ADD_TEST(NAME gtest.sh COMMAND gtest.sh)
 SET_PROPERTY(TARGET hiredis-gtest PROPERTY CXX_STANDARD 11)
 
 SET(EXAMPLE_CERT "${CMAKE_CURRENT_SOURCE_DIR}/example.crt")
