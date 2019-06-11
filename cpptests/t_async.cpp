@@ -312,26 +312,31 @@ TEST_F(AsyncTest, testConTimeout) {
     client.cmd([&](AsyncClient *c, redisReply *r) { }, "DEBUG SLEEP 1");
     client.cmd([&](AsyncClient *c, redisReply *r) { 
         ASSERT_TRUE(r == NULL);
-        ASSERT_EQ(REDIS_REPLY_ERROR, r->type);
-        ASSERT_STREQ(NULL, r->str);
-        ASSERT_EQ(c->ac->err, REDIS_ERR_TIMEOUT);
+        ASSERT_EQ(c->ac->err, REDIS_OK);
+        ASSERT_STREQ(c->ac->errstr, "Timeout");
         redisAsyncHandleTimeout(client.ac);
     }, "PING");
+    wait(); 
 }
 
 TEST_F(AsyncTest, testSetTimeout) {
-    redisAsyncContext *ac = redisAsyncConnect("localhost", 6379);
-    ASSERT_TRUE(ac->c.timeout == NULL);
+    AsyncClient client(settings_g, libevent);
+    ASSERT_TRUE(client.ac->c.timeout == NULL);
     struct timeval tv = { 0, 1000 };
-    redisAsyncSetTimeout(ac,tv);
-    ASSERT_TRUE(ac->c.timeout->tv_usec == 1000);
+    redisAsyncSetTimeout(client.ac, tv);
+    ASSERT_TRUE(client.ac->c.timeout->tv_usec == 1000);
     tv = { 0, 1000 };
-    redisAsyncSetTimeout(ac,tv);
-    ASSERT_TRUE(ac->c.timeout->tv_usec == 1000);
+    redisAsyncSetTimeout(client.ac, tv);
+    ASSERT_TRUE(client.ac->c.timeout->tv_usec == 1000);
+    tv = { 0, 1000000 };
+    redisAsyncSetTimeout(client.ac, tv);
+    ASSERT_TRUE(client.ac->c.timeout->tv_usec == 1000000);
 
-
-    AsyncClient client(ac, libevent);
-    redisAsyncCommand(client.ac, cmdCallback, &client, "SET foo bar"); 
+    client.cmd([&](AsyncClient *c, redisReply *r) { 
+        ASSERT_STREQ("PONG", r->str);
+        c->disconnect();
+    }, "PING");
+    wait(); 
 }
 
 class ClientTestAsyncConnections : public ::testing::Test {
