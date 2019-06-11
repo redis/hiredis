@@ -217,6 +217,17 @@ TEST_F(AsyncTest, testGetFirst) {
     wait();
 }
 
+TEST_F(AsyncTest, testWrongIP) {
+    redisAsyncContext *ac = redisAsyncConnect("localhost", 6378);
+    AsyncClient client(ac, libevent);
+    client.cmd([&](AsyncClient *c, redisReply *r) {
+        ASSERT_TRUE(r == NULL);
+        ASSERT_EQ(c->ac->err, REDIS_ERR_IO);
+        ASSERT_STRCASEEQ(c->ac->errstr, "Connection refused");
+    }, "PING");
+    wait();
+}
+
 TEST_F(AsyncTest, testError) {
     AsyncClient client(settings_g, libevent, 1000);
     client.cmd([&](AsyncClient *c, redisReply *r) {
