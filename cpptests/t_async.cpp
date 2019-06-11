@@ -224,6 +224,7 @@ TEST_F(AsyncTest, testWrongIP) {
         ASSERT_TRUE(r == NULL);
         ASSERT_EQ(c->ac->err, REDIS_ERR_IO);
         ASSERT_STRCASEEQ(c->ac->errstr, "Connection refused");
+        c->disconnect();
     }, "PING");
     wait();
 }
@@ -315,6 +316,7 @@ TEST_F(AsyncTest, testConTimeout) {
         ASSERT_EQ(c->ac->err, REDIS_OK);
         ASSERT_STREQ(c->ac->errstr, "Timeout");
         redisAsyncHandleTimeout(client.ac);
+        client.disconnect();
     }, "PING");
     wait(); 
 }
