@@ -2,7 +2,9 @@
 #include <cstdlib>
 #include <tuple>
 #include <gtest/gtest.h>
+
 #include "common.h"
+//#include "redis_fork.h"
 
 using namespace hiredis;
 
@@ -20,6 +22,11 @@ static bool isArg(const char *arg, const char *s) {
 
 int main(int argc, char **argv) {
     ClientSettings* settings = &settings_g;
+/*  redis_server_t redis = { 0 };
+    redis.ip = "localhost";
+    redis.port = 56379;
+    redis.unixsocket = "/tmp/redis.sock";*/
+
 
 #ifdef HIREDIS_TEST_SSL_CA
     printf("Setting SSL compile time defaults\n");
@@ -28,7 +35,7 @@ int main(int argc, char **argv) {
     settings->m_ssl_key_path = HIREDIS_TEST_SSL_KEY;
 #endif
 
-    for (size_t ii = 1; ii < argc; ++ii) {
+    for (int ii = 1; ii < argc; ++ii) {
         const char *ss = argv[ii];
         if (isArg(ss, "--unix")) {
             settings->setUnix(getKvValue(ss).c_str());

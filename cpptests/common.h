@@ -9,6 +9,9 @@
 namespace hiredis {
 class ClientSettings {
 public:
+    ClientSettings() {}
+    ClientSettings(std::string connectType_, std::string str_);
+
     void applyEnv();
     void setHost(const char *s);
     void setUnix(const char *s);
@@ -40,6 +43,7 @@ public:
 
     std::string m_hostname = "localhost";
     uint16_t m_port = 6379;
+    std::string m_unix;
 
     int m_mode = REDIS_CONN_TCP;
     const char *m_ssl_cert_path = NULL;
@@ -64,7 +68,7 @@ class ConnectError : public ClientError {
 public:
     ConnectError() : ClientError(){}
     ConnectError(const redisOptions& options);
-    virtual const char *what() const noexcept override{
+    virtual const char *what() const noexcept override {
         return endpoint.c_str();
     }
 private:
@@ -73,14 +77,14 @@ private:
 
 class IOError : public ClientError {
 public:
-    IOError() : ClientError(){}
-    IOError(const char *s) : ClientError(s) {}
+    IOError() : ClientError() {}
+    IOError(const char *what) : ClientError(what) {}
 };
 
 class TimeoutError : public ClientError {
 public:
     TimeoutError() : ClientError("timed out") {}
-    TimeoutError(const char *s) : ClientError(s) {}
+    TimeoutError(const char *what) : ClientError(what) {}
 };
 
 class SSLError : public ClientError {
@@ -100,6 +104,39 @@ public:
 private:
     std::string errstr;
 };
+
+class RedisReply {
+public:
+    RedisReply() 
+        : reply(nullptr) {}
+    RedisReply(void *other_) 
+        : reply(reinterpret_cast<redisReply*>(other_)) {}
+    ~RedisReply() { Destroy(); }
+
+    void operator=(redisReply* other_) { reply = other_; }
+    void operator=(void* other_) { 
+        this->Destroy();
+        reply = reinterpret_cast<redisReply*>(other_); 
+    }
+
+    operator redisReply*() const { return reply; }
+    redisReply *operator->() { return reply; }
+//    redisReply **operator&() { return &reply; }
+
+    void Destroy() { 
+        if(reply != nullptr) {
+            freeReplyObject(reply); 
+            reply = nullptr; 
+        }
+    }
+
+private:
+    redisReply *reply;
+};
+
+inline redisReply *castReply(void *reply) {
+    return reinterpret_cast<redisReply*>(reply);
+}
 
 }
 #endif

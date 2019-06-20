@@ -5,6 +5,20 @@ hiredis::ClientSettings hiredis::settings_g;
 
 using namespace hiredis;
 
+
+
+ClientSettings::ClientSettings(std::string connectType_, std::string str_) {
+    if(connectType_ == "env") {
+        applyEnv();
+    } else if(connectType_ == "tcp") { 
+        if(str_ != "") { setHost(str_.c_str()); }
+    } else if(connectType_ == "unix") {
+        setUnix(str_.c_str());
+    } else if(connectType_ == "ssl") {
+
+    }     
+}
+
 void ClientSettings::setHost(const char *s) {
     m_mode = REDIS_CONN_TCP;
     std::string hostval(s);
@@ -92,7 +106,7 @@ void ClientError::throwCode(int code) {
 }
 
 void ClientError::throwContext(const redisContext *c) {
-    const char *s;
+//    const char *what;
     switch (c->err) {
     case REDIS_ERR_IO:
     case REDIS_ERR_EOF:
