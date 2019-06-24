@@ -205,16 +205,16 @@ a single call to `read(2)`):
 redisReply *reply;
 redisAppendCommand(context,"SET foo bar");
 redisAppendCommand(context,"GET foo");
-redisGetReply(context,&reply); // reply for SET
+redisGetReply(context,(void *)&reply); // reply for SET
 freeReplyObject(reply);
-redisGetReply(context,&reply); // reply for GET
+redisGetReply(context,(void *)&reply); // reply for GET
 freeReplyObject(reply);
 ```
 This API can also be used to implement a blocking subscriber:
 ```c
 reply = redisCommand(context,"SUBSCRIBE foo");
 freeReplyObject(reply);
-while(redisGetReply(context,&reply) == REDIS_OK) {
+while(redisGetReply(context,(void *)&reply) == REDIS_OK) {
     // consume message
     freeReplyObject(reply);
 }
