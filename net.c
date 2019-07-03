@@ -435,9 +435,7 @@ addrretry:
         }
 
         /* For repeat connection */
-        if (c->saddr) {
-            free(c->saddr);
-        }
+        free(c->saddr);
         c->saddr = malloc(p->ai_addrlen);
         memcpy(c->saddr, p->ai_addr, p->ai_addrlen);
         c->addrlen = p->ai_addrlen;
