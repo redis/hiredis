@@ -362,7 +362,8 @@ static int processBulkItem(redisReader *r) {
     return REDIS_ERR;
 }
 
-static int processMultiBulkItem(redisReader *r) {
+/* Process the array, map and set types. */
+static int processAggregateItem(redisReader *r) {
     redisReadTask *cur = &(r->rstack[r->ridx]);
     void *obj;
     char *p;
@@ -404,10 +405,12 @@ static int processMultiBulkItem(redisReader *r) {
 
             moveToNextTask(r);
         } else {
+            if (cur->type == REDIS_REPLY_MAP) elements *= 2;
+
             if (r->fn && r->fn->createArray)
                 obj = r->fn->createArray(cur,elements);
             else
-                obj = (void*)REDIS_REPLY_ARRAY;
+                obj = (void*)(long)cur->type;
 
             if (obj == NULL) {
                 __redisReaderSetErrorOOM(r);
@@ -461,6 +464,12 @@ static int processItem(redisReader *r) {
             case '*':
                 cur->type = REDIS_REPLY_ARRAY;
                 break;
+            case '%':
+                cur->type = REDIS_REPLY_MAP;
+                break;
+            case '~':
+                cur->type = REDIS_REPLY_SET;
+                break;
             default:
                 __redisReaderSetErrorProtocolByte(r,*p);
                 return REDIS_ERR;
@@ -480,7 +489,9 @@ static int processItem(redisReader *r) {
     case REDIS_REPLY_STRING:
         return processBulkItem(r);
     case REDIS_REPLY_ARRAY:
-        return processMultiBulkItem(r);
+    case REDIS_REPLY_MAP:
+    case REDIS_REPLY_SET:
+        return processAggregateItem(r);
     default:
         assert(NULL);
         return REDIS_ERR; /* Avoid warning. */
