@@ -438,7 +438,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
                 assert(reply->element[2]->type == REDIS_REPLY_INTEGER);
 
                 /* Unset subscribed flag only when no pipelined pending subscribe. */
-                if (reply->element[2]->integer == 0 
+                if (reply->element[2]->integer == 0
                     && dictSize(ac->sub.channels) == 0
                     && dictSize(ac->sub.patterns) == 0)
                     c->flags &= ~REDIS_SUBSCRIBED;
@@ -557,7 +557,7 @@ static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
 /**
  * Handle SSL when socket becomes available for reading. This also handles
  * read-while-write and write-while-read.
- * 
+ *
  * These functions will not work properly unless `HIREDIS_SSL` is defined
  * (however, they will compile)
  */
