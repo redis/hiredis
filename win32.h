@@ -2,8 +2,18 @@
 #define _WIN32_HELPER_INCLUDE
 #ifdef _MSC_VER
 
+#include <winsock2.h> /* for struct timeval */
+
 #ifndef inline
 #define inline __inline
+#endif
+
+#ifndef strcasecmp
+#define strcasecmp stricmp
+#endif
+
+#ifndef strncasecmp
+#define strncasecmp strnicmp
 #endif
 
 #ifndef va_copy

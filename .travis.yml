@@ -56,3 +56,36 @@ script:
   - cmake .. ${EXTRA_CMAKE_OPTS}
   - make VERBOSE=1
   - ctest -V
+
+matrix:
+  include:
+    # Windows MinGW cross compile on Linux
+    - os: linux
+      dist: xenial
+      compiler: mingw
+      addons:
+        apt:
+          packages:
+            - ninja-build
+            - gcc-mingw-w64-x86-64
+            - g++-mingw-w64-x86-64
+      script:
+        - mkdir build && cd build
+        - CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_BUILD_WITH_INSTALL_RPATH=on
+        - ninja -v
+
+    # Windows MSVC 2017
+    - os: windows
+      compiler: msvc
+      env:
+        - MATRIX_EVAL="CC=cl.exe && CXX=cl.exe"
+      before_install:
+        - eval "${MATRIX_EVAL}"
+      install:
+        - choco install ninja
+      script:
+        - mkdir build && cd build
+        - cmd.exe /C '"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 &&
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release &&
+          ninja -v'
+        - ctest -V
