@@ -385,7 +385,7 @@ static int processMultiBulkItem(redisReader *r) {
 
         root = (r->ridx == 0);
 
-        if (elements < -1 || elements > INT_MAX) {
+        if (elements < -1 || (LLONG_MAX > SIZE_MAX && elements > SIZE_MAX)) {
             __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                     "Multi-bulk length out of range");
             return REDIS_ERR;
