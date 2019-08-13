@@ -63,6 +63,10 @@ int redisNetRead(redisContext *c, char *buf, size_t bufcap) {
         if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
             return 0;
+        } else if(errno == ETIMEDOUT && (c->flags & REDIS_BLOCK)) {
+            /* especially in windows */
+            __redisSetError(c, REDIS_ERR_TIMEOUT, "recv timeout");
+            return -1;
         } else {
             __redisSetError(c, REDIS_ERR_IO, NULL);
             return -1;
@@ -310,11 +314,18 @@ int redisCheckSocketError(redisContext *c) {
 }
 
 int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
-    if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv)) == -1) {
+    const void *to_ptr = &tv;
+    size_t to_sz = sizeof(tv);
+#ifdef _WIN32
+    DWORD timeout_msec = tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    to_ptr = &timeout_msec;
+    to_sz = sizeof(timeout_msec);
+#endif
+    if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,to_ptr,to_sz) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(SO_RCVTIMEO)");
         return REDIS_ERR;
     }
-    if (setsockopt(c->fd,SOL_SOCKET,SO_SNDTIMEO,&tv,sizeof(tv)) == -1) {
+    if (setsockopt(c->fd,SOL_SOCKET,SO_SNDTIMEO,to_ptr,to_sz) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(SO_SNDTIMEO)");
         return REDIS_ERR;
     }
