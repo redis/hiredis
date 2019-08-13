@@ -8,6 +8,7 @@
 
 void __redisSetError(redisContext *c, int type, const char *str);
 
+#ifdef HIREDIS_SSL_TRACE
 /**
  * Callback used for debugging
  */
@@ -37,6 +38,7 @@ static void sslLogCallback(const SSL *ssl, int where, int ret) {
         printf("Using SSL version %s. Cipher=%s\n", SSL_get_version(ssl), SSL_get_cipher_name(ssl));
     }
 }
+#endif
 
 typedef pthread_mutex_t sslLockType;
 static void sslLockInit(sslLockType *l) {
@@ -100,7 +102,9 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
 
     redisSsl *s = c->ssl;
     s->ctx = SSL_CTX_new(SSLv23_client_method());
+#ifdef HIREDIS_SSL_TRACE
     SSL_CTX_set_info_callback(s->ctx, sslLogCallback);
+#endif
     SSL_CTX_set_mode(s->ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_CTX_set_options(s->ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
     SSL_CTX_set_verify(s->ctx, SSL_VERIFY_PEER, NULL);
