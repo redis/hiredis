@@ -235,11 +235,24 @@ redisContext *redisConnectUnixNonBlock(const char *path);
 redisContext *redisConnectFd(redisFD fd);
 
 /**
+ *  Redis SSL options
+ */
+# define HIREDIS_SSL_VERIFY_NONE 0x00
+# define HIREDIS_SSL_VERIFY_PEER 0x01
+
+/**
  * Secure the connection using SSL. This should be done before any command is
  * executed on the connection.
  */
 int redisSecureConnection(redisContext *c, const char *capath, const char *certpath,
                           const char *keypath, const char *servername);
+
+/**
+ * Secure the connection using SSL with options. This should be done before any command is
+ * executed on the connection.
+ */
+int redisSecureConnectionWithOptions(redisContext *c, const char *capath, const char *certpath,
+                          const char *keypath, const char *servername, int ssloptions);
 
 /**
  * Reconnect the given context using the saved information.

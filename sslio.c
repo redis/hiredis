@@ -88,7 +88,7 @@ void redisFreeSsl(redisSsl *ssl){
 }
 
 int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
-                   const char *keypath, const char *servername) {
+                   const char *keypath, const char *servername, int ssloptions) {
     assert(!c->ssl);
     c->ssl = calloc(1, sizeof(*c->ssl));
     static int isInit = 0;
@@ -103,7 +103,7 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
     SSL_CTX_set_info_callback(s->ctx, sslLogCallback);
     SSL_CTX_set_mode(s->ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_CTX_set_options(s->ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-    SSL_CTX_set_verify(s->ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_verify(s->ctx, ssloptions, NULL);
 
     if ((certpath != NULL && keypath == NULL) || (keypath != NULL && certpath == NULL)) {
         __redisSetError(c, REDIS_ERR, "certpath and keypath must be specified together");

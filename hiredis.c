@@ -760,7 +760,12 @@ redisContext *redisConnectFd(redisFD fd) {
 
 int redisSecureConnection(redisContext *c, const char *caPath,
                           const char *certPath, const char *keyPath, const char *servername) {
-    return redisSslCreate(c, caPath, certPath, keyPath, servername);
+    return redisSslCreate(c, caPath, certPath, keyPath, servername, HIREDIS_SSL_VERIFY_PEER);
+}
+
+int redisSecureConnectionWithOptions(redisContext *c, const char *caPath,
+                          const char *certPath, const char *keyPath, const char *servername, int sslOptions) {
+    return redisSslCreate(c, caPath, certPath, keyPath, servername, sslOptions);
 }
 
 /* Set read/write timeout on a blocking socket. */
