@@ -5,6 +5,9 @@
 #ifdef HIREDIS_SSL
 #include <pthread.h>
 #include <errno.h>
+#include <string.h>
+
+#include <openssl/err.h>
 
 void __redisSetError(redisContext *c, int type, const char *str);
 
@@ -143,6 +146,7 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
     SSL_set_connect_state(s->ssl);
 
     c->flags |= REDIS_SSL;
+    ERR_clear_error();
     int rv = SSL_connect(c->ssl->ssl);
     if (rv == 1) {
         return REDIS_OK;
@@ -155,7 +159,15 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
     }
 
     if (c->err == 0) {
-        __redisSetError(c, REDIS_ERR_IO, "SSL_connect() failed");
+        char err[512];
+        if (rv == SSL_ERROR_SYSCALL)
+            snprintf(err,sizeof(err)-1,"SSL_connect failed: %s",strerror(errno));
+        else {
+            unsigned long e = ERR_peek_last_error();
+            snprintf(err,sizeof(err)-1,"SSL_connect failed: %s",
+                    ERR_reason_error_String(e));
+        }
+        __redisSetError(c, REDIS_ERR_IO, err);
     }
     return REDIS_ERR;
 }
