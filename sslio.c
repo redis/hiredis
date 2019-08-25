@@ -165,7 +165,7 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
         else {
             unsigned long e = ERR_peek_last_error();
             snprintf(err,sizeof(err)-1,"SSL_connect failed: %s",
-                    ERR_reason_error_String(e));
+                    ERR_reason_error_string(e));
         }
         __redisSetError(c, REDIS_ERR_IO, err);
     }
