@@ -48,7 +48,9 @@ static redisReply *createReplyObject(int type);
 static void *createStringObject(const redisReadTask *task, char *str, size_t len);
 static void *createArrayObject(const redisReadTask *task, size_t elements);
 static void *createIntegerObject(const redisReadTask *task, long long value);
+static void *createDoubleObject(const redisReadTask *task, double value, char *str, size_t len);
 static void *createNilObject(const redisReadTask *task);
+static void *createBoolObject(const redisReadTask *task, int bval);
 
 /* Default set of functions to build the reply. Keep in mind that such a
  * function returning NULL is interpreted as OOM. */
@@ -56,7 +58,9 @@ static redisReplyObjectFunctions defaultFunctions = {
     createStringObject,
     createArrayObject,
     createIntegerObject,
+    createDoubleObject,
     createNilObject,
+    createBoolObject,
     freeReplyObject
 };
 
@@ -83,6 +87,8 @@ void freeReplyObject(void *reply) {
     case REDIS_REPLY_INTEGER:
         break; /* Nothing to free */
     case REDIS_REPLY_ARRAY:
+    case REDIS_REPLY_MAP:
+    case REDIS_REPLY_SET:
         if (r->element != NULL) {
             for (j = 0; j < r->elements; j++)
                 freeReplyObject(r->element[j]);
@@ -92,6 +98,7 @@ void freeReplyObject(void *reply) {
     case REDIS_REPLY_ERROR:
     case REDIS_REPLY_STATUS:
     case REDIS_REPLY_STRING:
+    case REDIS_REPLY_DOUBLE:
         free(r->str);
         break;
     }
@@ -124,7 +131,9 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY);
+        assert(parent->type == REDIS_REPLY_ARRAY ||
+               parent->type == REDIS_REPLY_MAP ||
+               parent->type == REDIS_REPLY_SET);
         parent->element[task->idx] = r;
     }
     return r;
@@ -133,7 +142,7 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
 static void *createArrayObject(const redisReadTask *task, size_t elements) {
     redisReply *r, *parent;
 
-    r = createReplyObject(REDIS_REPLY_ARRAY);
+    r = createReplyObject(task->type);
     if (r == NULL)
         return NULL;
 
@@ -149,7 +158,9 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY);
+        assert(parent->type == REDIS_REPLY_ARRAY ||
+               parent->type == REDIS_REPLY_MAP ||
+               parent->type == REDIS_REPLY_SET);
         parent->element[task->idx] = r;
     }
     return r;
@@ -166,7 +177,41 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY);
+        assert(parent->type == REDIS_REPLY_ARRAY ||
+               parent->type == REDIS_REPLY_MAP ||
+               parent->type == REDIS_REPLY_SET);
+        parent->element[task->idx] = r;
+    }
+    return r;
+}
+
+static void *createDoubleObject(const redisReadTask *task, double value, char *str, size_t len) {
+    redisReply *r, *parent;
+
+    r = createReplyObject(REDIS_REPLY_DOUBLE);
+    if (r == NULL)
+        return NULL;
+
+    r->dval = value;
+    r->str = malloc(len+1);
+    if (r->str == NULL) {
+        freeReplyObject(r);
+        return NULL;
+    }
+
+    /* The double reply also has the original protocol string representing a
+     * double as a null terminated string. This way the caller does not need
+     * to format back for string conversion, especially since Redis does efforts
+     * to make the string more human readable avoiding the calssical double
+     * decimal string conversion artifacts. */
+    memcpy(r->str, str, len);
+    r->str[len] = '\0';
+
+    if (task->parent) {
+        parent = task->parent->obj;
+        assert(parent->type == REDIS_REPLY_ARRAY ||
+               parent->type == REDIS_REPLY_MAP ||
+               parent->type == REDIS_REPLY_SET);
         parent->element[task->idx] = r;
     }
     return r;
@@ -181,7 +226,28 @@ static void *createNilObject(const redisReadTask *task) {
 
     if (task->parent) {
         parent = task->parent->obj;
-        assert(parent->type == REDIS_REPLY_ARRAY);
+        assert(parent->type == REDIS_REPLY_ARRAY ||
+               parent->type == REDIS_REPLY_MAP ||
+               parent->type == REDIS_REPLY_SET);
+        parent->element[task->idx] = r;
+    }
+    return r;
+}
+
+static void *createBoolObject(const redisReadTask *task, int bval) {
+    redisReply *r, *parent;
+
+    r = createReplyObject(REDIS_REPLY_BOOL);
+    if (r == NULL)
+        return NULL;
+
+    r->integer = bval != 0;
+
+    if (task->parent) {
+        parent = task->parent->obj;
+        assert(parent->type == REDIS_REPLY_ARRAY ||
+               parent->type == REDIS_REPLY_MAP ||
+               parent->type == REDIS_REPLY_SET);
         parent->element[task->idx] = r;
     }
     return r;
