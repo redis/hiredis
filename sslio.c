@@ -2,14 +2,15 @@
 #include "sslio.h"
 
 #include <assert.h>
-#ifdef HIREDIS_SSL
+
 #include <pthread.h>
 #include <errno.h>
 #include <string.h>
 
-#include <openssl/err.h>
-
 void __redisSetError(redisContext *c, int type, const char *str);
+
+#ifdef HIREDIS_SSL
+#include <openssl/err.h>
 
 #ifdef HIREDIS_SSL_TRACE
 /**
@@ -113,23 +114,23 @@ int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
     SSL_CTX_set_verify(s->ctx, SSL_VERIFY_PEER, NULL);
 
     if ((certpath != NULL && keypath == NULL) || (keypath != NULL && certpath == NULL)) {
-        __redisSetError(c, REDIS_ERR, "certpath and keypath must be specified together");
+        __redisSetError(c, REDIS_ERR_OTHER, "certpath and keypath must be specified together");
         return REDIS_ERR;
     }
 
     if (capath) {
         if (!SSL_CTX_load_verify_locations(s->ctx, capath, NULL)) {
-            __redisSetError(c, REDIS_ERR, "Invalid CA certificate");
+            __redisSetError(c, REDIS_ERR_OTHER, "Invalid CA certificate");
             return REDIS_ERR;
         }
     }
     if (certpath) {
         if (!SSL_CTX_use_certificate_chain_file(s->ctx, certpath)) {
-            __redisSetError(c, REDIS_ERR, "Invalid client certificate");
+            __redisSetError(c, REDIS_ERR_OTHER, "Invalid client certificate");
             return REDIS_ERR;
         }
         if (!SSL_CTX_use_PrivateKey_file(s->ctx, keypath, SSL_FILETYPE_PEM)) {
-            __redisSetError(c, REDIS_ERR, "Invalid client key");
+            __redisSetError(c, REDIS_ERR_OTHER, "Invalid client key");
             return REDIS_ERR;
         }
     }
@@ -252,4 +253,33 @@ int redisSslWrite(redisContext *c) {
     return rv;
 }
 
-#endif
+#else
+int redisSslCreate(redisContext *c, const char *capath, const char *certpath,
+                   const char *keypath, const char *servername) {
+    (void) c;
+    (void) capath;
+    (void) certpath;
+    (void) keypath;
+    (void) servername;
+
+    __redisSetError(c, REDIS_ERR_OTHER, "SSL not supported by this library");
+    return REDIS_ERR;
+}
+
+int redisSslRead(struct redisContext *c, char *s, size_t n) {
+    (void) c;
+    (void) s;
+    (void) n;
+    return REDIS_ERR;
+}
+
+int redisSslWrite(struct redisContext *c) {
+    (void) c;
+    return REDIS_ERR;
+}
+
+void redisFreeSsl(struct redisSsl *ssl) {
+    (void) ssl;
+}
+
+#endif  /* HIREDIS_SSL */

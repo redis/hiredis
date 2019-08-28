@@ -3,27 +3,14 @@
 
 
 #ifndef HIREDIS_SSL
+
+/* Dummy struct to satisfy compilation */
 typedef struct redisSsl {
     size_t lastLen;
     int wantRead;
     int pendingWrite;
 } redisSsl;
-static inline void redisFreeSsl(redisSsl *ssl) {
-    (void)ssl;
-}
-static inline int redisSslCreate(struct redisContext *c, const char *ca,
-                          const char *cert, const char *key, const char *servername) {
-    (void)c;(void)ca;(void)cert;(void)key;(void)servername;
-    return REDIS_ERR;
-}
-static inline int redisSslRead(struct redisContext *c, char *s, size_t n) {
-    (void)c;(void)s;(void)n;
-    return -1;
-}
-static inline int redisSslWrite(struct redisContext *c) {
-    (void)c;
-    return -1;
-}
+
 #else
 #include <openssl/ssl.h>
 
@@ -51,6 +38,8 @@ typedef struct redisSsl {
     int pendingWrite;
 } redisSsl;
 
+#endif /* HIREDIS_SSL */
+
 struct redisContext;
 
 void redisFreeSsl(redisSsl *);
@@ -60,5 +49,4 @@ int redisSslCreate(struct redisContext *c, const char *caPath,
 int redisSslRead(struct redisContext *c, char *buf, size_t bufcap);
 int redisSslWrite(struct redisContext *c);
 
-#endif /* HIREDIS_SSL */
 #endif /* HIREDIS_SSLIO_H */
