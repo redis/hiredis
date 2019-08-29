@@ -3,7 +3,7 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ=net.o hiredis.o sds.o async.o read.o sockcompat.o sslio.o
+OBJ=net.o hiredis.o sds.o async.o read.o sockcompat.o ssl.o
 EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
 ifeq ($(USE_SSL),1)
 EXAMPLES+=hiredis-example-ssl hiredis-example-libevent-ssl
@@ -94,7 +94,7 @@ net.o: net.c fmacros.h net.h hiredis.h read.h sds.h sockcompat.h win32.h
 read.o: read.c fmacros.h read.h sds.h
 sds.o: sds.c sds.h
 sockcompat.o: sockcompat.c sockcompat.h
-sslio.o: sslio.c hiredis.h
+ssl.o: ssl.c hiredis.h
 test.o: test.c fmacros.h hiredis.h read.h sds.h
 
 $(DYLIBNAME): $(OBJ)
