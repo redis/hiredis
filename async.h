@@ -125,6 +125,8 @@ void redisAsyncFree(redisAsyncContext *ac);
 void redisAsyncHandleRead(redisAsyncContext *ac);
 void redisAsyncHandleWrite(redisAsyncContext *ac);
 void redisAsyncHandleTimeout(redisAsyncContext *ac);
+void redisAsyncRead(redisAsyncContext *ac);
+void redisAsyncWrite(redisAsyncContext *ac);
 
 /* Command functions for an async context. Write the command to the
  * output buffer and register the provided callback. */

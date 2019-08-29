@@ -41,8 +41,16 @@
 #include "hiredis.h"
 #include "net.h"
 #include "sds.h"
-#include "sslio.h"
+#include "async.h"
 #include "win32.h"
+
+static redisContextFuncs redisContextDefaultFuncs = {
+    .free_privdata = NULL,
+    .async_read = redisAsyncRead,
+    .async_write = redisAsyncWrite,
+    .read = redisNetRead,
+    .write = redisNetWrite
+};
 
 static redisReply *createReplyObject(int type);
 static void *createStringObject(const redisReadTask *task, char *str, size_t len);
@@ -657,6 +665,7 @@ static redisContext *redisContextInit(const redisOptions *options) {
     if (c == NULL)
         return NULL;
 
+    c->funcs = &redisContextDefaultFuncs;
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
     c->fd = REDIS_INVALID_FD;
@@ -681,8 +690,8 @@ void redisFree(redisContext *c) {
     free(c->unix_sock.path);
     free(c->timeout);
     free(c->saddr);
-    if (c->ssl) {
-        redisFreeSsl(c->ssl);
+    if (c->funcs->free_privdata) {
+        c->funcs->free_privdata(c->privdata);
     }
     memset(c, 0xff, sizeof(*c));
     free(c);
@@ -824,11 +833,6 @@ redisContext *redisConnectFd(redisFD fd) {
     return redisConnectWithOptions(&options);
 }
 
-int redisSecureConnection(redisContext *c, const char *caPath,
-                          const char *certPath, const char *keyPath, const char *servername) {
-    return redisSslCreate(c, caPath, certPath, keyPath, servername);
-}
-
 /* Set read/write timeout on a blocking socket. */
 int redisSetTimeout(redisContext *c, const struct timeval tv) {
     if (c->flags & REDIS_BLOCK)
@@ -856,8 +860,7 @@ int redisBufferRead(redisContext *c) {
     if (c->err)
         return REDIS_ERR;
 
-    nread = c->flags & REDIS_SSL ?
-        redisSslRead(c, buf, sizeof(buf)) : redisNetRead(c, buf, sizeof(buf));
+    nread = c->funcs->read(c, buf, sizeof(buf));
     if (nread > 0) {
         if (redisReaderFeed(c->reader, buf, nread) != REDIS_OK) {
             __redisSetError(c, c->reader->err, c->reader->errstr);
@@ -886,7 +889,7 @@ int redisBufferWrite(redisContext *c, int *done) {
         return REDIS_ERR;
 
     if (sdslen(c->obuf) > 0) {
-        int nwritten = (c->flags & REDIS_SSL) ? redisSslWrite(c) : redisNetWrite(c);
+        int nwritten = c->funcs->write(c);
         if (nwritten < 0) {
             return REDIS_ERR;
         } else if (nwritten > 0) {

@@ -78,9 +78,6 @@ struct timeval; /* forward declaration */
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
 #define REDIS_REUSEADDR 0x80
 
-/* Flag that is set when this connection is done through SSL */
-#define REDIS_SSL 0x100
-
 /**
  * Flag that indicates the user does not want the context to
  * be automatically freed upon error
@@ -193,8 +190,21 @@ typedef struct {
     (opts)->type = REDIS_CONN_UNIX;        \
     (opts)->endpoint.unix_socket = path;
 
+struct redisAsyncContext;
+struct redisContext;
+
+typedef struct redisContextFuncs {
+    void (*free_privdata)(void *);
+    void (*async_read)(struct redisAsyncContext *);
+    void (*async_write)(struct redisAsyncContext *);
+    int (*read)(struct redisContext *, char *, size_t);
+    int (*write)(struct redisContext *);
+} redisContextFuncs;
+
 /* Context for a connection to Redis */
 typedef struct redisContext {
+    redisContextFuncs *funcs;   /* Function table */
+
     int err; /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
     redisFD fd;
@@ -218,9 +228,9 @@ typedef struct redisContext {
     /* For non-blocking connect */
     struct sockadr *saddr;
     size_t addrlen;
-    /* For SSL communication */
-    struct redisSsl *ssl;
 
+    /* Additional private data for hiredis addons such as SSL */
+    void *privdata;
 } redisContext;
 
 redisContext *redisConnectWithOptions(const redisOptions *options);
@@ -235,13 +245,6 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 redisContext *redisConnectFd(redisFD fd);
-
-/**
- * Secure the connection using SSL. This should be done before any command is
- * executed on the connection.
- */
-int redisSecureConnection(redisContext *c, const char *capath, const char *certpath,
-                          const char *keypath, const char *servername);
 
 /**
  * Reconnect the given context using the saved information.
