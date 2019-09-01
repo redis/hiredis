@@ -203,7 +203,7 @@ typedef struct redisContextFuncs {
 
 /* Context for a connection to Redis */
 typedef struct redisContext {
-    redisContextFuncs *funcs;   /* Function table */
+    const redisContextFuncs *funcs;   /* Function table */
 
     int err; /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
