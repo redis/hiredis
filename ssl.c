@@ -34,7 +34,6 @@
 #include "async.h"
 
 #include <assert.h>
-#ifdef HIREDIS_SSL
 #include <pthread.h>
 #include <errno.h>
 #include <string.h>
@@ -447,4 +446,3 @@ redisContextFuncs redisContextSSLFuncs = {
     .write = redisSSLWrite
 };
 
-#endif
