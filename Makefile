@@ -65,6 +65,12 @@ STLIB_MAKE_CMD=$(AR) rcs
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 
 USE_SSL?=0
+
+# This is required for test.c only
+ifeq ($(USE_SSL),1)
+  CFLAGS+=-DHIREDIS_TEST_SSL
+endif
+
 ifeq ($(uname_S),Linux)
   SSL_LDFLAGS=-lssl -lcrypto
 else
@@ -176,19 +182,20 @@ hiredis-example: examples/example.c $(STLIBNAME)
 
 examples: $(EXAMPLES)
 
-hiredis-test: test.o $(STLIBNAME)
+TEST_LIBS = $(STLIBNAME)
+ifeq ($(USE_SSL),1)
+    TEST_LIBS += $(SSL_STLIBNAME) -lssl -lcrypto -lpthread
+endif
+hiredis-test: test.o $(TEST_LIBS)
 
 hiredis-%: %.o $(STLIBNAME)
-	$(CC) $(REAL_CFLAGS) -o $@ $< $(STLIBNAME) $(REAL_LDFLAGS)
+	$(CC) $(REAL_CFLAGS) -o $@ $< $(TEST_LIBS) $(REAL_LDFLAGS)
 
 test: hiredis-test
 	./hiredis-test
 
 check: hiredis-test
-	@echo "$$REDIS_TEST_CONFIG" | $(REDIS_SERVER) -
-	$(PRE) ./hiredis-test -h 127.0.0.1 -p $(REDIS_PORT) -s /tmp/hiredis-test-redis.sock || \
-			( kill `cat /tmp/hiredis-test-redis.pid` && false )
-	kill `cat /tmp/hiredis-test-redis.pid`
+	TEST_SSL=$(USE_SSL) ./test.sh
 
 .c.o:
 	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
