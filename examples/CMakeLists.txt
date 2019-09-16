@@ -37,9 +37,9 @@ IF (APPLE)
     TARGET_LINK_LIBRARIES(example-macosx hiredis ${CF})
 ENDIF()
 
-IF (HIREDIS_SSL)
+IF (ENABLE_SSL)
     ADD_EXECUTABLE(example-ssl example-ssl.c)
-    TARGET_LINK_LIBRARIES(example-ssl hiredis)
+    TARGET_LINK_LIBRARIES(example-ssl hiredis hiredis_ssl)
 ENDIF()
 
 ADD_EXECUTABLE(example example.c)
