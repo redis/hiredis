@@ -13,12 +13,16 @@
 #include <limits.h>
 
 #include "hiredis.h"
+#ifdef HIREDIS_TEST_SSL
+#include "hiredis_ssl.h"
+#endif
 #include "net.h"
 
 enum connection_type {
     CONN_TCP,
     CONN_UNIX,
-    CONN_FD
+    CONN_FD,
+    CONN_SSL
 };
 
 struct config {
@@ -33,6 +37,14 @@ struct config {
     struct {
         const char *path;
     } unix_sock;
+
+    struct {
+        const char *host;
+        int port;
+        const char *ca_cert;
+        const char *cert;
+        const char *key;
+    } ssl;
 };
 
 /* The following lines make up our testing "framework" :) */
@@ -93,11 +105,27 @@ static int disconnect(redisContext *c, int keep_fd) {
     return -1;
 }
 
+static void do_ssl_handshake(redisContext *c, struct config config) {
+#ifdef HIREDIS_TEST_SSL
+    redisSecureConnection(c, config.ssl.ca_cert, config.ssl.cert, config.ssl.key, NULL);
+    if (c->err) {
+        printf("SSL error: %s\n", c->errstr);
+        redisFree(c);
+        exit(1);
+    }
+#else
+    (void) c;
+    (void) config;
+#endif
+}
+
 static redisContext *do_connect(struct config config) {
     redisContext *c = NULL;
 
     if (config.type == CONN_TCP) {
         c = redisConnect(config.tcp.host, config.tcp.port);
+    } else if (config.type == CONN_SSL) {
+        c = redisConnect(config.ssl.host, config.ssl.port);
     } else if (config.type == CONN_UNIX) {
         c = redisConnectUnix(config.unix_sock.path);
     } else if (config.type == CONN_FD) {
@@ -121,7 +149,19 @@ static redisContext *do_connect(struct config config) {
         exit(1);
     }
 
+    if (config.type == CONN_SSL) {
+        do_ssl_handshake(c, config);
+    }
+
     return select_database(c);
+}
+
+static void do_reconnect(redisContext *c, struct config config) {
+    redisReconnect(c);
+
+    if (config.type == CONN_SSL) {
+        do_ssl_handshake(c, config);
+    }
 }
 
 static void test_format_commands(void) {
@@ -575,7 +615,8 @@ static void test_blocking_connection_timeouts(struct config config) {
 
     c = do_connect(config);
     test("Does not return a reply when the command times out: ");
-    s = write(c->fd, cmd, strlen(cmd));
+    redisAppendFormattedCommand(c, cmd, strlen(cmd));
+    s = c->funcs->write(c);
     tv.tv_sec = 0;
     tv.tv_usec = 10000;
     redisSetTimeout(c, tv);
@@ -584,7 +625,7 @@ static void test_blocking_connection_timeouts(struct config config) {
     freeReplyObject(reply);
 
     test("Reconnect properly reconnects after a timeout: ");
-    redisReconnect(c);
+    do_reconnect(c, config);
     reply = redisCommand(c, "PING");
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
     freeReplyObject(reply);
@@ -592,7 +633,7 @@ static void test_blocking_connection_timeouts(struct config config) {
     test("Reconnect properly uses owned parameters: ");
     config.tcp.host = "foo";
     config.unix_sock.path = "foo";
-    redisReconnect(c);
+    do_reconnect(c, config);
     reply = redisCommand(c, "PING");
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
     freeReplyObject(reply);
@@ -895,6 +936,23 @@ int main(int argc, char **argv) {
             throughput = 0;
         } else if (argc >= 1 && !strcmp(argv[0],"--skip-inherit-fd")) {
             test_inherit_fd = 0;
+#ifdef HIREDIS_TEST_SSL
+        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-port")) {
+            argv++; argc--;
+            cfg.ssl.port = atoi(argv[0]);
+        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-host")) {
+            argv++; argc--;
+            cfg.ssl.host = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-ca-cert")) {
+            argv++; argc--;
+            cfg.ssl.ca_cert  = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-cert")) {
+            argv++; argc--;
+            cfg.ssl.cert = argv[0];
+        } else if (argc >= 2 && !strcmp(argv[0],"--ssl-key")) {
+            argv++; argc--;
+            cfg.ssl.key = argv[0];
+#endif
         } else {
             fprintf(stderr, "Invalid argument: %s\n", argv[0]);
             exit(1);
@@ -922,6 +980,20 @@ int main(int argc, char **argv) {
     test_blocking_connection_timeouts(cfg);
     test_blocking_io_errors(cfg);
     if (throughput) test_throughput(cfg);
+
+#ifdef HIREDIS_TEST_SSL
+    if (cfg.ssl.port && cfg.ssl.host) {
+        printf("\nTesting against SSL connection (%s:%d):\n", cfg.ssl.host, cfg.ssl.port);
+        cfg.type = CONN_SSL;
+
+        test_blocking_connection(cfg);
+        test_blocking_connection_timeouts(cfg);
+        test_blocking_io_errors(cfg);
+        test_invalid_timeout_errors(cfg);
+        test_append_formatted_commands(cfg);
+        if (throughput) test_throughput(cfg);
+    }
+#endif
 
     if (test_inherit_fd) {
         printf("\nTesting against inherited fd (%s):\n", cfg.unix_sock.path);

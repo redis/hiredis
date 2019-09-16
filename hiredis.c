@@ -708,6 +708,11 @@ int redisReconnect(redisContext *c) {
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
+    if (c->privdata && c->funcs->free_privdata) {
+        c->funcs->free_privdata(c->privdata);
+        c->privdata = NULL;
+    }
+
     redisNetClose(c);
 
     sdsfree(c->obuf);
