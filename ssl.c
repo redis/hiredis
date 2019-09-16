@@ -337,7 +337,7 @@ static int redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
             } else {
                 const char *msg = NULL;
                 if (errno == EAGAIN) {
-                    msg = "Timed out";
+                    msg = "Resource temporarily unavailable";
                 }
                 __redisSetError(c, REDIS_ERR_IO, msg);
                 return -1;
