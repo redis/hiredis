@@ -410,7 +410,7 @@ as soon as possible in order to prevent allocation of useless memory.
 
 SSL/TLS support is not built by default and requires an explicit flag:
 
-    make USE_TLS=1
+    make USE_SSL=1
 
 This requires OpenSSL development package (e.g. including header files to be
 available.
