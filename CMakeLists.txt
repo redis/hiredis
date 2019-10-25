@@ -22,6 +22,10 @@ PROJECT(hiredis VERSION "${VERSION}")
 
 SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 
+IF(MSVC)
+  include(cmake/msvc_static_runtime.cmake)
+ENDIF()
+
 ADD_LIBRARY(hiredis SHARED
     async.c
     dict.c
