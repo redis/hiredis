@@ -23,6 +23,10 @@ PROJECT(hiredis VERSION "${VERSION}")
 
 SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 
+IF(MSVC)
+  include(cmake/msvc_static_runtime.cmake)
+ENDIF()
+
 SET(hiredis_sources
     async.c
     dict.c
@@ -40,6 +44,25 @@ IF(WIN32)
 ENDIF()
 
 ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
+
+
+OPTION(BUILD_STATIC_LIBS "Build hiredis_lib static library." ON)
+IF(BUILD_STATIC_LIBS)
+	ADD_LIBRARY(hiredis_lib_static STATIC
+		async.c
+		dict.c
+		hiredis.c
+		net.c
+		read.c
+		sds.c
+		sockcompat.c
+	)
+    set_target_properties (hiredis_lib_static PROPERTIES OUTPUT_NAME hiredis_static DEBUG_OUTPUT_NAME hiredis_staticd)
+    INSTALL( TARGETS hiredis_lib_static ${INSTALL_EXPORT}
+             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ENDIF()
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
