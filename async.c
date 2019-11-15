@@ -290,7 +290,7 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
 
     /* Execute disconnect callback. When redisAsyncFree() initiated destroying
      * this context, the status will always be REDIS_OK. */
-    if (ac->onDisconnect && (c->flags & REDIS_CONNECTED)) {
+    if (ac->onDisconnect) {
         if (c->flags & REDIS_FREEING) {
             ac->onDisconnect(ac,REDIS_OK);
         } else {
