@@ -132,7 +132,7 @@ was received:
     * A multi bulk reply. The number of elements in the multi bulk reply is stored in
       `reply->elements`. Every element in the multi bulk reply is a `redisReply` object as well
       and can be accessed via `reply->element[..index..]`.
-      Redis may reply with nested arrays but this is fully supported.
+      Redis may reply with nested arrays which is supported by Hiredis.
 
 Replies should be freed using the `freeReplyObject()` function.
 Note that this function will take care of freeing sub-reply objects
