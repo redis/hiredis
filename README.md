@@ -286,6 +286,7 @@ return `REDIS_ERR`. The function to set the disconnect callback has the followin
 ```c
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 ```
+`ac->data` may be used to pass user data to this callback, the same can be done for redisConnectCallback.
 ### Sending commands and their callbacks
 
 In an asynchronous context, commands are automatically pipelined due to the nature of an event loop.
@@ -403,9 +404,67 @@ This should be done only in order to maximize performances when working with
 large payloads. The context should be set back to `REDIS_READER_MAX_BUF` again
 as soon as possible in order to prevent allocation of useless memory.
 
+## SSL/TLS Support
+
+### Building
+
+SSL/TLS support is not built by default and requires an explicit flag:
+
+    make USE_SSL=1
+
+This requires OpenSSL development package (e.g. including header files to be
+available.
+
+When enabled, SSL/TLS support is built into extra `libhiredis_ssl.a` and
+`libhiredis_ssl.so` static/dynamic libraries. This leaves the original libraries
+unaffected so no additional dependencies are introduced.
+
+### Using it
+
+First, you'll need to make sure you include the SSL header file:
+
+```c
+#include "hiredis.h"
+#include "hiredis_ssl.h"
+```
+
+SSL can only be enabled on a `redisContext` connection after the connection has
+been established and before any command has been processed.  For example:
+
+```c
+c = redisConnect('localhost', 6443);
+if (c == NULL || c->err) {
+    /* Handle error and abort... */
+}
+
+if (redisSecureConnection(c,
+    "cacertbundle.crt",     /* File name of trusted CA/ca bundle file */
+    "client_cert.pem",      /* File name of client certificate file */
+    "client_key.pem",       /* File name of client privat ekey */
+    "redis.mydomain.com"    /* Server name to request (SNI) */
+    ) != REDIS_OK) {
+    printf("SSL error: %s\n", c->errstr);
+    /* Abort... */
+}
+```
+
+You will also need to link against `libhiredis_ssl`, **in addition** to
+`libhiredis` and add `-lssl -lcrypto` to satisfy its dependencies.
+
+### OpenSSL Global State Initialization
+
+OpenSSL needs to have certain global state initialized before it can be used.
+Using `redisSecureConnection()` will handle this automatically on the first
+call.
+
+**If the calling application itself also initializes and uses OpenSSL directly,
+`redisSecureConnection()` must not be used.**
+
+Instead, use `redisInitiateSSL()` which also provides greater control over the
+configuration of the SSL connection, as the caller is responsible to create a
+connection context using `SSL_new()` and configure it as required.
+
 ## AUTHORS
 
 Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
-Pieter Noordhuis (pcnoordhuis at gmail) and is released under the BSD license.  
-Hiredis is currently maintained by Matt Stancliff (matt at genges dot com) and
-Jan-Erik Rediger (janerik at fnordig dot com)
+Pieter Noordhuis (pcnoordhuis at gmail) and is released under the BSD license.

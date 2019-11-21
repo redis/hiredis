@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.4.0)
 INCLUDE(GNUInstallDirs)
 PROJECT(hiredis)
 
-OPTION(HIREDIS_SSL "Link against OpenSSL" OFF)
+OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
@@ -29,8 +29,7 @@ ADD_LIBRARY(hiredis SHARED
     net.c
     read.c
     sds.c
-    sockcompat.c
-    sslio.c)
+    sockcompat.c)
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES
@@ -47,20 +46,34 @@ INSTALL(TARGETS hiredis
 
 INSTALL(FILES hiredis.h read.h sds.h async.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
-
+    
+INSTALL(DIRECTORY adapters
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
+    
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
-IF(HIREDIS_SSL)
+IF(ENABLE_SSL)
     IF (NOT OPENSSL_ROOT_DIR)
         IF (APPLE)
             SET(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
         ENDIF()
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
-    TARGET_COMPILE_DEFINITIONS(hiredis PRIVATE HIREDIS_SSL)
-    TARGET_INCLUDE_DIRECTORIES(hiredis PRIVATE "${OPENSSL_INCLUDE_DIR}")
-    TARGET_LINK_LIBRARIES(hiredis PRIVATE ${OPENSSL_LIBRARIES})
+    ADD_LIBRARY(hiredis_ssl SHARED
+        ssl.c)
+    TARGET_INCLUDE_DIRECTORIES(hiredis_ssl PRIVATE "${OPENSSL_INCLUDE_DIR}")
+    TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE ${OPENSSL_LIBRARIES})
+    CONFIGURE_FILE(hiredis_ssl.pc.in hiredis_ssl.pc @ONLY)
+
+    INSTALL(TARGETS hiredis_ssl
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
+    INSTALL(FILES hiredis_ssl.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
+    
+    INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 ENDIF()
 
 IF(NOT (WIN32 OR MINGW))

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <hiredis.h>
+#include <hiredis_ssl.h>
 
 int main(int argc, char **argv) {
     unsigned int j;

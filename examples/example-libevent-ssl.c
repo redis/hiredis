@@ -4,6 +4,7 @@
 #include <signal.h>
 
 #include <hiredis.h>
+#include <hiredis_ssl.h>
 #include <async.h>
 #include <adapters/libevent.h>
 

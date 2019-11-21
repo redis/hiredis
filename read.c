@@ -29,20 +29,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "fmacros.h"
 #include <string.h>
 #include <stdlib.h>
 #ifndef _MSC_VER
 #include <unistd.h>
+#include <strings.h>
 #endif
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
 #include <limits.h>
+#include <math.h>
 
 #include "read.h"
 #include "sds.h"
+#include "win32.h"
 
 static void __redisReaderSetError(redisReader *r, int type, const char *str) {
     size_t len;
@@ -243,7 +245,9 @@ static void moveToNextTask(redisReader *r) {
 
         cur = &(r->rstack[r->ridx]);
         prv = &(r->rstack[r->ridx-1]);
-        assert(prv->type == REDIS_REPLY_ARRAY);
+        assert(prv->type == REDIS_REPLY_ARRAY ||
+               prv->type == REDIS_REPLY_MAP ||
+               prv->type == REDIS_REPLY_SET);
         if (cur->idx == prv->elements-1) {
             r->ridx--;
         } else {
@@ -276,6 +280,47 @@ static int processLineItem(redisReader *r) {
             } else {
                 obj = (void*)REDIS_REPLY_INTEGER;
             }
+        } else if (cur->type == REDIS_REPLY_DOUBLE) {
+            if (r->fn && r->fn->createDouble) {
+                char buf[326], *eptr;
+                double d;
+
+                if ((size_t)len >= sizeof(buf)) {
+                    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                            "Double value is too large");
+                    return REDIS_ERR;
+                }
+
+                memcpy(buf,p,len);
+                buf[len] = '\0';
+
+                if (strcasecmp(buf,",inf") == 0) {
+                    d = INFINITY; /* Positive infinite. */
+                } else if (strcasecmp(buf,",-inf") == 0) {
+                    d = -INFINITY; /* Nevative infinite. */
+                } else {
+                    d = strtod((char*)buf,&eptr);
+                    if (buf[0] == '\0' || eptr[0] != '\0' || isnan(d)) {
+                        __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                                "Bad double value");
+                        return REDIS_ERR;
+                    }
+                }
+                obj = r->fn->createDouble(cur,d,buf,len);
+            } else {
+                obj = (void*)REDIS_REPLY_DOUBLE;
+            }
+        } else if (cur->type == REDIS_REPLY_NIL) {
+            if (r->fn && r->fn->createNil)
+                obj = r->fn->createNil(cur);
+            else
+                obj = (void*)REDIS_REPLY_NIL;
+        } else if (cur->type == REDIS_REPLY_BOOL) {
+            int bval = p[0] == 't' || p[0] == 'T';
+            if (r->fn && r->fn->createBool)
+                obj = r->fn->createBool(cur,bval);
+            else
+                obj = (void*)REDIS_REPLY_BOOL;
         } else {
             /* Type will be error or status. */
             if (r->fn && r->fn->createString)
@@ -362,7 +407,8 @@ static int processBulkItem(redisReader *r) {
     return REDIS_ERR;
 }
 
-static int processMultiBulkItem(redisReader *r) {
+/* Process the array, map and set types. */
+static int processAggregateItem(redisReader *r) {
     redisReadTask *cur = &(r->rstack[r->ridx]);
     void *obj;
     char *p;
@@ -385,7 +431,7 @@ static int processMultiBulkItem(redisReader *r) {
 
         root = (r->ridx == 0);
 
-        if (elements < -1 || elements > INT_MAX) {
+        if (elements < -1 || (LLONG_MAX > SIZE_MAX && elements > SIZE_MAX)) {
             __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                     "Multi-bulk length out of range");
             return REDIS_ERR;
@@ -404,10 +450,12 @@ static int processMultiBulkItem(redisReader *r) {
 
             moveToNextTask(r);
         } else {
+            if (cur->type == REDIS_REPLY_MAP) elements *= 2;
+
             if (r->fn && r->fn->createArray)
                 obj = r->fn->createArray(cur,elements);
             else
-                obj = (void*)REDIS_REPLY_ARRAY;
+                obj = (void*)(long)cur->type;
 
             if (obj == NULL) {
                 __redisReaderSetErrorOOM(r);
@@ -455,11 +503,26 @@ static int processItem(redisReader *r) {
             case ':':
                 cur->type = REDIS_REPLY_INTEGER;
                 break;
+            case ',':
+                cur->type = REDIS_REPLY_DOUBLE;
+                break;
+            case '_':
+                cur->type = REDIS_REPLY_NIL;
+                break;
             case '$':
                 cur->type = REDIS_REPLY_STRING;
                 break;
             case '*':
                 cur->type = REDIS_REPLY_ARRAY;
+                break;
+            case '%':
+                cur->type = REDIS_REPLY_MAP;
+                break;
+            case '~':
+                cur->type = REDIS_REPLY_SET;
+                break;
+            case '#':
+                cur->type = REDIS_REPLY_BOOL;
                 break;
             default:
                 __redisReaderSetErrorProtocolByte(r,*p);
@@ -476,11 +539,16 @@ static int processItem(redisReader *r) {
     case REDIS_REPLY_ERROR:
     case REDIS_REPLY_STATUS:
     case REDIS_REPLY_INTEGER:
+    case REDIS_REPLY_DOUBLE:
+    case REDIS_REPLY_NIL:
+    case REDIS_REPLY_BOOL:
         return processLineItem(r);
     case REDIS_REPLY_STRING:
         return processBulkItem(r);
     case REDIS_REPLY_ARRAY:
-        return processMultiBulkItem(r);
+    case REDIS_REPLY_MAP:
+    case REDIS_REPLY_SET:
+        return processAggregateItem(r);
     default:
         assert(NULL);
         return REDIS_ERR; /* Avoid warning. */
@@ -590,8 +658,11 @@ int redisReaderGetReply(redisReader *r, void **reply) {
 
     /* Emit a reply when there is one. */
     if (r->ridx == -1) {
-        if (reply != NULL)
+        if (reply != NULL) {
             *reply = r->reply;
+        } else if (r->reply != NULL && r->fn && r->fn->freeObject) {
+            r->fn->freeObject(r->reply);
+        }
         r->reply = NULL;
     }
     return REDIS_OK;

@@ -50,7 +50,9 @@
 #include <ws2tcpip.h>
 #include <stddef.h>
 
+#ifdef _MSC_VER
 typedef signed long ssize_t;
+#endif
 
 /* Emulate the parts of the BSD socket API that we need (override the winsock signatures). */
 int win32_getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);

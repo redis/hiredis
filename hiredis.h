@@ -35,10 +35,10 @@
 #define __HIREDIS_H
 #include "read.h"
 #include <stdarg.h> /* for va_list */
-#ifndef _WIN32
+#ifndef _MSC_VER
 #include <sys/time.h> /* for struct timeval */
 #else
-#include <winsock2.h>
+struct timeval; /* forward declaration */
 #endif
 #include <stdint.h> /* uintXX_t, etc */
 #include "sds.h" /* for sds */
@@ -78,9 +78,6 @@
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
 #define REDIS_REUSEADDR 0x80
 
-/* Flag that is set when this connection is done through SSL */
-#define REDIS_SSL 0x100
-
 /**
  * Flag that indicates the user does not want the context to
  * be automatically freed upon error
@@ -101,8 +98,10 @@ extern "C" {
 typedef struct redisReply {
     int type; /* REDIS_REPLY_* */
     long long integer; /* The integer when type is REDIS_REPLY_INTEGER */
+    double dval; /* The double when type is REDIS_REPLY_DOUBLE */
     size_t len; /* Length of string */
-    char *str; /* Used for both REDIS_REPLY_ERROR and REDIS_REPLY_STRING */
+    char *str; /* Used for REDIS_REPLY_ERROR, REDIS_REPLY_STRING
+                  and REDIS_REPLY_DOUBLE (in additionl to dval). */
     size_t elements; /* number of elements, for REDIS_REPLY_ARRAY */
     struct redisReply **element; /* elements vector for REDIS_REPLY_ARRAY */
 } redisReply;
@@ -191,8 +190,21 @@ typedef struct {
     (opts)->type = REDIS_CONN_UNIX;        \
     (opts)->endpoint.unix_socket = path;
 
+struct redisAsyncContext;
+struct redisContext;
+
+typedef struct redisContextFuncs {
+    void (*free_privdata)(void *);
+    void (*async_read)(struct redisAsyncContext *);
+    void (*async_write)(struct redisAsyncContext *);
+    int (*read)(struct redisContext *, char *, size_t);
+    int (*write)(struct redisContext *);
+} redisContextFuncs;
+
 /* Context for a connection to Redis */
 typedef struct redisContext {
+    const redisContextFuncs *funcs;   /* Function table */
+
     int err; /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
     redisFD fd;
@@ -216,9 +228,9 @@ typedef struct redisContext {
     /* For non-blocking connect */
     struct sockadr *saddr;
     size_t addrlen;
-    /* For SSL communication */
-    struct redisSsl *ssl;
 
+    /* Additional private data for hiredis addons such as SSL */
+    void *privdata;
 } redisContext;
 
 redisContext *redisConnectWithOptions(const redisOptions *options);
@@ -233,13 +245,6 @@ redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
 redisContext *redisConnectFd(redisFD fd);
-
-/**
- * Secure the connection using SSL. This should be done before any command is
- * executed on the connection.
- */
-int redisSecureConnection(redisContext *c, const char *capath, const char *certpath,
-                          const char *keypath, const char *servername);
 
 /**
  * Reconnect the given context using the saved information.
