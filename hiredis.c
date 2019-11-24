@@ -493,7 +493,7 @@ format_err:
     error_type = -2;
     goto cleanup;
 
-memory_err:
+memory_err:                     // LCOV_EXCL_LINE memory allocation failure
     error_type = -1;
     goto cleanup;
 
@@ -671,7 +671,7 @@ static redisContext *redisContextInit(const redisOptions *options) {
     c->fd = REDIS_INVALID_FD;
 
     if (c->obuf == NULL || c->reader == NULL) {
-        redisFree(c);
+        redisFree(c);               // LCOV_EXCL_LINE memory allocation failure
         return NULL;
     }
     (void)options; /* options are used in other functions */

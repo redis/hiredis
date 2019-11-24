@@ -734,25 +734,36 @@ static void test_blocking_io_errors(struct config config) {
 static void test_invalid_timeout_errors(struct config config) {
     redisContext *c;
 
-    test("Set error when an invalid timeout usec value is given to redisConnectWithTimeout: ");
+    if(config.type == CONN_TCP) {
+        test("Set error when an invalid timeout usec value is given to redisConnectWithTimeout: ");
 
-    config.tcp.timeout.tv_sec = 0;
-    config.tcp.timeout.tv_usec = 10000001;
+        config.tcp.timeout.tv_sec = 0;
+        config.tcp.timeout.tv_usec = 10000001;
 
-    c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
+        c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
 
-    test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
-    redisFree(c);
+        test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+        redisFree(c);
 
-    test("Set error when an invalid timeout sec value is given to redisConnectWithTimeout: ");
+        test("Set error when an invalid timeout sec value is given to redisConnectWithTimeout: ");
 
-    config.tcp.timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
-    config.tcp.timeout.tv_usec = 0;
+        config.tcp.timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
+        config.tcp.timeout.tv_usec = 0;
 
-    c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
+        c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
 
-    test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
-    redisFree(c);
+        test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+        redisFree(c);
+    } else if(config.type == CONN_UNIX) {
+        test("Set error when an invalid timeout usec value is given to redisConnectUnixWithTimeout: ");
+
+        config.tcp.timeout.tv_sec = 0;
+        config.tcp.timeout.tv_usec = 10000001;
+
+        c = redisConnectUnixWithTimeout(config.unix_sock.path, config.tcp.timeout);
+        test_cond(c->err == REDIS_ERR_IO);
+        redisFree(c);
+    }
 }
 
 static void test_throughput(struct config config) {
@@ -1018,6 +1029,7 @@ int main(int argc, char **argv) {
     test_blocking_connection(cfg);
     test_blocking_connection_timeouts(cfg);
     test_blocking_io_errors(cfg);
+    test_invalid_timeout_errors(cfg);
     if (throughput) test_throughput(cfg);
 
 #ifdef HIREDIS_TEST_SSL
