@@ -463,6 +463,26 @@ static void test_reply_reader(void) {
     freeReplyObject(root);
     redisReaderFree(reader);
 
+    test("Correctly parse double: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",1.23\r\n",7);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+            ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+            ((redisReply*)reply)->dval == 1.23);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Correctly parse bool: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#t\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+            ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
+            ((redisReply*)reply)->integer == 1);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
     test("Correctly parses LLONG_MAX: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, ":9223372036854775807\r\n",22);
@@ -780,6 +800,17 @@ static void test_reply_reader(void) {
         ((redisReply*)reply)->type == REDIS_REPLY_BIGNUM &&
         ((redisReply*)reply)->len == 43 &&
         !strcmp(((redisReply*)reply)->str,"3492890328409238509324850943850943825024385"));
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    /* Test type in array. */
+    test("Don't do empty allocation for empty multi bulk: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader,(char*)"*4\r\n#t\r\n:1\r\n,1.23\r\n_\r\n",22);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
+        ((redisReply*)reply)->elements == 4);
     freeReplyObject(reply);
     redisReaderFree(reader);
 }
@@ -1103,6 +1134,13 @@ static void test_blocking_connection(struct config config) {
     test_cond(reply->len == 11)
     freeReplyObject(reply);
 
+    test("Test redisCommandArgv func: ");
+    const char *argv[3] = {"SET", "foo", "bar"};
+    size_t argvlen[3] = {3, 3, 3};
+    reply = redisCommandArgv(c, 3, argv, argvlen);
+    test_cond (reply->type == REDIS_REPLY_STATUS);
+    freeReplyObject(reply);
+
     test("Can parse nil replies: ");
     reply = redisCommand(c,"GET nokey");
     test_cond(reply->type == REDIS_REPLY_NIL)
@@ -1287,25 +1325,36 @@ static void test_blocking_io_errors(struct config config) {
 static void test_invalid_timeout_errors(struct config config) {
     redisContext *c;
 
-    test("Set error when an invalid timeout usec value is given to redisConnectWithTimeout: ");
+    if(config.type == CONN_TCP) {
+        test("Set error when an invalid timeout usec value is given to redisConnectWithTimeout: ");
 
-    config.tcp.timeout.tv_sec = 0;
-    config.tcp.timeout.tv_usec = 10000001;
+        config.tcp.timeout.tv_sec = 0;
+        config.tcp.timeout.tv_usec = 10000001;
 
-    c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
+        c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
 
-    test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
-    redisFree(c);
+        test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+        redisFree(c);
 
-    test("Set error when an invalid timeout sec value is given to redisConnectWithTimeout: ");
+        test("Set error when an invalid timeout sec value is given to redisConnectWithTimeout: ");
 
-    config.tcp.timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
-    config.tcp.timeout.tv_usec = 0;
+        config.tcp.timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
+        config.tcp.timeout.tv_usec = 0;
 
-    c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
+        c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
 
-    test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
-    redisFree(c);
+        test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+        redisFree(c);
+    } else if(config.type == CONN_UNIX) {
+        test("Set error when an invalid timeout usec value is given to redisConnectUnixWithTimeout: ");
+
+        config.tcp.timeout.tv_sec = 0;
+        config.tcp.timeout.tv_usec = 10000001;
+
+        c = redisConnectUnixWithTimeout(config.unix_sock.path, config.tcp.timeout);
+        test_cond(c->err == REDIS_ERR_IO);
+        redisFree(c);
+    }
 }
 
 /* Wrap malloc to abort on failure so OOM checks don't make the test logic
@@ -2284,6 +2333,7 @@ int main(int argc, char **argv) {
         test_blocking_connection(cfg);
         test_blocking_connection_timeouts(cfg);
         test_blocking_io_errors(cfg);
+        test_invalid_timeout_errors(cfg);
         if (throughput) test_throughput(cfg);
     } else {
         test_skipped();
