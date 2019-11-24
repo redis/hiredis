@@ -344,6 +344,26 @@ static void test_reply_reader(void) {
               strncasecmp(reader->errstr,"No support for",14) == 0);
     redisReaderFree(reader);
 
+    test("Correctly parse double: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",1.23\r\n",7);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+            ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+            ((redisReply*)reply)->dval == 1.23);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Correctly parse bool: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#t\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+            ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
+            ((redisReply*)reply)->integer == 1);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
     test("Correctly parses LLONG_MAX: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, ":9223372036854775807\r\n",22);
@@ -452,13 +472,25 @@ static void test_reply_reader(void) {
     /* Regression test for issue #45 on GitHub. */
     test("Don't do empty allocation for empty multi bulk: ");
     reader = redisReaderCreate();
-    redisReaderFeed(reader,(char*)"*0\r\n",4);
+    redisReaderFeed(reader,(char*)"*0\r\n",8);
     ret = redisReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_OK &&
         ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
         ((redisReply*)reply)->elements == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    /* Test type in array. */
+    test("Don't do empty allocation for empty multi bulk: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader,(char*)"*4\r\n#t\r\n:1\r\n,1.23\r\n_\r\n",22);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
+        ((redisReply*)reply)->elements == 4);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
 }
 
 static void test_free_null(void) {
@@ -551,6 +583,13 @@ static void test_blocking_connection(struct config config) {
 
     test("Binary reply length is correct: ");
     test_cond(reply->len == 11)
+    freeReplyObject(reply);
+
+    test("Test redisCommandArgv func: ");
+    const char *argv[3] = {"SET", "foo", "bar"};
+    size_t argvlen[3] = {3, 3, 3};
+    reply = redisCommandArgv(c, 3, argv, argvlen);
+    test_cond (reply->type == REDIS_REPLY_STATUS);
     freeReplyObject(reply);
 
     test("Can parse nil replies: ");

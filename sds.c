@@ -219,10 +219,10 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
     hdrlen = sdsHdrSize(type);
     if (oldtype==type) {
         newsh = s_realloc(sh, hdrlen+newlen+1);
-        if (newsh == NULL) {
+        if (newsh == NULL) {            // LCOV_EXCL_START
             s_free(sh);
             return NULL;
-        }
+        }                               // LCOV_EXCL_STOP
         s = (char*)newsh+hdrlen;
     } else {
         /* Since the header size changes, need to move the string forward,
@@ -1031,10 +1031,10 @@ sds *sdssplitargs(const char *line, int *argc) {
             /* add the token to the vector */
             {
                 char **new_vector = s_realloc(vector,((*argc)+1)*sizeof(char*));
-                if (new_vector == NULL) {
+                if (new_vector == NULL) {       // LCOV_EXCL_START
                     s_free(vector);
                     return NULL;
-                }
+                }                               // LCOV_EXCL_STOP
 
                 vector = new_vector;
                 vector[*argc] = current;

@@ -122,10 +122,10 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
         return NULL;
 
     buf = malloc(len+1);
-    if (buf == NULL) {
+    if (buf == NULL) {          // LCOV_EXCL_START 
         freeReplyObject(r);
         return NULL;
-    }
+    }                           // LCOV_EXCL_STOP
 
     assert(task->type == REDIS_REPLY_ERROR  ||
            task->type == REDIS_REPLY_STATUS ||
@@ -156,10 +156,10 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
 
     if (elements > 0) {
         r->element = calloc(elements,sizeof(redisReply*));
-        if (r->element == NULL) {
+        if (r->element == NULL) {       // LCOV_EXCL_START
             freeReplyObject(r);
             return NULL;
-        }
+        }                               // LCOV_EXCL_STOP
     }
 
     r->elements = elements;
@@ -202,10 +202,10 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
 
     r->dval = value;
     r->str = malloc(len+1);
-    if (r->str == NULL) {
+    if (r->str == NULL) {           // LCOV_EXCL_START
         freeReplyObject(r);
         return NULL;
-    }
+    }                               // LCOV_EXCL_STOP
 
     /* The double reply also has the original protocol string representing a
      * double as a null terminated string. This way the caller does not need

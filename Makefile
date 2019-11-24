@@ -265,7 +265,8 @@ coverage: gcov
 	make check
 	mkdir -p tmp/lcov
 	lcov -d . -c -o tmp/lcov/hiredis.info
-	genhtml --legend -o tmp/lcov/report tmp/lcov/hiredis.info
+	lcov -l tmp/lcov/hiredis.info
+	genhtml --legend -o tmp/lcov/report tmp/lcov/hiredis.info > /dev/null 2>&1
 
 noopt:
 	$(MAKE) OPTIMIZATION=""
