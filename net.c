@@ -474,6 +474,9 @@ addrretry:
         }
         if (blocking && redisSetBlocking(c,1) != REDIS_OK)
             goto error;
+#ifdef _MSC_VER
+        _sleep(0);
+#endif
         if (redisSetTcpNoDelay(c) != REDIS_OK)
             goto error;
 
