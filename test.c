@@ -472,7 +472,7 @@ static void test_reply_reader(void) {
     /* Regression test for issue #45 on GitHub. */
     test("Don't do empty allocation for empty multi bulk: ");
     reader = redisReaderCreate();
-    redisReaderFeed(reader,(char*)"*0\r\n",8);
+    redisReaderFeed(reader,(char*)"*0\r\n",4);
     ret = redisReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_OK &&
         ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
