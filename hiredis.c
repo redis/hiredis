@@ -122,10 +122,10 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
         return NULL;
 
     buf = malloc(len+1);
-    if (buf == NULL) {          // LCOV_EXCL_START 
+    if (buf == NULL) {
         freeReplyObject(r);
         return NULL;
-    }                           // LCOV_EXCL_STOP
+    }
 
     assert(task->type == REDIS_REPLY_ERROR  ||
            task->type == REDIS_REPLY_STATUS ||
@@ -156,10 +156,10 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
 
     if (elements > 0) {
         r->element = calloc(elements,sizeof(redisReply*));
-        if (r->element == NULL) {       // LCOV_EXCL_START
+        if (r->element == NULL) {
             freeReplyObject(r);
             return NULL;
-        }                               // LCOV_EXCL_STOP
+        }
     }
 
     r->elements = elements;
@@ -202,10 +202,10 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
 
     r->dval = value;
     r->str = malloc(len+1);
-    if (r->str == NULL) {           // LCOV_EXCL_START
+    if (r->str == NULL) {
         freeReplyObject(r);
         return NULL;
-    }                               // LCOV_EXCL_STOP
+    }
 
     /* The double reply also has the original protocol string representing a
      * double as a null terminated string. This way the caller does not need
@@ -493,7 +493,7 @@ format_err:
     error_type = -2;
     goto cleanup;
 
-memory_err:                     // LCOV_EXCL_LINE memory allocation failure
+memory_err:
     error_type = -1;
     goto cleanup;
 
@@ -671,7 +671,7 @@ static redisContext *redisContextInit(const redisOptions *options) {
     c->fd = REDIS_INVALID_FD;
 
     if (c->obuf == NULL || c->reader == NULL) {
-        redisFree(c);               // LCOV_EXCL_LINE memory allocation failure
+        redisFree(c);
         return NULL;
     }
     (void)options; /* options are used in other functions */
