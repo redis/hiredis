@@ -3,6 +3,7 @@ INCLUDE(GNUInstallDirs)
 PROJECT(hiredis)
 
 OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
+OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
@@ -76,7 +77,7 @@ IF(ENABLE_SSL)
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 ENDIF()
 
-IF(NOT (WIN32 OR MINGW))
+IF(NOT (DISABLE_TESTS OR (WIN32 OR MINGW)))
     ENABLE_TESTING()
     ADD_EXECUTABLE(hiredis-test test.c)
     TARGET_LINK_LIBRARIES(hiredis-test hiredis)
