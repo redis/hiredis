@@ -591,6 +591,11 @@ static void test_blocking_connection(struct config config) {
               strcasecmp(reply->element[1]->str,"pong") == 0);
     freeReplyObject(reply);
 
+    /* Make sure passing NULL to redisGetReply is safe */
+    test("Can pass NULL to redisGetReply: ");
+    assert(redisAppendCommand(c, "PING") == REDIS_OK);
+    test_cond(redisGetReply(c, NULL) == REDIS_OK);
+
     disconnect(c, 0);
 }
 
