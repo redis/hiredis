@@ -945,8 +945,13 @@ int redisGetReply(redisContext *c, void **reply) {
         } while (aux == NULL);
     }
 
-    /* Set reply object */
-    if (reply != NULL) *reply = aux;
+    /* Set reply or free it if we were passed NULL */
+    if (reply != NULL) {
+        *reply = aux;
+    } else {
+        freeReplyObject(aux);
+    }
+
     return REDIS_OK;
 }
 
