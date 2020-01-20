@@ -34,6 +34,7 @@
  */
 
 #include "fmacros.h"
+#include "hralloc.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <limits.h>
@@ -71,7 +72,7 @@ static void _dictReset(dict *ht) {
 
 /* Create a new hash table */
 static dict *dictCreate(dictType *type, void *privDataPtr) {
-    dict *ht = malloc(sizeof(*ht));
+    dict *ht = hr_safe_malloc(sizeof(*ht));
     _dictInit(ht,type,privDataPtr);
     return ht;
 }
@@ -142,7 +143,7 @@ static int dictAdd(dict *ht, void *key, void *val) {
         return DICT_ERR;
 
     /* Allocates the memory and stores key */
-    entry = malloc(sizeof(*entry));
+    entry = hr_safe_malloc(sizeof(*entry));
     entry->next = ht->table[index];
     ht->table[index] = entry;
 
@@ -256,7 +257,7 @@ static dictEntry *dictFind(dict *ht, const void *key) {
 }
 
 static dictIterator *dictGetIterator(dict *ht) {
-    dictIterator *iter = malloc(sizeof(*iter));
+    dictIterator *iter = hr_safe_malloc(sizeof(*iter));
 
     iter->ht = ht;
     iter->index = -1;
