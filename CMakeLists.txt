@@ -30,7 +30,8 @@ ADD_LIBRARY(hiredis SHARED
     net.c
     read.c
     sds.c
-    sockcompat.c)
+    sockcompat.c
+    hralloc.c)
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES
