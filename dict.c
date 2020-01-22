@@ -33,6 +33,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "hiredis.h"
 #include "fmacros.h"
 #include <stdlib.h>
 #include <assert.h>
@@ -72,6 +73,8 @@ static void _dictReset(dict *ht) {
 /* Create a new hash table */
 static dict *dictCreate(dictType *type, void *privDataPtr) {
     dict *ht = malloc(sizeof(*ht));
+    if (ht == NULL)
+        REDIS_OOM_HANDLER;
     _dictInit(ht,type,privDataPtr);
     return ht;
 }
@@ -98,6 +101,8 @@ static int dictExpand(dict *ht, unsigned long size) {
     n.size = realsize;
     n.sizemask = realsize-1;
     n.table = calloc(realsize,sizeof(dictEntry*));
+    if (n.table == NULL)
+        REDIS_OOM_HANDLER;
 
     /* Copy all the elements from the old to the new table:
      * note that if the old hash table is empty ht->size is zero,
@@ -143,6 +148,8 @@ static int dictAdd(dict *ht, void *key, void *val) {
 
     /* Allocates the memory and stores key */
     entry = malloc(sizeof(*entry));
+    if (entry == NULL)
+        REDIS_OOM_HANDLER;
     entry->next = ht->table[index];
     ht->table[index] = entry;
 
@@ -258,6 +265,8 @@ static dictEntry *dictFind(dict *ht, const void *key) {
 static dictIterator *dictGetIterator(dict *ht) {
     dictIterator *iter = malloc(sizeof(*iter));
 
+    if (iter == NULL)
+        REDIS_OOM_HANDLER;
     iter->ht = ht;
     iter->index = -1;
     iter->entry = NULL;

@@ -58,6 +58,8 @@ static unsigned int callbackHash(const void *key) {
 static void *callbackValDup(void *privdata, const void *src) {
     ((void) privdata);
     redisCallback *dup = malloc(sizeof(*dup));
+    if (dup == NULL)
+        REDIS_OOM_HANDLER;
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }
@@ -755,6 +757,8 @@ int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
 void redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {
     if (!ac->c.timeout) {
         ac->c.timeout = calloc(1, sizeof(tv));
+        if (ac->c.timeout == NULL)
+            REDIS_OOM_HANDLER;
     }
 
     if (tv.tv_sec == ac->c.timeout->tv_sec &&

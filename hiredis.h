@@ -90,6 +90,10 @@ struct timeval; /* forward declaration */
  * SO_REUSEADDR is being used. */
 #define REDIS_CONNECT_RETRIES  10
 
+#ifndef REDIS_OOM_HANDLER
+#define REDIS_OOM_HANDLER abort();
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

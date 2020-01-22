@@ -56,6 +56,8 @@ static int redisIvykisAttach(redisAsyncContext *ac) {
 
     /* Create container for context and r/w events */
     e = (redisIvykisEvents*)malloc(sizeof(*e));
+    if (e == NULL)
+        REDIS_OOM_HANDLER;
     e->context = ac;
 
     /* Register functions to start/stop listening for events */
