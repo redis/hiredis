@@ -58,7 +58,7 @@ static unsigned int callbackHash(const void *key) {
 
 static void *callbackValDup(void *privdata, const void *src) {
     ((void) privdata);
-    redisCallback *dup = hiredis_safe_malloc(sizeof(*dup));
+    redisCallback *dup = hi_malloc(sizeof(*dup));
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }
@@ -755,7 +755,7 @@ int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
 
 void redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {
     if (!ac->c.timeout) {
-        ac->c.timeout = hiredis_safe_calloc(1, sizeof(tv));
+        ac->c.timeout = hi_calloc(1, sizeof(tv));
     }
 
     if (tv.tv_sec == ac->c.timeout->tv_sec &&

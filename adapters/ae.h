@@ -108,7 +108,7 @@ static int redisAeAttach(aeEventLoop *loop, redisAsyncContext *ac) {
         return REDIS_ERR;
 
     /* Create container for context and r/w events */
-    e = (redisAeEvents*)hiredis_safe_malloc(sizeof(*e));
+    e = (redisAeEvents*)hi_malloc(sizeof(*e));
     e->context = ac;
     e->loop = loop;
     e->fd = c->fd;
