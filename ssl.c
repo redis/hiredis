@@ -151,7 +151,7 @@ static void initOpensslLocks(void) {
         return;
     }
     nlocks = CRYPTO_num_locks();
-    ossl_locks = malloc(sizeof(*ossl_locks) * nlocks);
+    ossl_locks = hi_malloc(sizeof(*ossl_locks) * nlocks);
     for (ii = 0; ii < nlocks; ii++) {
         sslLockInit(ossl_locks + ii);
     }
