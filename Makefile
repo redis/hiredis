@@ -3,7 +3,7 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ=net.o hiredis.o sds.o async.o read.o
+OBJ=net.o hiredis.o sds.o async.o read.o alloc.o
 EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
 TESTS=hiredis-test
 LIBNAME=libhiredis
@@ -68,13 +68,14 @@ endif
 all: $(DYLIBNAME) $(STLIBNAME) hiredis-test $(PKGCONFNAME)
 
 # Deps (use make dep to generate this)
-async.o: async.c fmacros.h async.h hiredis.h read.h sds.h net.h dict.c dict.h
-dict.o: dict.c fmacros.h dict.h
-hiredis.o: hiredis.c fmacros.h hiredis.h read.h sds.h net.h
-net.o: net.c fmacros.h net.h hiredis.h read.h sds.h
+alloc.o: alloc.c fmacros.h alloc.h
+async.o: async.c fmacros.h alloc.h async.h hiredis.h read.h sds.h net.h dict.c dict.h
+dict.o: dict.c fmacros.h alloc.h dict.h
+hiredis.o: hiredis.c fmacros.h hiredis.h read.h sds.h alloc.h net.h
+net.o: net.c fmacros.h net.h hiredis.h read.h sds.h alloc.h
 read.o: read.c fmacros.h read.h sds.h
-sds.o: sds.c sds.h
-test.o: test.c fmacros.h hiredis.h read.h sds.h
+sds.o: sds.c sds.h sdsalloc.h
+test.o: test.c fmacros.h hiredis.h read.h sds.h alloc.h net.h
 
 $(DYLIBNAME): $(OBJ)
 	$(DYLIB_MAKE_CMD) $(OBJ)
@@ -177,7 +178,7 @@ $(PKGCONFNAME): hiredis.h
 
 install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
 	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_INCLUDE_PATH)/adapters $(INSTALL_LIBRARY_PATH)
-	$(INSTALL) hiredis.h async.h read.h sds.h $(INSTALL_INCLUDE_PATH)
+	$(INSTALL) hiredis.h async.h read.h sds.h alloc.h $(INSTALL_INCLUDE_PATH)
 	$(INSTALL) adapters/*.h $(INSTALL_INCLUDE_PATH)/adapters
 	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
 	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIBNAME)

@@ -287,13 +287,13 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     if (c->tcp.host != addr) {
         free(c->tcp.host);
 
-        c->tcp.host = strdup(addr);
+        c->tcp.host = hi_strdup(addr);
     }
 
     if (timeout) {
         if (c->timeout != timeout) {
             if (c->timeout == NULL)
-                c->timeout = malloc(sizeof(struct timeval));
+                c->timeout = hi_malloc(sizeof(struct timeval));
 
             memcpy(c->timeout, timeout, sizeof(struct timeval));
         }
@@ -312,7 +312,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
         c->tcp.source_addr = NULL;
     } else if (c->tcp.source_addr != source_addr) {
         free(c->tcp.source_addr);
-        c->tcp.source_addr = strdup(source_addr);
+        c->tcp.source_addr = hi_strdup(source_addr);
     }
 
     snprintf(_port, 6, "%d", port);
@@ -440,12 +440,12 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
 
     c->connection_type = REDIS_CONN_UNIX;
     if (c->unix_sock.path != path)
-        c->unix_sock.path = strdup(path);
+        c->unix_sock.path = hi_strdup(path);
 
     if (timeout) {
         if (c->timeout != timeout) {
             if (c->timeout == NULL)
-                c->timeout = malloc(sizeof(struct timeval));
+                c->timeout = hi_malloc(sizeof(struct timeval));
 
             memcpy(c->timeout, timeout, sizeof(struct timeval));
         }

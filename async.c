@@ -30,6 +30,7 @@
  */
 
 #include "fmacros.h"
+#include "alloc.h"
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -68,7 +69,7 @@ static unsigned int callbackHash(const void *key) {
 
 static void *callbackValDup(void *privdata, const void *src) {
     ((void) privdata);
-    redisCallback *dup = malloc(sizeof(*dup));
+    redisCallback *dup = hi_malloc(sizeof(*dup));
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }

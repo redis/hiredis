@@ -38,6 +38,7 @@
 #include <sys/time.h> /* for struct timeval */
 #include <stdint.h> /* uintXX_t, etc */
 #include "sds.h" /* for sds */
+#include "alloc.h" /* for allocation wrappers */
 
 #define HIREDIS_MAJOR 0
 #define HIREDIS_MINOR 14
