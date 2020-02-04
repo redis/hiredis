@@ -36,9 +36,17 @@
 #define HIREDIS_OOM_HANDLER abort()
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void *hi_malloc(size_t size);
 void *hi_calloc(size_t nmemb, size_t size);
 void *hi_realloc(void *ptr, size_t size);
 char *hi_strdup(const char *str);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* HIREDIS_ALLOC_H */
