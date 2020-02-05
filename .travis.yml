@@ -87,11 +87,7 @@ matrix:
         - MATRIX_EVAL="CC=cl.exe && CXX=cl.exe"
       before_install:
         - eval "${MATRIX_EVAL}"
-      install:
-        - choco install ninja
       script:
-        - mkdir build && cd build
-        - cmd.exe /C '"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 &&
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release &&
-          ninja -v'
-        - ctest -V
+          - mkdir build && cd build
+          - cmake -G "Visual Studio 15 2017" -DCMAKE_CONFIGURATION_TYPES=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=/out64/hiredis/ ..
+          - cmake -G "Visual Studio 15 2017" -A x64 -S .. -B build && cmake --build build --config Release
