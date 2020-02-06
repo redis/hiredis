@@ -602,8 +602,6 @@ static void test_blocking_connection(struct config config) {
 static void test_blocking_connection_timeouts(struct config config) {
     redisContext *c;
     redisReply *reply;
-    ssize_t s;
-    const char *cmd = "DEBUG SLEEP 3\r\n";
     struct timeval tv;
 
     c = do_connect(config);
@@ -619,6 +617,9 @@ static void test_blocking_connection_timeouts(struct config config) {
     disconnect(c, 0);
 
     c = do_connect(config);
+#ifndef REMOTE_DB
+    ssize_t s;
+    const char *cmd = "DEBUG SLEEP 3\r\n";
     test("Does not return a reply when the command times out: ");
     redisAppendFormattedCommand(c, cmd, strlen(cmd));
     s = c->funcs->write(c);
@@ -626,9 +627,10 @@ static void test_blocking_connection_timeouts(struct config config) {
     tv.tv_usec = 10000;
     redisSetTimeout(c, tv);
     reply = redisCommand(c, "GET foo");
+    printf("\nGet Replay (%s):\n", reply->str);
     test_cond(s > 0 && reply == NULL && c->err == REDIS_ERR_IO && strcmp(c->errstr, "Resource temporarily unavailable") == 0);
     freeReplyObject(reply);
-
+#endif
     test("Reconnect properly reconnects after a timeout: ");
     do_reconnect(c, config);
     reply = redisCommand(c, "PING");
@@ -979,12 +981,14 @@ int main(int argc, char **argv) {
     test_append_formatted_commands(cfg);
     if (throughput) test_throughput(cfg);
 
+#ifndef REMOTE_DB
     printf("\nTesting against Unix socket connection (%s):\n", cfg.unix_sock.path);
     cfg.type = CONN_UNIX;
     test_blocking_connection(cfg);
     test_blocking_connection_timeouts(cfg);
     test_blocking_io_errors(cfg);
     if (throughput) test_throughput(cfg);
+#endif
 
 #ifdef HIREDIS_TEST_SSL
     if (cfg.ssl.port && cfg.ssl.host) {

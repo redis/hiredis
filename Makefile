@@ -65,8 +65,13 @@ STLIB_MAKE_CMD=$(AR) rcs
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 
 USE_SSL?=0
+REMOTE_DB?=0
 
 # This is required for test.c only
+ifeq ($(REMOTE_DB),1)
+  CFALGS+=i-DREMOTE_DB
+endif
+
 ifeq ($(USE_SSL),1)
   CFLAGS+=-DHIREDIS_TEST_SSL
 endif
