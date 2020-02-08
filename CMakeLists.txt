@@ -23,7 +23,7 @@ PROJECT(hiredis VERSION "${VERSION}")
 
 SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 
-ADD_LIBRARY(hiredis SHARED
+SET(hiredis_sources
     async.c
     dict.c
     hiredis.c
@@ -32,6 +32,15 @@ ADD_LIBRARY(hiredis SHARED
     sds.c
     sockcompat.c
     alloc.c)
+
+IF(WIN32)
+    SET(hiredis_sources
+        ${hiredis_sources}
+        hiredis.def
+    )
+ENDIF()
+
+ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES
@@ -46,7 +55,7 @@ CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 INSTALL(TARGETS hiredis
     DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
-INSTALL(FILES hiredis.h read.h sds.h async.h
+INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
     
 INSTALL(DIRECTORY adapters
