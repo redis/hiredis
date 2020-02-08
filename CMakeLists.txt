@@ -23,7 +23,7 @@ PROJECT(hiredis VERSION "${VERSION}")
 
 SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 
-ADD_LIBRARY(hiredis SHARED
+SET(hiredis_sources
     async.c
     dict.c
     hiredis.c
@@ -31,8 +31,16 @@ ADD_LIBRARY(hiredis SHARED
     read.c
     sds.c
     sockcompat.c
-    alloc.c
-    hiredis.def)
+    alloc.c)
+
+IF(WIN32)
+    SET(hiredis_sources
+        ${hiredis_sources}
+        hiredis.def
+    )
+ENDIF()
+
+ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES
