@@ -34,3 +34,5 @@ EXPORTS
 	redisvCommand
 	redisvFormatCommand
 	freeReplyObject
+	hi_calloc
+	hi_malloc
