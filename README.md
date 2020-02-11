@@ -432,7 +432,7 @@ SSL can only be enabled on a `redisContext` connection after the connection has
 been established and before any command has been processed.  For example:
 
 ```c
-c = redisConnect('localhost', 6443);
+c = redisConnect("localhost", 6443);
 if (c == NULL || c->err) {
     /* Handle error and abort... */
 }
@@ -440,7 +440,7 @@ if (c == NULL || c->err) {
 if (redisSecureConnection(c,
     "cacertbundle.crt",     /* File name of trusted CA/ca bundle file */
     "client_cert.pem",      /* File name of client certificate file */
-    "client_key.pem",       /* File name of client privat ekey */
+    "client_key.pem",       /* File name of client private key */
     "redis.mydomain.com"    /* Server name to request (SNI) */
     ) != REDIS_OK) {
     printf("SSL error: %s\n", c->errstr);
