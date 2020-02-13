@@ -98,10 +98,15 @@ IF(ENABLE_SSL)
         ssl.c)
     ADD_LIBRARY(hiredis_ssl SHARED
             ${hiredis_ssl_sources})
-    SET_TARGET_PROPERTIES(hiredis_ssl
-        PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        VERSION "${HIREDIS_SONAME}")
 
+    IF (APPLE)
+        SET_PROPERTY(TARGET hiredis_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
+    ENDIF()
+
+    SET_TARGET_PROPERTIES(hiredis_ssl
+        PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+        VERSION "${HIREDIS_SONAME}")
 
     TARGET_INCLUDE_DIRECTORIES(hiredis_ssl PRIVATE "${OPENSSL_INCLUDE_DIR}")
     TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE ${OPENSSL_LIBRARIES})
