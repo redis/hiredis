@@ -15,7 +15,7 @@ branches:
     - /^release\/.*$/
 
 before_script:
-    - if [ "$TRAVIS_OS_NAME" == "osx" ] ; then brew update; brew install redis; fi
+    - if [ "$TRAVIS_OS_NAME" == "osx" ] ; then brew update; brew install redis openssl; fi
 
 addons:
   apt:
@@ -27,6 +27,8 @@ addons:
     - libc6-dbg:i386
     - gcc-multilib
     - g++-multilib
+    - libssl-dev
+    - libssl-dev:i386
     - valgrind
 
 env:
@@ -58,6 +60,16 @@ script:
       fi;
     fi;
     export CFLAGS CXXFLAGS LDFLAGS TEST_PREFIX EXTRA_CMAKE_OPTS
+  - if [ "$TRAVIS_OS_NAME" != "windows" ]; then
+      make && make clean;
+      if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+        if [ "$BITS" == "64" ]; then
+          OPENSSL_PREFIX="$(ls -d /usr/local/Cellar/openssl@1.1/*)" USE_SSL=1 make;
+        fi;
+      else
+        USE_SSL=1 make;
+      fi;
+    fi;
   - mkdir build/ && cd build/
   - cmake .. ${EXTRA_CMAKE_OPTS}
   - make VERBOSE=1
