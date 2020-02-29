@@ -48,11 +48,13 @@ SET_TARGET_PROPERTIES(hiredis
 IF(WIN32 OR MINGW)
     TARGET_LINK_LIBRARIES(hiredis PRIVATE ws2_32)
 ENDIF()
-TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC .)
+
+TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:.> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
 INSTALL(TARGETS hiredis
+    EXPORT hiredis-targets
     DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
 INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h
@@ -63,6 +65,26 @@ INSTALL(DIRECTORY adapters
     
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+
+export(EXPORT hiredis-targets
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/hiredis-targets.cmake"
+    NAMESPACE hiredis::)
+
+SET(CMAKE_CONF_INSTALL_DIR share/hiredis)
+SET(INCLUDE_INSTALL_DIR include)
+include(CMakePackageConfigHelpers)
+configure_package_config_file(hiredis-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
+                  INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
+                  PATH_VARS INCLUDE_INSTALL_DIR)
+
+INSTALL(EXPORT hiredis-targets
+    FILE hiredis-targets.cmake
+    NAMESPACE hiredis::
+    DESTINATION ${CMAKE_CONF_INSTALL_DIR})
+
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
+    DESTINATION ${CMAKE_CONF_INSTALL_DIR})
+
 
 IF(ENABLE_SSL)
     IF (NOT OPENSSL_ROOT_DIR)
