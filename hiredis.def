@@ -4,6 +4,13 @@ EXPORTS
 	redisAppendCommand
 	redisAppendCommandArgv
 	redisAppendFormattedCommand
+	redisAsyncCommand
+	redisAsyncConnect
+	redisAsyncDisconnect
+	redisAsyncFormattedCommand
+	redisAsyncFree
+	redisAsyncSetConnectCallback
+	redisAsyncSetDisconnectCallback
 	redisBufferRead
 	redisBufferWrite
 	redisCommand
@@ -39,3 +46,11 @@ EXPORTS
 	freeReplyObject
 	hi_calloc
 	hi_malloc
+	sdscatfmt
+	sdsdup
+	sdsfree
+	sdsfreesplitres
+	sdsnew
+	sdsnewlen
+	sdsrange
+	sdssplitlen
