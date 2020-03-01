@@ -38,6 +38,7 @@ IF(WIN32)
         ${hiredis_sources}
         hiredis.def
     )
+    ADD_COMPILE_DEFINITIONS(_CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN)
 ENDIF()
 
 ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
@@ -54,8 +55,7 @@ TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:.> $<BUILD_INTERFA
 CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
 INSTALL(TARGETS hiredis
-    EXPORT hiredis-targets
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    EXPORT hiredis-targets)
 
 INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
@@ -93,15 +93,25 @@ IF(ENABLE_SSL)
         ENDIF()
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
-    ADD_LIBRARY(hiredis_ssl SHARED
+    SET(hiredis_ssl_sources
         ssl.c)
+
+    IF(WIN32)
+        SET(hiredis_ssl_sources
+            ${hiredis_ssl_sources}
+            hiredis_ssl.def)
+    ENDIF()
+    ADD_LIBRARY(hiredis_ssl SHARED
+            ${hiredis_ssl_sources})
     TARGET_INCLUDE_DIRECTORIES(hiredis_ssl PRIVATE "${OPENSSL_INCLUDE_DIR}")
     TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE ${OPENSSL_LIBRARIES})
+    IF (WIN32 OR MINGW)
+        TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE hiredis)
+    ENDIF()
     CONFIGURE_FILE(hiredis_ssl.pc.in hiredis_ssl.pc @ONLY)
 
     INSTALL(TARGETS hiredis_ssl
-        EXPORT hiredis_ssl-targets
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+        EXPORT hiredis_ssl-targets)
 
     INSTALL(FILES hiredis_ssl.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)

@@ -1,4 +1,6 @@
 EXPORTS
+	__redisAsyncDisconnect
+	__redisSetError
 	redisAppendCommand
 	redisAppendCommandArgv
 	redisAppendFormattedCommand
@@ -27,6 +29,7 @@ EXPORTS
 	redisFreeSdsCommand
 	redisGetReply
 	redisGetReplyFromReader
+	redisProcessCallbacks
 	redisReaderCreate
 	redisReconnect
 	redisSetTimeout
