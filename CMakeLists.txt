@@ -74,16 +74,16 @@ SET(CMAKE_CONF_INSTALL_DIR share/hiredis)
 SET(INCLUDE_INSTALL_DIR include)
 include(CMakePackageConfigHelpers)
 configure_package_config_file(hiredis-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
-                  INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
-                  PATH_VARS INCLUDE_INSTALL_DIR)
+                              INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
+                              PATH_VARS INCLUDE_INSTALL_DIR)
 
 INSTALL(EXPORT hiredis-targets
-    FILE hiredis-targets.cmake
-    NAMESPACE hiredis::
-    DESTINATION ${CMAKE_CONF_INSTALL_DIR})
+        FILE hiredis-targets.cmake
+        NAMESPACE hiredis::
+        DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
-    DESTINATION ${CMAKE_CONF_INSTALL_DIR})
+        DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 
 
 IF(ENABLE_SSL)
@@ -100,6 +100,7 @@ IF(ENABLE_SSL)
     CONFIGURE_FILE(hiredis_ssl.pc.in hiredis_ssl.pc @ONLY)
 
     INSTALL(TARGETS hiredis_ssl
+        EXPORT hiredis_ssl-targets
         DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
     INSTALL(FILES hiredis_ssl.h
@@ -107,6 +108,23 @@ IF(ENABLE_SSL)
     
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl.pc
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+
+    export(EXPORT hiredis_ssl-targets
+           FILE "${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl-targets.cmake"
+           NAMESPACE hiredis::)
+
+    SET(CMAKE_CONF_INSTALL_DIR share/hiredis_ssl)
+    configure_package_config_file(hiredis_ssl-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl-config.cmake
+                                  INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
+                                  PATH_VARS INCLUDE_INSTALL_DIR)
+
+    INSTALL(EXPORT hiredis_ssl-targets
+        FILE hiredis_ssl-targets.cmake
+        NAMESPACE hiredis::
+        DESTINATION ${CMAKE_CONF_INSTALL_DIR})
+
+    INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl-config.cmake
+        DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 ENDIF()
 
 IF(NOT (DISABLE_TESTS OR (WIN32 OR MINGW)))
