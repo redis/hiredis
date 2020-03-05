@@ -69,7 +69,12 @@ typedef struct redisAsyncContext {
     char *errstr;
 
     /* Not used by hiredis */
-    void *data;
+    union {
+        void *data;
+        int fdData;
+        uint32_t u32Data;
+        uint64_t u64Data;
+    };
 
     /* Event library data and hooks */
     struct {
