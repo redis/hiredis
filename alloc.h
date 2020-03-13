@@ -29,6 +29,7 @@
  */
 
 #ifndef HIREDIS_ALLOC_H
+#define HIREDIS_ALLOC_H
 
 #include <stdlib.h> /* for size_t */
 
