@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
 
-**This Readme reflects the latest changed in the master branch. See [v0.13.3](https://github.com/redis/hiredis/tree/v0.13.3) for the Readme and documentation for the latest release.**
+**This Readme reflects the latest changed in the master branch. See [v0.14.1](https://github.com/redis/hiredis/tree/v0.14.1) for the Readme and documentation for the latest release.**
 
 # HIREDIS
 
@@ -22,20 +22,19 @@ Redis version >= 1.2.0.
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
 
-## Upgrading to `1.0.0`
+## IMPORTANT: Breaking changes when upgrading from 0.13.x -> 0.14.x
 
-Version 1.0.0 marks a stable release of hiredis.
-It includes some minor breaking changes, mostly to make the exposed API more uniform and self-explanatory.
-It also bundles the updated `sds` library, to sync up with upstream and Redis.
-For most applications a recompile against the new hiredis should be enough.
-For code changes see the [Changelog](CHANGELOG.md).
+Bulk and multi-bulk lengths less than -1 or greater than `LLONG_MAX` are now
+protocol errors. This is consistent with the RESP specification. On 32-bit
+platforms, the upper bound is lowered to `SIZE_MAX`.
 
-## Upgrading from `<0.9.0`
+Change `redisReply.len` to `size_t`, as it denotes the the size of a string
 
-Version 0.9.0 is a major overhaul of hiredis in every aspect. However, upgrading existing
-code using hiredis should not be a big pain. The key thing to keep in mind when
-upgrading is that hiredis >= 0.9.0 uses a `redisContext*` to keep state, in contrast to
-the stateless 0.0.1 that only has a file descriptor to work with.
+User code should compare this to `size_t` values as well.  If it was used to
+compare to other values, casting might be necessary or can be removed, if
+casting was applied before.
+
+For a detailed list of changes please view our [Changelog](CHANGELOG.md).
 
 ## Synchronous API
 
