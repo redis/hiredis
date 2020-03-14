@@ -13,6 +13,7 @@ branches:
     - staging
     - trying
     - master
+    - /^release\/.*$/
 
 before_script:
     - if [ "$TRAVIS_OS_NAME" == "osx" ] ; then brew update; brew install redis; fi
