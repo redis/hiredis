@@ -1,13 +1,13 @@
 #include "fmacros.h"
+#include "sockcompat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <strings.h>
-#include <sys/socket.h>
 #include <sys/time.h>
-#include <netdb.h>
+#endif
 #include <assert.h>
-#include <unistd.h>
 #include <signal.h>
 #include <errno.h>
 #include <limits.h>
@@ -17,6 +17,7 @@
 #include "hiredis_ssl.h"
 #endif
 #include "net.h"
+#include "win32.h"
 
 enum connection_type {
     CONN_TCP,
@@ -51,11 +52,18 @@ struct config {
 static int tests = 0, fails = 0;
 #define test(_s) { printf("#%02d ", ++tests); printf(_s); }
 #define test_cond(_c) if(_c) printf("\033[0;32mPASSED\033[0;0m\n"); else {printf("\033[0;31mFAILED\033[0;0m\n"); fails++;}
+#define test_skipped() printf("\033[01;33mSKIPPED\033[0;0m\n")
 
 static long long usec(void) {
+#ifndef _MSC_VER
     struct timeval tv;
     gettimeofday(&tv,NULL);
     return (((long long)tv.tv_sec)*1000000)+tv.tv_usec;
+#else
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+    return (((long long)ft.dwHighDateTime << 32) | ft.dwLowDateTime) / 10;
+#endif
 }
 
 /* The assert() calls below have side effects, so we need assert()
@@ -491,19 +499,19 @@ static void test_blocking_connection_errors(void) {
             (strcmp(c->errstr, "Name or service not known") == 0 ||
              strcmp(c->errstr, "Can't resolve: " HIREDIS_BAD_DOMAIN) == 0 ||
              strcmp(c->errstr, "Name does not resolve") == 0 ||
-             strcmp(c->errstr,
-                    "nodename nor servname provided, or not known") == 0 ||
+             strcmp(c->errstr, "nodename nor servname provided, or not known") == 0 ||
              strcmp(c->errstr, "No address associated with hostname") == 0 ||
              strcmp(c->errstr, "Temporary failure in name resolution") == 0 ||
-             strcmp(c->errstr,
-                    "hostname nor servname provided, or not known") == 0 ||
-             strcmp(c->errstr, "no address associated with name") == 0));
+             strcmp(c->errstr, "hostname nor servname provided, or not known") == 0 ||
+             strcmp(c->errstr, "no address associated with name") == 0 ||
+             strcmp(c->errstr, "No such host is known. ") == 0));
         redisFree(c);
     } else {
         printf("Skipping NXDOMAIN test. Found evil ISP!\n");
         freeaddrinfo(ai_tmp);
     }
 
+#ifndef _WIN32
     test("Returns error when the port is not open: ");
     c = redisConnect((char*)"localhost", 1);
     test_cond(c->err == REDIS_ERR_IO &&
@@ -514,6 +522,7 @@ static void test_blocking_connection_errors(void) {
     c = redisConnectUnix((char*)"/tmp/idontexist.sock");
     test_cond(c->err == REDIS_ERR_IO); /* Don't care about the message... */
     redisFree(c);
+#endif
 }
 
 static void test_blocking_connection(struct config config) {
@@ -599,11 +608,28 @@ static void test_blocking_connection(struct config config) {
     disconnect(c, 0);
 }
 
+/* Send DEBUG SLEEP 0 to detect if we have this command */
+static int detect_debug_sleep(redisContext *c) {
+    int detected;
+    redisReply *reply = redisCommand(c, "DEBUG SLEEP 0\r\n");
+
+    if (reply == NULL || c->err) {
+        const char *cause = c->err ? c->errstr : "(none)";
+        fprintf(stderr, "Error testing for DEBUG SLEEP (Redis error: %s), exiting\n", cause);
+        exit(-1);
+    }
+
+    detected = reply->type == REDIS_REPLY_STATUS;
+    freeReplyObject(reply);
+
+    return detected;
+}
+
 static void test_blocking_connection_timeouts(struct config config) {
     redisContext *c;
     redisReply *reply;
     ssize_t s;
-    const char *cmd = "DEBUG SLEEP 3\r\n";
+    const char *sleep_cmd = "DEBUG SLEEP 3\r\n";
     struct timeval tv;
 
     c = do_connect(config);
@@ -620,14 +646,24 @@ static void test_blocking_connection_timeouts(struct config config) {
 
     c = do_connect(config);
     test("Does not return a reply when the command times out: ");
-    redisAppendFormattedCommand(c, cmd, strlen(cmd));
-    s = c->funcs->write(c);
-    tv.tv_sec = 0;
-    tv.tv_usec = 10000;
-    redisSetTimeout(c, tv);
-    reply = redisCommand(c, "GET foo");
-    test_cond(s > 0 && reply == NULL && c->err == REDIS_ERR_IO && strcmp(c->errstr, "Resource temporarily unavailable") == 0);
-    freeReplyObject(reply);
+    if (detect_debug_sleep(c)) {
+        redisAppendFormattedCommand(c, sleep_cmd, strlen(sleep_cmd));
+        s = c->funcs->write(c);
+        tv.tv_sec = 0;
+        tv.tv_usec = 10000;
+        redisSetTimeout(c, tv);
+        reply = redisCommand(c, "GET foo");
+#ifndef _WIN32
+        test_cond(s > 0 && reply == NULL && c->err == REDIS_ERR_IO &&
+                  strcmp(c->errstr, "Resource temporarily unavailable") == 0);
+#else
+        test_cond(s > 0 && reply == NULL && c->err == REDIS_ERR_TIMEOUT &&
+                  strcmp(c->errstr, "recv timeout") == 0);
+#endif
+        freeReplyObject(reply);
+    } else {
+        test_skipped();
+    }
 
     test("Reconnect properly reconnects after a timeout: ");
     do_reconnect(c, config);
@@ -679,6 +715,7 @@ static void test_blocking_io_errors(struct config config) {
         test_cond(reply == NULL);
     }
 
+#ifndef _WIN32
     /* On 2.0, QUIT will cause the connection to be closed immediately and
      * the read(2) for the reply on QUIT will set the error to EOF.
      * On >2.0, QUIT will return with OK and another read(2) needed to be
@@ -686,14 +723,19 @@ static void test_blocking_io_errors(struct config config) {
      * conditions, the error will be set to EOF. */
     assert(c->err == REDIS_ERR_EOF &&
         strcmp(c->errstr,"Server closed the connection") == 0);
+#endif
     redisFree(c);
 
     c = do_connect(config);
     test("Returns I/O error on socket timeout: ");
     struct timeval tv = { 0, 1000 };
     assert(redisSetTimeout(c,tv) == REDIS_OK);
-    test_cond(redisGetReply(c,&_reply) == REDIS_ERR &&
-        c->err == REDIS_ERR_IO && errno == EAGAIN);
+    int respcode = redisGetReply(c,&_reply);
+#ifndef _WIN32
+    test_cond(respcode == REDIS_ERR && c->err == REDIS_ERR_IO && errno == EAGAIN);
+#else
+    test_cond(respcode == REDIS_ERR && c->err == REDIS_ERR_TIMEOUT);
+#endif
     redisFree(c);
 }
 
@@ -921,9 +963,17 @@ int main(int argc, char **argv) {
     };
     int throughput = 1;
     int test_inherit_fd = 1;
+    int test_unix_socket;
 
+#ifndef _WIN32
     /* Ignore broken pipe signal (for I/O error tests). */
     signal(SIGPIPE, SIG_IGN);
+
+    test_unix_socket = access(cfg.unix_sock.path, F_OK) == 0;
+#else
+    /* Unix sockets don't exist in Windows */
+    test_unix_socket = 0;
+#endif
 
     /* Parse command line options. */
     argv++; argc--;
@@ -979,12 +1029,17 @@ int main(int argc, char **argv) {
     test_append_formatted_commands(cfg);
     if (throughput) test_throughput(cfg);
 
-    printf("\nTesting against Unix socket connection (%s):\n", cfg.unix_sock.path);
-    cfg.type = CONN_UNIX;
-    test_blocking_connection(cfg);
-    test_blocking_connection_timeouts(cfg);
-    test_blocking_io_errors(cfg);
-    if (throughput) test_throughput(cfg);
+    printf("\nTesting against Unix socket connection (%s): ", cfg.unix_sock.path);
+    if (test_unix_socket) {
+        printf("\n");
+        cfg.type = CONN_UNIX;
+        test_blocking_connection(cfg);
+        test_blocking_connection_timeouts(cfg);
+        test_blocking_io_errors(cfg);
+        if (throughput) test_throughput(cfg);
+    } else {
+        test_skipped();
+    }
 
 #ifdef HIREDIS_TEST_SSL
     if (cfg.ssl.port && cfg.ssl.host) {
@@ -1001,11 +1056,15 @@ int main(int argc, char **argv) {
 #endif
 
     if (test_inherit_fd) {
-        printf("\nTesting against inherited fd (%s):\n", cfg.unix_sock.path);
-        cfg.type = CONN_FD;
-        test_blocking_connection(cfg);
+        printf("\nTesting against inherited fd (%s): ", cfg.unix_sock.path);
+        if (test_unix_socket) {
+            printf("\n");
+            cfg.type = CONN_FD;
+            test_blocking_connection(cfg);
+        } else {
+            test_skipped();
+        }
     }
-
 
     if (fails) {
         printf("*** %d TESTS FAILED ***\n", fails);
