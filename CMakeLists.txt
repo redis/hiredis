@@ -33,17 +33,10 @@ SET(hiredis_sources
     sockcompat.c
     alloc.c)
 
-IF(WIN32)
-    SET(hiredis_sources
-        ${hiredis_sources}
-        hiredis.def
-    )
-ENDIF()
-
 ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
 
 SET_TARGET_PROPERTIES(hiredis
-    PROPERTIES
+    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
     VERSION "${HIREDIS_SONAME}")
 IF(WIN32 OR MINGW)
     TARGET_LINK_LIBRARIES(hiredis PRIVATE ws2_32)
