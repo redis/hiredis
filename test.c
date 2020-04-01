@@ -49,10 +49,10 @@ struct config {
 };
 
 /* The following lines make up our testing "framework" :) */
-static int tests = 0, fails = 0;
+static int tests = 0, fails = 0, skips = 0;
 #define test(_s) { printf("#%02d ", ++tests); printf(_s); }
 #define test_cond(_c) if(_c) printf("\033[0;32mPASSED\033[0;0m\n"); else {printf("\033[0;31mFAILED\033[0;0m\n"); fails++;}
-#define test_skipped() printf("\033[01;33mSKIPPED\033[0;0m\n")
+#define test_skipped() { printf("\033[01;33mSKIPPED\033[0;0m\n"); skips++; }
 
 static long long usec(void) {
 #ifndef _MSC_VER
@@ -963,17 +963,8 @@ int main(int argc, char **argv) {
     };
     int throughput = 1;
     int test_inherit_fd = 1;
+    int skips_as_fails = 0;
     int test_unix_socket;
-
-#ifndef _WIN32
-    /* Ignore broken pipe signal (for I/O error tests). */
-    signal(SIGPIPE, SIG_IGN);
-
-    test_unix_socket = access(cfg.unix_sock.path, F_OK) == 0;
-#else
-    /* Unix sockets don't exist in Windows */
-    test_unix_socket = 0;
-#endif
 
     /* Parse command line options. */
     argv++; argc--;
@@ -991,6 +982,8 @@ int main(int argc, char **argv) {
             throughput = 0;
         } else if (argc >= 1 && !strcmp(argv[0],"--skip-inherit-fd")) {
             test_inherit_fd = 0;
+        } else if (argc >= 1 && !strcmp(argv[0],"--skips-as-fails")) {
+            skips_as_fails = 1;
 #ifdef HIREDIS_TEST_SSL
         } else if (argc >= 2 && !strcmp(argv[0],"--ssl-port")) {
             argv++; argc--;
@@ -1014,6 +1007,16 @@ int main(int argc, char **argv) {
         }
         argv++; argc--;
     }
+
+#ifndef _WIN32
+    /* Ignore broken pipe signal (for I/O error tests). */
+    signal(SIGPIPE, SIG_IGN);
+
+    test_unix_socket = access(cfg.unix_sock.path, F_OK) == 0;
+#else
+    /* Unix sockets don't exist in Windows */
+    test_unix_socket = 0;
+#endif
 
     test_format_commands();
     test_reply_reader();
@@ -1066,11 +1069,14 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (fails) {
+    if (fails || (skips_as_fails && skips)) {
         printf("*** %d TESTS FAILED ***\n", fails);
+        if (skips) {
+            printf("*** %d TESTS SKIPPED ***\n", skips);
+        }
         return 1;
     }
 
-    printf("ALL TESTS PASSED\n");
+    printf("ALL TESTS PASSED (%d skipped)\n", skips);
     return 0;
 }
