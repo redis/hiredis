@@ -1,5 +1,4 @@
 language: c
-sudo: false
 compiler:
   - gcc
   - clang
@@ -62,9 +61,9 @@ script:
   - mkdir build/ && cd build/
   - cmake .. ${EXTRA_CMAKE_OPTS}
   - make VERBOSE=1
-  - ctest -V
+  - SKIPS_AS_FAILS=1 ctest -V
 
-matrix:
+jobs:
   include:
     # Windows MinGW cross compile on Linux
     - os: linux
@@ -90,8 +89,12 @@ matrix:
         - eval "${MATRIX_EVAL}"
       install:
         - choco install ninja
+        - choco install redis-64 -y
+      before_script:
+        - redis-server --service-install --service-name Redis --port 6379
+        - redis-server --service-start
       script:
         - mkdir build && cd build
         - cmd.exe //C 'C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat' amd64 '&&'
           cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release '&&' ninja -v
-        - ctest -V
+        - ./hiredis-test.exe
