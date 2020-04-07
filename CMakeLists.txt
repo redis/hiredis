@@ -66,6 +66,9 @@ IF(ENABLE_SSL)
     FIND_PACKAGE(OpenSSL REQUIRED)
     ADD_LIBRARY(hiredis_ssl SHARED
         ssl.c)
+    SET_TARGET_PROPERTIES(hiredis_ssl
+        PROPERTIES
+        VERSION "${HIREDIS_SONAME}")
     TARGET_INCLUDE_DIRECTORIES(hiredis_ssl PRIVATE "${OPENSSL_INCLUDE_DIR}")
     TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE ${OPENSSL_LIBRARIES})
     CONFIGURE_FILE(hiredis_ssl.pc.in hiredis_ssl.pc @ONLY)
