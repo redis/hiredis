@@ -34,13 +34,18 @@
 #include "async.h"
 
 #include <assert.h>
-#include <pthread.h>
 #include <errno.h>
 #include <string.h>
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include "win32.h"
 #include "async_private.h"
 
 void __redisSetError(redisContext *c, int type, const char *str);
@@ -119,6 +124,18 @@ static void sslLogCallback(const SSL *ssl, int where, int ret) {
 #endif
 
 #ifdef HIREDIS_USE_CRYPTO_LOCKS
+#ifdef WIN32
+typedef CRITICAL_SECTION sslLockType;
+static void sslLockInit(sslLockType* l) {
+    InitializeCriticalSection(l);
+}
+static void sslLockAcquire(sslLockType* l) {
+    EnterCriticalSection(l);
+}
+static void sslLockRelease(sslLockType* l) {
+    LeaveCriticalSection(l);
+}
+#else
 typedef pthread_mutex_t sslLockType;
 static void sslLockInit(sslLockType *l) {
     pthread_mutex_init(l, NULL);
@@ -129,7 +146,9 @@ static void sslLockAcquire(sslLockType *l) {
 static void sslLockRelease(sslLockType *l) {
     pthread_mutex_unlock(l);
 }
-static pthread_mutex_t *ossl_locks;
+#endif
+
+static sslLockType* ossl_locks;
 
 static void opensslDoLock(int mode, int lkid, const char *f, int line) {
     sslLockType *l = ossl_locks + lkid;
