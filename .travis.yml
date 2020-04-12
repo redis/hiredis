@@ -60,15 +60,13 @@ script:
       fi;
     fi;
     export CFLAGS CXXFLAGS LDFLAGS TEST_PREFIX EXTRA_CMAKE_OPTS
-  - if [ "$TRAVIS_OS_NAME" != "windows" ]; then
-      make && make clean;
-      if [ "$TRAVIS_OS_NAME" == "osx" ]; then
-        if [ "$BITS" == "64" ]; then
-          OPENSSL_PREFIX="$(ls -d /usr/local/Cellar/openssl@1.1/*)" USE_SSL=1 make;
-        fi;
-      else
-        USE_SSL=1 make;
+  - make && make clean;
+    if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+      if [ "$BITS" == "64" ]; then
+        OPENSSL_PREFIX="$(ls -d /usr/local/Cellar/openssl@1.1/*)" USE_SSL=1 make;
       fi;
+    else
+      USE_SSL=1 make;
     fi;
   - mkdir build/ && cd build/
   - cmake .. ${EXTRA_CMAKE_OPTS}
