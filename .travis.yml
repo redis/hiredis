@@ -36,7 +36,7 @@ env:
   - BITS="64"
 
 script:
-  - EXTRA_CMAKE_OPTS="-DENABLE_EXAMPLES:BOOL=ON -DHIREDIS_SSL:BOOL=ON";
+  - EXTRA_CMAKE_OPTS="-DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON";
     if [ "$TRAVIS_OS_NAME" == "osx" ]; then
       if [ "$BITS" == "32" ]; then
         CFLAGS="-m32 -Werror";
