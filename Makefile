@@ -87,6 +87,7 @@ ifeq ($(uname_S),Darwin)
   DYLIBSUFFIX=dylib
   DYLIB_MINOR_NAME=$(LIBNAME).$(HIREDIS_SONAME).$(DYLIBSUFFIX)
   DYLIB_MAKE_CMD=$(CC) -dynamiclib -Wl,-install_name,$(PREFIX)/$(LIBRARY_PATH)/$(DYLIB_MINOR_NAME) -o $(DYLIBNAME) $(LDFLAGS)
+  DYLIB_PLUGIN=-Wl,-undefined -Wl,dynamic_lookup
 endif
 
 all: $(DYLIBNAME) $(STLIBNAME) hiredis-test $(PKGCONFNAME)
@@ -113,7 +114,7 @@ $(STLIBNAME): $(OBJ)
 	$(STLIB_MAKE_CMD) $(STLIBNAME) $(OBJ)
 
 $(SSL_DYLIBNAME): $(SSL_OBJ)
-	$(DYLIB_MAKE_CMD) -o $(SSL_DYLIBNAME) $(SSL_OBJ) $(REAL_LDFLAGS) $(SSL_LDFLAGS)
+	$(DYLIB_MAKE_CMD) $(DYLIB_PLUGIN) -o $(SSL_DYLIBNAME) $(SSL_OBJ) $(REAL_LDFLAGS) $(SSL_LDFLAGS)
 
 $(SSL_STLIBNAME): $(SSL_OBJ)
 	$(STLIB_MAKE_CMD) $(SSL_STLIBNAME) $(SSL_OBJ)
@@ -185,9 +186,12 @@ examples: $(EXAMPLES)
 
 TEST_LIBS = $(STLIBNAME)
 ifeq ($(USE_SSL),1)
-    TEST_LIBS += $(SSL_STLIBNAME) -lssl -lcrypto -lpthread
+    TEST_LIBS += $(SSL_STLIBNAME)
+    TEST_LDFLAGS = $(SSL_LDFLAGS) -lssl -lcrypto -lpthread
 endif
+
 hiredis-test: test.o $(TEST_LIBS)
+	$(CC) -o $@ $(REAL_CFLAGS) -I. $^ $(REAL_LDFLAGS) $(TEST_LDFLAGS)
 
 hiredis-%: %.o $(STLIBNAME)
 	$(CC) $(REAL_CFLAGS) -o $@ $< $(TEST_LIBS) $(REAL_LDFLAGS)
