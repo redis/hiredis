@@ -80,8 +80,14 @@ else
 endif
 
 ifeq ($(uname_S),SunOS)
+  IS_SUN_CC=$(shell sh -c '$(CC) -V 2>&1 |egrep -i -c "sun|studio"')
+  ifeq ($(IS_SUN_CC),1)
+    SUN_SHARED_FLAG=-G
+  else
+    SUN_SHARED_FLAG=-shared
+  endif
   REAL_LDFLAGS+= -ldl -lnsl -lsocket
-  DYLIB_MAKE_CMD=$(CC) -G -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
+  DYLIB_MAKE_CMD=$(CC) $(SUN_SHARED_FLAG) -o $(DYLIBNAME) -h $(DYLIB_MINOR_NAME) $(LDFLAGS)
 endif
 ifeq ($(uname_S),Darwin)
   DYLIBSUFFIX=dylib
