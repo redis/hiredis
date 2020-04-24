@@ -316,7 +316,7 @@ static void test_append_formatted_commands(struct config config) {
 
 static void test_reply_reader(void) {
     redisReader *reader;
-    void *reply;
+    void *reply, *root;
     int ret;
     int i;
 
@@ -340,16 +340,26 @@ static void test_reply_reader(void) {
               strcasecmp(reader->errstr,"Protocol error, got \"@\" as reply type byte") == 0);
     redisReaderFree(reader);
 
-    test("Set error on nested multi bulks with depth > 7: ");
     reader = redisReaderCreate();
-
-    for (i = 0; i < 9; i++) {
-        redisReaderFeed(reader,(char*)"*1\r\n",4);
+    test("Can handle arbitrarily nested multi-bulks: ");
+    for (i = 0; i < 128; i++) {
+        redisReaderFeed(reader,(char*)"*1\r\n", 4);
     }
+    redisReaderFeed(reader,(char*)"$6\r\nLOLWUT\r\n",12);
+    ret = redisReaderGetReply(reader,&reply);
+    root = reply; /* Keep track of the root reply */
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
+        ((redisReply*)reply)->elements == 1);
 
-    ret = redisReaderGetReply(reader,NULL);
-    test_cond(ret == REDIS_ERR &&
-              strncasecmp(reader->errstr,"No support for",14) == 0);
+    test("Can parse arbitrarily nested multi-bulks correctly: ");
+    while(i--) {
+        assert(reply != NULL && ((redisReply*)reply)->type == REDIS_REPLY_ARRAY);
+        reply = ((redisReply*)reply)->element[0];
+    }
+    test_cond(((redisReply*)reply)->type == REDIS_REPLY_STRING &&
+        !memcmp(((redisReply*)reply)->str, "LOLWUT", 6));
+    freeReplyObject(root);
     redisReaderFree(reader);
 
     test("Correctly parses LLONG_MAX: ");
