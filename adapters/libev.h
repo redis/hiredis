@@ -125,7 +125,7 @@ static void redisLibevTimeout(EV_P_ ev_timer *timer, int revents) {
     redisAsyncHandleTimeout(e->context);
 }
 
-static void redisLibevScheduleTimer(void *privdata, struct timeval tv) {
+static void redisLibevSetTimeout(void *privdata, struct timeval tv) {
     redisLibevEvents *e = privdata;
     struct ev_loop *loop = e->loop;
     ((void)loop);
@@ -164,12 +164,8 @@ static int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
     ac->ev.addWrite = redisLibevAddWrite;
     ac->ev.delWrite = redisLibevDelWrite;
     ac->ev.cleanup = redisLibevCleanup;
-    ac->ev.scheduleTimer = redisLibevScheduleTimer;
+    ac->ev.scheduleTimer = redisLibevSetTimeout;
     ac->ev.data = e;
-
-    if (ac->c.timeout->tv_sec != 0 || ac->c.timeout->tv_usec != 0) {
-        redisLibevScheduleTimer(e, *ac->c.timeout);
-    }
 
     /* Initialize read/write events */
     ev_io_init(&e->rev,redisLibevReadEvent,c->fd,EV_READ);
