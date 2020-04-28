@@ -118,7 +118,7 @@ redisAsyncContext *redisAsyncConnectUnix(const char *path);
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 
-void redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv);
+int redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv);
 void redisAsyncDisconnect(redisAsyncContext *ac);
 void redisAsyncFree(redisAsyncContext *ac);
 

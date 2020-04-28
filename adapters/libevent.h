@@ -153,6 +153,9 @@ static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {
 
     /* Create container for context and r/w events */
     e = (redisLibeventEvents*)hi_calloc(1, sizeof(*e));
+    if (e == NULL)
+        return REDIS_ERR;
+
     e->context = ac;
 
     /* Register functions to start/stop listening for events */

@@ -74,7 +74,7 @@ static redisReplyObjectFunctions defaultFunctions = {
 
 /* Create a reply object */
 static redisReply *createReplyObject(int type) {
-    redisReply *r = calloc(1,sizeof(*r));
+    redisReply *r = hi_calloc(1,sizeof(*r));
 
     if (r == NULL)
         return NULL;
@@ -100,17 +100,17 @@ void freeReplyObject(void *reply) {
         if (r->element != NULL) {
             for (j = 0; j < r->elements; j++)
                 freeReplyObject(r->element[j]);
-            free(r->element);
+            hi_free(r->element);
         }
         break;
     case REDIS_REPLY_ERROR:
     case REDIS_REPLY_STATUS:
     case REDIS_REPLY_STRING:
     case REDIS_REPLY_DOUBLE:
-        free(r->str);
+        hi_free(r->str);
         break;
     }
-    free(r);
+    hi_free(r);
 }
 
 static void *createStringObject(const redisReadTask *task, char *str, size_t len) {
@@ -121,7 +121,7 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     if (r == NULL)
         return NULL;
 
-    buf = malloc(len+1);
+    buf = hi_malloc(len+1);
     if (buf == NULL) {
         freeReplyObject(r);
         return NULL;
@@ -155,7 +155,7 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
         return NULL;
 
     if (elements > 0) {
-        r->element = calloc(elements,sizeof(redisReply*));
+        r->element = hi_calloc(elements,sizeof(redisReply*));
         if (r->element == NULL) {
             freeReplyObject(r);
             return NULL;
@@ -305,7 +305,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
         if (*c != '%' || c[1] == '\0') {
             if (*c == ' ') {
                 if (touched) {
-                    newargv = realloc(curargv,sizeof(char*)*(argc+1));
+                    newargv = hi_realloc(curargv,sizeof(char*)*(argc+1));
                     if (newargv == NULL) goto memory_err;
                     curargv = newargv;
                     curargv[argc++] = curarg;
@@ -454,7 +454,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     /* Add the last argument if needed */
     if (touched) {
-        newargv = realloc(curargv,sizeof(char*)*(argc+1));
+        newargv = hi_realloc(curargv,sizeof(char*)*(argc+1));
         if (newargv == NULL) goto memory_err;
         curargv = newargv;
         curargv[argc++] = curarg;
@@ -485,7 +485,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     assert(pos == totlen);
     cmd[pos] = '\0';
 
-    free(curargv);
+    hi_free(curargv);
     *target = cmd;
     return totlen;
 
@@ -501,11 +501,11 @@ cleanup:
     if (curargv) {
         while(argc--)
             sdsfree(curargv[argc]);
-        free(curargv);
+        hi_free(curargv);
     }
 
     sdsfree(curarg);
-    free(cmd);
+    hi_free(cmd);
 
     return error_type;
 }
@@ -546,7 +546,7 @@ int redisFormatCommand(char **target, const char *format, ...) {
 int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
                               const size_t *argvlen)
 {
-    sds cmd;
+    sds cmd, aux;
     unsigned long long totlen;
     int j;
     size_t len;
@@ -568,9 +568,13 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
         return -1;
 
     /* We already know how much storage we need */
-    cmd = sdsMakeRoomFor(cmd, totlen);
-    if (cmd == NULL)
+    aux = sdsMakeRoomFor(cmd, totlen);
+    if (aux == NULL) {
+        sdsfree(cmd);
         return -1;
+    }
+
+    cmd = aux;
 
     /* Construct command */
     cmd = sdscatfmt(cmd, "*%i\r\n", argc);
@@ -635,7 +639,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
 }
 
 void redisFreeCommand(char *cmd) {
-    free(cmd);
+    hi_free(cmd);
 }
 
 void __redisSetError(redisContext *c, int type, const char *str) {
@@ -661,7 +665,7 @@ redisReader *redisReaderCreate(void) {
 static redisContext *redisContextInit(const redisOptions *options) {
     redisContext *c;
 
-    c = calloc(1, sizeof(*c));
+    c = hi_calloc(1, sizeof(*c));
     if (c == NULL)
         return NULL;
 
@@ -685,16 +689,16 @@ void redisFree(redisContext *c) {
 
     sdsfree(c->obuf);
     redisReaderFree(c->reader);
-    free(c->tcp.host);
-    free(c->tcp.source_addr);
-    free(c->unix_sock.path);
-    free(c->timeout);
-    free(c->saddr);
+    hi_free(c->tcp.host);
+    hi_free(c->tcp.source_addr);
+    hi_free(c->unix_sock.path);
+    hi_free(c->timeout);
+    hi_free(c->saddr);
     if (c->funcs->free_privdata) {
         c->funcs->free_privdata(c->privdata);
     }
     memset(c, 0xff, sizeof(*c));
-    free(c);
+    hi_free(c);
 }
 
 redisFD redisFreeKeepFd(redisContext *c) {
@@ -720,6 +724,11 @@ int redisReconnect(redisContext *c) {
 
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
+
+    if (c->obuf == NULL || c->reader == NULL) {
+        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+        return REDIS_ERR;
+    }
 
     if (c->connection_type == REDIS_CONN_TCP) {
         return redisContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
@@ -901,6 +910,8 @@ int redisBufferWrite(redisContext *c, int *done) {
             if (nwritten == (signed)sdslen(c->obuf)) {
                 sdsfree(c->obuf);
                 c->obuf = sdsempty();
+                if (c->obuf == NULL)
+                    goto oom;
             } else {
                 sdsrange(c->obuf,nwritten,-1);
             }
@@ -908,6 +919,10 @@ int redisBufferWrite(redisContext *c, int *done) {
     }
     if (done != NULL) *done = (sdslen(c->obuf) == 0);
     return REDIS_OK;
+
+oom:
+    __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+    return REDIS_ERR;
 }
 
 /* Internal helper function to try and get a reply from the reader,
@@ -998,11 +1013,11 @@ int redisvAppendCommand(redisContext *c, const char *format, va_list ap) {
     }
 
     if (__redisAppendCommand(c,cmd,len) != REDIS_OK) {
-        free(cmd);
+        hi_free(cmd);
         return REDIS_ERR;
     }
 
-    free(cmd);
+    hi_free(cmd);
     return REDIS_OK;
 }
 

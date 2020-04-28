@@ -31,23 +31,10 @@
 #ifndef HIREDIS_ALLOC_H
 #define HIREDIS_ALLOC_H
 
-#include <stdlib.h> /* for size_t */
-
-#ifndef HIREDIS_OOM_HANDLER
-#define HIREDIS_OOM_HANDLER abort()
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void *hi_malloc(size_t size);
-void *hi_calloc(size_t nmemb, size_t size);
-void *hi_realloc(void *ptr, size_t size);
-char *hi_strdup(const char *str);
-
-#ifdef __cplusplus
-}
-#endif
+#define hi_malloc malloc
+#define hi_calloc calloc
+#define hi_realloc realloc
+#define hi_strdup strdup
+#define hi_free free
 
 #endif  /* HIREDIS_ALLOC_H */

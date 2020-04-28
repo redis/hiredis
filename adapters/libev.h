@@ -120,6 +120,9 @@ static int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
 
     /* Create container for context and r/w events */
     e = (redisLibevEvents*)hi_malloc(sizeof(*e));
+    if (e == NULL)
+        return REDIS_ERR;
+
     e->context = ac;
 #if EV_MULTIPLICITY
     e->loop = loop;

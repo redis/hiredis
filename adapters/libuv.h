@@ -98,11 +98,9 @@ static int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
   ac->ev.delWrite = redisLibuvDelWrite;
   ac->ev.cleanup  = redisLibuvCleanup;
 
-  redisLibuvEvents* p = (redisLibuvEvents*)malloc(sizeof(*p));
-
-  if (!p) {
-    return REDIS_ERR;
-  }
+  redisLibuvEvents* p = (redisLibuvEvents*)hi_malloc(sizeof(*p));
+  if (p == NULL)
+      return REDIS_ERR;
 
   memset(p, 0, sizeof(*p));
 

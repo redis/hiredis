@@ -180,43 +180,43 @@ static void test_format_commands(void) {
     len = redisFormatCommand(&cmd,"SET foo bar");
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(3+2));
-    free(cmd);
+    hi_free(cmd);
 
     test("Format command with %%s string interpolation: ");
     len = redisFormatCommand(&cmd,"SET %s %s","foo","bar");
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(3+2));
-    free(cmd);
+    hi_free(cmd);
 
     test("Format command with %%s and an empty string: ");
     len = redisFormatCommand(&cmd,"SET %s %s","foo","");
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(0+2));
-    free(cmd);
+    hi_free(cmd);
 
     test("Format command with an empty string in between proper interpolations: ");
     len = redisFormatCommand(&cmd,"SET %s %s","","foo");
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$0\r\n\r\n$3\r\nfoo\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(0+2)+4+(3+2));
-    free(cmd);
+    hi_free(cmd);
 
     test("Format command with %%b string interpolation: ");
     len = redisFormatCommand(&cmd,"SET %b %b","foo",(size_t)3,"b\0r",(size_t)3);
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nb\0r\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(3+2));
-    free(cmd);
+    hi_free(cmd);
 
     test("Format command with %%b and an empty string: ");
     len = redisFormatCommand(&cmd,"SET %b %b","foo",(size_t)3,"",(size_t)0);
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$0\r\n\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(0+2));
-    free(cmd);
+    hi_free(cmd);
 
     test("Format command with literal %%: ");
     len = redisFormatCommand(&cmd,"SET %% %%");
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$1\r\n%\r\n$1\r\n%\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(1+2)+4+(1+2));
-    free(cmd);
+    hi_free(cmd);
 
     /* Vararg width depends on the type. These tests make sure that the
      * width is correctly determined using the format and subsequent varargs
@@ -227,7 +227,7 @@ static void test_format_commands(void) {
     len = redisFormatCommand(&cmd,"key:%08" fmt " str:%s", value, "hello");               \
     test_cond(strncmp(cmd,"*2\r\n$12\r\nkey:00000123\r\n$9\r\nstr:hello\r\n",len) == 0 && \
         len == 4+5+(12+2)+4+(9+2));                                                       \
-    free(cmd);                                                                            \
+    hi_free(cmd);                                                                         \
 } while(0)
 
 #define FLOAT_WIDTH_TEST(type) do {                                                       \
@@ -236,7 +236,7 @@ static void test_format_commands(void) {
     len = redisFormatCommand(&cmd,"key:%08.3f str:%s", value, "hello");                   \
     test_cond(strncmp(cmd,"*2\r\n$12\r\nkey:0123.000\r\n$9\r\nstr:hello\r\n",len) == 0 && \
         len == 4+5+(12+2)+4+(9+2));                                                       \
-    free(cmd);                                                                            \
+    hi_free(cmd);                                                                         \
 } while(0)
 
     INTEGER_WIDTH_TEST("d", int);
@@ -267,13 +267,13 @@ static void test_format_commands(void) {
     len = redisFormatCommandArgv(&cmd,argc,argv,NULL);
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(3+2)+4+(3+2));
-    free(cmd);
+    hi_free(cmd);
 
     test("Format command by passing argc/argv with lengths: ");
     len = redisFormatCommandArgv(&cmd,argc,argv,lens);
     test_cond(strncmp(cmd,"*3\r\n$3\r\nSET\r\n$7\r\nfoo\0xxx\r\n$3\r\nbar\r\n",len) == 0 &&
         len == 4+4+(3+2)+4+(7+2)+4+(3+2));
-    free(cmd);
+    hi_free(cmd);
 
     sds sds_cmd;
 
@@ -308,7 +308,7 @@ static void test_append_formatted_commands(struct config config) {
 
     assert(redisGetReply(c, (void*)&reply) == REDIS_OK);
 
-    free(cmd);
+    hi_free(cmd);
     freeReplyObject(reply);
 
     disconnect(c, 0);
@@ -763,6 +763,18 @@ static void test_invalid_timeout_errors(struct config config) {
     redisFree(c);
 }
 
+/* Wrap malloc to abort on failure so OOM checks don't make the test logic
+ * harder to follow. */
+void *hi_malloc_safe(size_t size) {
+    void *ptr = hi_malloc(size);
+    if (ptr == NULL) {
+        fprintf(stderr, "Error:  Out of memory\n");
+        exit(-1);
+    }
+
+    return ptr;
+}
+
 static void test_throughput(struct config config) {
     redisContext *c = do_connect(config);
     redisReply **replies;
@@ -774,7 +786,7 @@ static void test_throughput(struct config config) {
         freeReplyObject(redisCommand(c,"LPUSH mylist foo"));
 
     num = 1000;
-    replies = malloc(sizeof(redisReply*)*num);
+    replies = hi_malloc_safe(sizeof(redisReply*)*num);
     t1 = usec();
     for (i = 0; i < num; i++) {
         replies[i] = redisCommand(c,"PING");
@@ -782,10 +794,10 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
-    free(replies);
+    hi_free(replies);
     printf("\t(%dx PING: %.3fs)\n", num, (t2-t1)/1000000.0);
 
-    replies = malloc(sizeof(redisReply*)*num);
+    replies = hi_malloc_safe(sizeof(redisReply*)*num);
     t1 = usec();
     for (i = 0; i < num; i++) {
         replies[i] = redisCommand(c,"LRANGE mylist 0 499");
@@ -794,10 +806,10 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
-    free(replies);
+    hi_free(replies);
     printf("\t(%dx LRANGE with 500 elements: %.3fs)\n", num, (t2-t1)/1000000.0);
 
-    replies = malloc(sizeof(redisReply*)*num);
+    replies = hi_malloc_safe(sizeof(redisReply*)*num);
     t1 = usec();
     for (i = 0; i < num; i++) {
         replies[i] = redisCommand(c, "INCRBY incrkey %d", 1000000);
@@ -805,11 +817,11 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
-    free(replies);
+    hi_free(replies);
     printf("\t(%dx INCRBY: %.3fs)\n", num, (t2-t1)/1000000.0);
 
     num = 10000;
-    replies = malloc(sizeof(redisReply*)*num);
+    replies = hi_malloc_safe(sizeof(redisReply*)*num);
     for (i = 0; i < num; i++)
         redisAppendCommand(c,"PING");
     t1 = usec();
@@ -819,10 +831,10 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
-    free(replies);
+    hi_free(replies);
     printf("\t(%dx PING (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
 
-    replies = malloc(sizeof(redisReply*)*num);
+    replies = hi_malloc_safe(sizeof(redisReply*)*num);
     for (i = 0; i < num; i++)
         redisAppendCommand(c,"LRANGE mylist 0 499");
     t1 = usec();
@@ -833,10 +845,10 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
-    free(replies);
+    hi_free(replies);
     printf("\t(%dx LRANGE with 500 elements (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
 
-    replies = malloc(sizeof(redisReply*)*num);
+    replies = hi_malloc_safe(sizeof(redisReply*)*num);
     for (i = 0; i < num; i++)
         redisAppendCommand(c,"INCRBY incrkey %d", 1000000);
     t1 = usec();
@@ -846,7 +858,7 @@ static void test_throughput(struct config config) {
     }
     t2 = usec();
     for (i = 0; i < num; i++) freeReplyObject(replies[i]);
-    free(replies);
+    hi_free(replies);
     printf("\t(%dx INCRBY (pipelined): %.3fs)\n", num, (t2-t1)/1000000.0);
 
     disconnect(c, 0);

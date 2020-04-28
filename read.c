@@ -42,6 +42,7 @@
 #include <limits.h>
 #include <math.h>
 
+#include "alloc.h"
 #include "read.h"
 #include "sds.h"
 #include "win32.h"
@@ -558,19 +559,20 @@ static int processItem(redisReader *r) {
 redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     redisReader *r;
 
-    r = calloc(1,sizeof(redisReader));
+    r = hi_calloc(1,sizeof(redisReader));
     if (r == NULL)
         return NULL;
 
-    r->fn = fn;
     r->buf = sdsempty();
-    r->maxbuf = REDIS_READER_MAX_BUF;
     if (r->buf == NULL) {
-        free(r);
+        hi_free(r);
         return NULL;
     }
 
+    r->fn = fn;
+    r->maxbuf = REDIS_READER_MAX_BUF;
     r->ridx = -1;
+
     return r;
 }
 
@@ -580,7 +582,7 @@ void redisReaderFree(redisReader *r) {
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
     sdsfree(r->buf);
-    free(r);
+    hi_free(r);
 }
 
 int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
@@ -596,23 +598,22 @@ int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
         if (r->len == 0 && r->maxbuf != 0 && sdsavail(r->buf) > r->maxbuf) {
             sdsfree(r->buf);
             r->buf = sdsempty();
-            r->pos = 0;
+            if (r->buf == 0) goto oom;
 
-            /* r->buf should not be NULL since we just free'd a larger one. */
-            assert(r->buf != NULL);
+            r->pos = 0;
         }
 
         newbuf = sdscatlen(r->buf,buf,len);
-        if (newbuf == NULL) {
-            __redisReaderSetErrorOOM(r);
-            return REDIS_ERR;
-        }
+        if (newbuf == NULL) goto oom;
 
         r->buf = newbuf;
         r->len = sdslen(r->buf);
     }
 
     return REDIS_OK;
+oom:
+    __redisReaderSetErrorOOM(r);
+    return REDIS_ERR;
 }
 
 int redisReaderGetReply(redisReader *r, void **reply) {

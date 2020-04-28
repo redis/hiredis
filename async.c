@@ -58,7 +58,12 @@ static unsigned int callbackHash(const void *key) {
 
 static void *callbackValDup(void *privdata, const void *src) {
     ((void) privdata);
-    redisCallback *dup = hi_malloc(sizeof(*dup));
+    redisCallback *dup;
+
+    dup = hi_malloc(sizeof(*dup));
+    if (dup == NULL)
+        return NULL;
+
     memcpy(dup,src,sizeof(*dup));
     return dup;
 }
@@ -80,7 +85,7 @@ static void callbackKeyDestructor(void *privdata, void *key) {
 
 static void callbackValDestructor(void *privdata, void *val) {
     ((void) privdata);
-    free(val);
+    hi_free(val);
 }
 
 static dictType callbackDict = {
@@ -95,7 +100,7 @@ static dictType callbackDict = {
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac;
 
-    ac = realloc(c,sizeof(redisAsyncContext));
+    ac = hi_realloc(c,sizeof(redisAsyncContext));
     if (ac == NULL)
         return NULL;
 
@@ -216,7 +221,7 @@ static int __redisPushCallback(redisCallbackList *list, redisCallback *source) {
     redisCallback *cb;
 
     /* Copy callback from stack to heap */
-    cb = malloc(sizeof(*cb));
+    cb = hi_malloc(sizeof(*cb));
     if (cb == NULL)
         return REDIS_ERR_OOM;
 
@@ -244,7 +249,7 @@ static int __redisShiftCallback(redisCallbackList *list, redisCallback *target) 
         /* Copy callback from heap to stack */
         if (target != NULL)
             memcpy(target,cb,sizeof(*cb));
-        free(cb);
+        hi_free(cb);
         return REDIS_OK;
     }
     return REDIS_ERR;
@@ -276,16 +281,24 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
 
     /* Run subscription callbacks callbacks with NULL reply */
     it = dictGetIterator(ac->sub.channels);
-    while ((de = dictNext(it)) != NULL)
-        __redisRunCallback(ac,dictGetEntryVal(de),NULL);
-    dictReleaseIterator(it);
-    dictRelease(ac->sub.channels);
+    if (it != NULL) {
+        while ((de = dictNext(it)) != NULL)
+            __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+        dictReleaseIterator(it);
+    }
+
+    if (ac->sub.channels)
+        dictRelease(ac->sub.channels);
 
     it = dictGetIterator(ac->sub.patterns);
-    while ((de = dictNext(it)) != NULL)
-        __redisRunCallback(ac,dictGetEntryVal(de),NULL);
-    dictReleaseIterator(it);
-    dictRelease(ac->sub.patterns);
+    if (it != NULL) {
+        while ((de = dictNext(it)) != NULL)
+            __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+        dictReleaseIterator(it);
+    }
+
+    if (ac->sub.patterns)
+        dictRelease(ac->sub.patterns);
 
     /* Signal event lib to clean up */
     _EL_CLEANUP(ac);
@@ -728,7 +741,7 @@ int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdat
         return REDIS_ERR;
 
     status = __redisAsyncCommand(ac,fn,privdata,cmd,len);
-    free(cmd);
+    hi_free(cmd);
     return status;
 }
 
@@ -758,15 +771,21 @@ int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     return status;
 }
 
-void redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {
+int redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {
     if (!ac->c.timeout) {
         ac->c.timeout = hi_calloc(1, sizeof(tv));
+        if (ac->c.timeout == NULL) {
+            __redisSetError(&ac->c, REDIS_ERR_OOM, "Out of memory");
+            __redisAsyncCopyError(ac);
+            return REDIS_ERR;
+        }
     }
 
-    if (tv.tv_sec == ac->c.timeout->tv_sec &&
-        tv.tv_usec == ac->c.timeout->tv_usec) {
-        return;
+    if (tv.tv_sec != ac->c.timeout->tv_sec ||
+        tv.tv_usec != ac->c.timeout->tv_usec)
+    {
+        *ac->c.timeout = tv;
     }
 
-    *ac->c.timeout = tv;
+    return REDIS_OK;
 }

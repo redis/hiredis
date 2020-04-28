@@ -73,6 +73,9 @@ static void _dictReset(dict *ht) {
 /* Create a new hash table */
 static dict *dictCreate(dictType *type, void *privDataPtr) {
     dict *ht = hi_malloc(sizeof(*ht));
+    if (ht == NULL)
+        return NULL;
+
     _dictInit(ht,type,privDataPtr);
     return ht;
 }
@@ -99,6 +102,8 @@ static int dictExpand(dict *ht, unsigned long size) {
     n.size = realsize;
     n.sizemask = realsize-1;
     n.table = calloc(realsize,sizeof(dictEntry*));
+    if (n.table == NULL)
+        return DICT_ERR;
 
     /* Copy all the elements from the old to the new table:
      * note that if the old hash table is empty ht->size is zero,
@@ -125,7 +130,7 @@ static int dictExpand(dict *ht, unsigned long size) {
         }
     }
     assert(ht->used == 0);
-    free(ht->table);
+    hi_free(ht->table);
 
     /* Remap the new hashtable in the old */
     *ht = n;
@@ -144,6 +149,9 @@ static int dictAdd(dict *ht, void *key, void *val) {
 
     /* Allocates the memory and stores key */
     entry = hi_malloc(sizeof(*entry));
+    if (entry == NULL)
+        return DICT_ERR;
+
     entry->next = ht->table[index];
     ht->table[index] = entry;
 
@@ -200,7 +208,7 @@ static int dictDelete(dict *ht, const void *key) {
 
             dictFreeEntryKey(ht,de);
             dictFreeEntryVal(ht,de);
-            free(de);
+            hi_free(de);
             ht->used--;
             return DICT_OK;
         }
@@ -223,13 +231,13 @@ static int _dictClear(dict *ht) {
             nextHe = he->next;
             dictFreeEntryKey(ht, he);
             dictFreeEntryVal(ht, he);
-            free(he);
+            hi_free(he);
             ht->used--;
             he = nextHe;
         }
     }
     /* Free the table and the allocated cache structure */
-    free(ht->table);
+    hi_free(ht->table);
     /* Re-initialize the table */
     _dictReset(ht);
     return DICT_OK; /* never fails */
@@ -238,7 +246,7 @@ static int _dictClear(dict *ht) {
 /* Clear & Release the hash table */
 static void dictRelease(dict *ht) {
     _dictClear(ht);
-    free(ht);
+    hi_free(ht);
 }
 
 static dictEntry *dictFind(dict *ht, const void *key) {
@@ -258,6 +266,8 @@ static dictEntry *dictFind(dict *ht, const void *key) {
 
 static dictIterator *dictGetIterator(dict *ht) {
     dictIterator *iter = hi_malloc(sizeof(*iter));
+    if (iter == NULL)
+        return NULL;
 
     iter->ht = ht;
     iter->index = -1;
@@ -287,7 +297,7 @@ static dictEntry *dictNext(dictIterator *iter) {
 }
 
 static void dictReleaseIterator(dictIterator *iter) {
-    free(iter);
+    hi_free(iter);
 }
 
 /* ------------------------- private functions ------------------------------ */

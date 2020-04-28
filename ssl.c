@@ -163,7 +163,7 @@ static void opensslDoLock(int mode, int lkid, const char *f, int line) {
     (void)line;
 }
 
-static void initOpensslLocks(void) {
+static int initOpensslLocks(void) {
     unsigned ii, nlocks;
     if (CRYPTO_get_locking_callback() != NULL) {
         /* Someone already set the callback before us. Don't destroy it! */
@@ -171,10 +171,14 @@ static void initOpensslLocks(void) {
     }
     nlocks = CRYPTO_num_locks();
     ossl_locks = hi_malloc(sizeof(*ossl_locks) * nlocks);
+    if (ossl_locks == NULL)
+        return REDIS_ERR;
+
     for (ii = 0; ii < nlocks; ii++) {
         sslLockInit(ossl_locks + ii);
     }
     CRYPTO_set_locking_callback(opensslDoLock);
+    return REDIS_OK;
 }
 #endif /* HIREDIS_USE_CRYPTO_LOCKS */
 
@@ -187,7 +191,12 @@ static int redisSSLConnect(redisContext *c, SSL_CTX *ssl_ctx, SSL *ssl) {
         __redisSetError(c, REDIS_ERR_OTHER, "redisContext was already associated");
         return REDIS_ERR;
     }
-    c->privdata = calloc(1, sizeof(redisSSLContext));
+
+    c->privdata = hi_calloc(1, sizeof(redisSSLContext));
+    if (c->privdata == NULL) {
+        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+        return REDIS_ERR;
+    }
 
     c->funcs = &redisContextSSLFuncs;
     redisSSLContext *rssl = c->privdata;
@@ -241,7 +250,10 @@ int redisSecureConnection(redisContext *c, const char *capath,
         isInit = 1;
         SSL_library_init();
 #ifdef HIREDIS_USE_CRYPTO_LOCKS
-        initOpensslLocks();
+        if (initOpensslLocks() == REDIS_ERR) {
+            __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+            goto error;
+        }
 #endif
     }
 
