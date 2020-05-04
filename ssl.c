@@ -187,20 +187,20 @@ static int initOpensslLocks(void) {
  */
 
 static int redisSSLConnect(redisContext *c, SSL_CTX *ssl_ctx, SSL *ssl) {
+    redisSSLContext *rssl;
+
     if (c->privdata) {
         __redisSetError(c, REDIS_ERR_OTHER, "redisContext was already associated");
         return REDIS_ERR;
     }
 
-    c->privdata = hi_calloc(1, sizeof(redisSSLContext));
-    if (c->privdata == NULL) {
+    rssl = hi_calloc(1, sizeof(redisSSLContext));
+    if (rssl == NULL) {
         __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
         return REDIS_ERR;
     }
 
     c->funcs = &redisContextSSLFuncs;
-    redisSSLContext *rssl = c->privdata;
-
     rssl->ssl_ctx = ssl_ctx;
     rssl->ssl = ssl;
 
@@ -211,12 +211,14 @@ static int redisSSLConnect(redisContext *c, SSL_CTX *ssl_ctx, SSL *ssl) {
     ERR_clear_error();
     int rv = SSL_connect(rssl->ssl);
     if (rv == 1) {
+        c->privdata = rssl;
         return REDIS_OK;
     }
 
     rv = SSL_get_error(rssl->ssl, rv);
     if (((c->flags & REDIS_BLOCK) == 0) &&
         (rv == SSL_ERROR_WANT_READ || rv == SSL_ERROR_WANT_WRITE)) {
+        c->privdata = rssl;
         return REDIS_OK;
     }
 
@@ -231,6 +233,8 @@ static int redisSSLConnect(redisContext *c, SSL_CTX *ssl_ctx, SSL *ssl) {
         }
         __redisSetError(c, REDIS_ERR_IO, err);
     }
+
+    hi_free(rssl);
     return REDIS_ERR;
 }
 
@@ -302,7 +306,8 @@ int redisSecureConnection(redisContext *c, const char *capath,
         }
     }
 
-    return redisSSLConnect(c, ssl_ctx, ssl);
+    if (redisSSLConnect(c, ssl_ctx, ssl) == REDIS_OK)
+        return REDIS_OK;
 
 error:
     if (ssl) SSL_free(ssl);
