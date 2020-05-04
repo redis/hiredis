@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (C) 2014 Pietro Cerutti <gahr@gahr.ch>
  *
  * Redistribution and use in source and binary forms, with or without
