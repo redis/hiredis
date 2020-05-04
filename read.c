@@ -46,6 +46,9 @@
 #include "sds.h"
 #include "win32.h"
 
+/* Initial size of our nested reply stack and how much we grow it when needd */
+#define REDIS_READER_STACK_SIZE 9
+
 static void __redisReaderSetError(redisReader *r, int type, const char *str) {
     size_t len;
 
@@ -243,8 +246,8 @@ static void moveToNextTask(redisReader *r) {
             return;
         }
 
-        cur = &(r->rstack[r->ridx]);
-        prv = &(r->rstack[r->ridx-1]);
+        cur = r->task[r->ridx];
+        prv = r->task[r->ridx-1];
         assert(prv->type == REDIS_REPLY_ARRAY ||
                prv->type == REDIS_REPLY_MAP ||
                prv->type == REDIS_REPLY_SET);
@@ -262,7 +265,7 @@ static void moveToNextTask(redisReader *r) {
 }
 
 static int processLineItem(redisReader *r) {
-    redisReadTask *cur = &(r->rstack[r->ridx]);
+    redisReadTask *cur = r->task[r->ridx];
     void *obj;
     char *p;
     int len;
@@ -344,7 +347,7 @@ static int processLineItem(redisReader *r) {
 }
 
 static int processBulkItem(redisReader *r) {
-    redisReadTask *cur = &(r->rstack[r->ridx]);
+    redisReadTask *cur = r->task[r->ridx];
     void *obj = NULL;
     char *p, *s;
     long long len;
@@ -407,19 +410,43 @@ static int processBulkItem(redisReader *r) {
     return REDIS_ERR;
 }
 
+static int redisReaderGrow(redisReader *r) {
+    redisReadTask **aux;
+    int newlen;
+
+    /* Grow our stack size */
+    newlen = r->tasks + REDIS_READER_STACK_SIZE;
+    aux = realloc(r->task, sizeof(*r->task) * newlen);
+    if (aux == NULL)
+        goto oom;
+
+    r->task = aux;
+
+    /* Allocate new tasks */
+    for (; r->tasks < newlen; r->tasks++) {
+        r->task[r->tasks] = calloc(1, sizeof(**r->task));
+        if (r->task[r->tasks] == NULL)
+            goto oom;
+    }
+
+    return REDIS_OK;
+oom:
+    __redisReaderSetErrorOOM(r);
+    return REDIS_ERR;
+}
+
 /* Process the array, map and set types. */
 static int processAggregateItem(redisReader *r) {
-    redisReadTask *cur = &(r->rstack[r->ridx]);
+    redisReadTask *cur = r->task[r->ridx];
     void *obj;
     char *p;
     long long elements;
     int root = 0, len;
 
     /* Set error for nested multi bulks with depth > 7 */
-    if (r->ridx == 8) {
-        __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
-            "No support for nested multi bulk replies with depth > 7");
-        return REDIS_ERR;
+    if (r->ridx == r->tasks - 1) {
+        if (redisReaderGrow(r) == REDIS_ERR)
+            return REDIS_ERR;
     }
 
     if ((p = readLine(r,&len)) != NULL) {
@@ -467,12 +494,12 @@ static int processAggregateItem(redisReader *r) {
                 cur->elements = elements;
                 cur->obj = obj;
                 r->ridx++;
-                r->rstack[r->ridx].type = -1;
-                r->rstack[r->ridx].elements = -1;
-                r->rstack[r->ridx].idx = 0;
-                r->rstack[r->ridx].obj = NULL;
-                r->rstack[r->ridx].parent = cur;
-                r->rstack[r->ridx].privdata = r->privdata;
+                r->task[r->ridx]->type = -1;
+                r->task[r->ridx]->elements = -1;
+                r->task[r->ridx]->idx = 0;
+                r->task[r->ridx]->obj = NULL;
+                r->task[r->ridx]->parent = cur;
+                r->task[r->ridx]->privdata = r->privdata;
             } else {
                 moveToNextTask(r);
             }
@@ -487,7 +514,7 @@ static int processAggregateItem(redisReader *r) {
 }
 
 static int processItem(redisReader *r) {
-    redisReadTask *cur = &(r->rstack[r->ridx]);
+    redisReadTask *cur = r->task[r->ridx];
     char *p;
 
     /* check if we need to read type */
@@ -562,23 +589,46 @@ redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     if (r == NULL)
         return NULL;
 
-    r->fn = fn;
     r->buf = sdsempty();
-    r->maxbuf = REDIS_READER_MAX_BUF;
-    if (r->buf == NULL) {
-        free(r);
-        return NULL;
+    if (r->buf == NULL)
+        goto oom;
+
+    r->task = calloc(REDIS_READER_STACK_SIZE, sizeof(*r->task));
+    if (r->task == NULL)
+        goto oom;
+
+    for (; r->tasks < REDIS_READER_STACK_SIZE; r->tasks++) {
+        r->task[r->tasks] = calloc(1, sizeof(**r->task));
+        if (r->task[r->tasks] == NULL)
+            goto oom;
     }
+
+    r->fn = fn;
+    r->maxbuf = REDIS_READER_MAX_BUF;
 
     r->ridx = -1;
     return r;
+
+oom:
+    redisReaderFree(r);
+    return NULL;
 }
 
 void redisReaderFree(redisReader *r) {
     if (r == NULL)
         return;
+
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
+
+    /* We know r->task[i] is allocatd if i < r->tasks */
+    for (int i = 0; i < r->tasks; i++) {
+        free(r->task[i]);
+    }
+
+    if (r->task)
+        free(r->task);
+
     sdsfree(r->buf);
     free(r);
 }
@@ -630,12 +680,12 @@ int redisReaderGetReply(redisReader *r, void **reply) {
 
     /* Set first item to process when the stack is empty. */
     if (r->ridx == -1) {
-        r->rstack[0].type = -1;
-        r->rstack[0].elements = -1;
-        r->rstack[0].idx = -1;
-        r->rstack[0].obj = NULL;
-        r->rstack[0].parent = NULL;
-        r->rstack[0].privdata = r->privdata;
+        r->task[0]->type = -1;
+        r->task[0]->elements = -1;
+        r->task[0]->idx = -1;
+        r->task[0]->obj = NULL;
+        r->task[0]->parent = NULL;
+        r->task[0]->privdata = r->privdata;
         r->ridx = 0;
     }
 
