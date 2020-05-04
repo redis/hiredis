@@ -46,7 +46,7 @@
 #include "sds.h"
 #include "win32.h"
 
-/* The initial size of our working stack */
+/* Initial size of our nested reply stack and how much we grow it when needd */
 #define REDIS_READER_STACK_SIZE 9
 
 static void __redisReaderSetError(redisReader *r, int type, const char *str) {
