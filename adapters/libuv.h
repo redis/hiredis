@@ -73,7 +73,7 @@ static void redisLibuvDelWrite(void *privdata) {
 static void on_close(uv_handle_t* handle) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
 
-  free(p);
+  hi_free(p);
 }
 
 

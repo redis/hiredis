@@ -43,7 +43,7 @@ static void redisIvykisCleanup(void *privdata) {
     redisIvykisEvents *e = (redisIvykisEvents*)privdata;
 
     iv_fd_unregister(&e->fd);
-    free(e);
+    hi_free(e);
 }
 
 static int redisIvykisAttach(redisAsyncContext *ac) {

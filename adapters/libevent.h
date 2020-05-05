@@ -47,7 +47,7 @@ typedef struct redisLibeventEvents {
 } redisLibeventEvents;
 
 static void redisLibeventDestroy(redisLibeventEvents *e) {
-    free(e);
+    hi_free(e);
 }
 
 static void redisLibeventHandler(int fd, short event, void *arg) {

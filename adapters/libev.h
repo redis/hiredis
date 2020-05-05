@@ -116,7 +116,7 @@ static void redisLibevCleanup(void *privdata) {
     redisLibevDelRead(privdata);
     redisLibevDelWrite(privdata);
     redisLibevStopTimer(privdata);
-    free(e);
+    hi_free(e);
 }
 
 static void redisLibevTimeout(EV_P_ ev_timer *timer, int revents) {

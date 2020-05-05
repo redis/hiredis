@@ -27,7 +27,7 @@ static int freeRedisRunLoop(RedisRunLoop* redisRunLoop) {
             CFSocketInvalidate(redisRunLoop->socketRef);
             CFRelease(redisRunLoop->socketRef);
         }
-        free(redisRunLoop);
+        hi_free(redisRunLoop);
     }
     return REDIS_ERR;
 }

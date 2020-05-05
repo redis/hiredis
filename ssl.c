@@ -347,7 +347,7 @@ static void redisSSLFreeContext(void *privdata){
         SSL_CTX_free(rsc->ssl_ctx);
         rsc->ssl_ctx = NULL;
     }
-    free(rsc);
+    hi_free(rsc);
 }
 
 static int redisSSLRead(redisContext *c, char *buf, size_t bufcap) {

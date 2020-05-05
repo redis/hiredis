@@ -201,7 +201,7 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
         return NULL;
 
     r->dval = value;
-    r->str = malloc(len+1);
+    r->str = hi_malloc(len+1);
     if (r->str == NULL) {
         freeReplyObject(r);
         return NULL;
@@ -470,7 +470,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
     totlen += 1+countDigits(argc)+2;
 
     /* Build the command at protocol level */
-    cmd = malloc(totlen+1);
+    cmd = hi_malloc(totlen+1);
     if (cmd == NULL) goto memory_err;
 
     pos = sprintf(cmd,"*%d\r\n",argc);
@@ -618,7 +618,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     }
 
     /* Build the command at protocol level */
-    cmd = malloc(totlen+1);
+    cmd = hi_malloc(totlen+1);
     if (cmd == NULL)
         return -1;
 

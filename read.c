@@ -417,7 +417,7 @@ static int redisReaderGrow(redisReader *r) {
 
     /* Grow our stack size */
     newlen = r->tasks + REDIS_READER_STACK_SIZE;
-    aux = realloc(r->task, sizeof(*r->task) * newlen);
+    aux = hi_realloc(r->task, sizeof(*r->task) * newlen);
     if (aux == NULL)
         goto oom;
 
@@ -425,7 +425,7 @@ static int redisReaderGrow(redisReader *r) {
 
     /* Allocate new tasks */
     for (; r->tasks < newlen; r->tasks++) {
-        r->task[r->tasks] = calloc(1, sizeof(**r->task));
+        r->task[r->tasks] = hi_calloc(1, sizeof(**r->task));
         if (r->task[r->tasks] == NULL)
             goto oom;
     }
@@ -594,7 +594,7 @@ redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     if (r->buf == NULL)
         goto oom;
 
-    r->task = calloc(REDIS_READER_STACK_SIZE, sizeof(*r->task));
+    r->task = hi_calloc(REDIS_READER_STACK_SIZE, sizeof(*r->task));
     if (r->task == NULL)
         goto oom;
 
@@ -623,11 +623,11 @@ void redisReaderFree(redisReader *r) {
 
     /* We know r->task[i] is allocatd if i < r->tasks */
     for (int i = 0; i < r->tasks; i++) {
-        free(r->task[i]);
+        hi_free(r->task[i]);
     }
 
     if (r->task)
-        free(r->task);
+        hi_free(r->task);
 
     sdsfree(r->buf);
     hi_free(r);
