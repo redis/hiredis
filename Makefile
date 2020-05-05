@@ -20,14 +20,15 @@ HIREDIS_MINOR=$(shell grep HIREDIS_MINOR hiredis.h | awk '{print $$3}')
 HIREDIS_PATCH=$(shell grep HIREDIS_PATCH hiredis.h | awk '{print $$3}')
 HIREDIS_SONAME=$(shell grep HIREDIS_SONAME hiredis.h | awk '{print $$3}')
 
+
 # Installation related variables and target
 PREFIX?=/usr/local
-INCLUDE_PATH?=include/hiredis
-LIBRARY_PATH?=lib
-PKGCONF_PATH?=pkgconfig
-INSTALL_INCLUDE_PATH= $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
-INSTALL_LIBRARY_PATH= $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
-INSTALL_PKGCONF_PATH= $(INSTALL_LIBRARY_PATH)/$(PKGCONF_PATH)
+INCLUDEDIR?=$(PREFIX)/include
+LIBDIR?=$(PREFIX)/lib
+PKGLIBDIR?=$(LIBDIR)/pkgconfig
+INSTALL_INCLUDEDIR= $(DESTDIR)$(INCLUDEDIR)/hiredis
+INSTALL_LIBDIR= $(DESTDIR)$(LIBDIR)
+INSTALL_PKGLIBDIR= $(DESTDIR)$(PKGLIBDIR)
 
 # redis-server configuration used for testing
 REDIS_PORT=56379
@@ -247,14 +248,14 @@ $(SSL_PKGCONFNAME): hiredis.h
 	@echo Libs.private: -lssl -lcrypto >> $@
 
 install: $(DYLIBNAME) $(STLIBNAME) $(PKGCONFNAME)
-	mkdir -p $(INSTALL_INCLUDE_PATH) $(INSTALL_INCLUDE_PATH)/adapters $(INSTALL_LIBRARY_PATH)
-	$(INSTALL) hiredis.h async.h read.h sds.h alloc.h $(INSTALL_INCLUDE_PATH)
-	$(INSTALL) adapters/*.h $(INSTALL_INCLUDE_PATH)/adapters
-	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBRARY_PATH)/$(DYLIB_MINOR_NAME)
-	cd $(INSTALL_LIBRARY_PATH) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIBNAME)
-	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBRARY_PATH)
-	mkdir -p $(INSTALL_PKGCONF_PATH)
-	$(INSTALL) $(PKGCONFNAME) $(INSTALL_PKGCONF_PATH)
+	mkdir -p $(INSTALL_INCLUDEDIR) $(INSTALL_INCLUDEDIR)/adapters $(INSTALL_LIBDIR)
+	$(INSTALL) hiredis.h async.h read.h sds.h alloc.h $(INSTALL_INCLUDEDIR)
+	$(INSTALL) adapters/*.h $(INSTALL_INCLUDEDIR)/adapters
+	$(INSTALL) $(DYLIBNAME) $(INSTALL_LIBDIR)/$(DYLIB_MINOR_NAME)
+	cd $(INSTALL_LIBDIR) && ln -sf $(DYLIB_MINOR_NAME) $(DYLIBNAME)
+	$(INSTALL) $(STLIBNAME) $(INSTALL_LIBDIR)
+	mkdir -p $(INSTALL_PKGLIBDIR)
+	$(INSTALL) $(PKGCONFNAME) $(INSTALL_PKGLIBDIR)
 
 32bit:
 	@echo ""
