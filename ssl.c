@@ -167,7 +167,7 @@ static int initOpensslLocks(void) {
     unsigned ii, nlocks;
     if (CRYPTO_get_locking_callback() != NULL) {
         /* Someone already set the callback before us. Don't destroy it! */
-        return;
+        return REDIS_OK;
     }
     nlocks = CRYPTO_num_locks();
     ossl_locks = hi_malloc(sizeof(*ossl_locks) * nlocks);
