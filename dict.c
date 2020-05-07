@@ -175,6 +175,9 @@ static int dictReplace(dict *ht, void *key, void *val) {
         return 1;
     /* It already exists, get the entry */
     entry = dictFind(ht, key);
+    if (entry == NULL)
+        return 0;
+
     /* Free the old value and set the new one */
     /* Set the new value and free the old one. Note that it is important
      * to do that in this order, as the value may just be exactly the same

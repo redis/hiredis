@@ -47,8 +47,9 @@
 
 #include "async_private.h"
 
-/* Forward declaration of function in hiredis.c */
+/* Forward declarations of hiredis.c functions */
 int __redisAppendCommand(redisContext *c, const char *cmd, size_t len);
+void __redisSetError(redisContext *c, int type, const char *str);
 
 /* Functions managing dictionary of callbacks for pub/sub. */
 static unsigned int callbackHash(const void *key) {
@@ -99,10 +100,19 @@ static dictType callbackDict = {
 
 static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac;
+    dict *channels = NULL, *patterns = NULL;
+
+    channels = dictCreate(&callbackDict,NULL);
+    if (channels == NULL)
+        goto oom;
+
+    patterns = dictCreate(&callbackDict,NULL);
+    if (patterns == NULL)
+        goto oom;
 
     ac = hi_realloc(c,sizeof(redisAsyncContext));
     if (ac == NULL)
-        return NULL;
+        goto oom;
 
     c = &(ac->c);
 
@@ -131,9 +141,14 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     ac->replies.tail = NULL;
     ac->sub.invalid.head = NULL;
     ac->sub.invalid.tail = NULL;
-    ac->sub.channels = dictCreate(&callbackDict,NULL);
-    ac->sub.patterns = dictCreate(&callbackDict,NULL);
+    ac->sub.channels = channels;
+    ac->sub.patterns = patterns;
+
     return ac;
+oom:
+    if (channels) dictRelease(channels);
+    if (patterns) dictRelease(patterns);
+    return NULL;
 }
 
 /* We want the error field to be accessible directly instead of requiring
@@ -280,25 +295,27 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
         __redisRunCallback(ac,&cb,NULL);
 
     /* Run subscription callbacks callbacks with NULL reply */
-    it = dictGetIterator(ac->sub.channels);
-    if (it != NULL) {
-        while ((de = dictNext(it)) != NULL)
-            __redisRunCallback(ac,dictGetEntryVal(de),NULL);
-        dictReleaseIterator(it);
-    }
+    if (ac->sub.channels) {
+        it = dictGetIterator(ac->sub.channels);
+        if (it != NULL) {
+            while ((de = dictNext(it)) != NULL)
+                __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+            dictReleaseIterator(it);
+        }
 
-    if (ac->sub.channels)
         dictRelease(ac->sub.channels);
-
-    it = dictGetIterator(ac->sub.patterns);
-    if (it != NULL) {
-        while ((de = dictNext(it)) != NULL)
-            __redisRunCallback(ac,dictGetEntryVal(de),NULL);
-        dictReleaseIterator(it);
     }
 
-    if (ac->sub.patterns)
+    if (ac->sub.patterns) {
+        it = dictGetIterator(ac->sub.patterns);
+        if (it != NULL) {
+            while ((de = dictNext(it)) != NULL)
+                __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+            dictReleaseIterator(it);
+        }
+
         dictRelease(ac->sub.patterns);
+    }
 
     /* Signal event lib to clean up */
     _EL_CLEANUP(ac);
@@ -401,6 +418,9 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
         /* Locate the right callback */
         assert(reply->element[1]->type == REDIS_REPLY_STRING);
         sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len);
+        if (sname == NULL)
+            goto oom;
+
         de = dictFind(callbacks,sname);
         if (de != NULL) {
             cb = dictGetEntryVal(de);
@@ -434,6 +454,9 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
         __redisShiftCallback(&ac->sub.invalid,dstcb);
     }
     return REDIS_OK;
+oom:
+    __redisSetError(&(ac->c), REDIS_ERR_OOM, "Out of memory");
+    return REDIS_ERR;
 }
 
 void redisProcessCallbacks(redisAsyncContext *ac) {
@@ -601,8 +624,6 @@ void redisAsyncHandleWrite(redisAsyncContext *ac) {
     c->funcs->async_write(ac);
 }
 
-void __redisSetError(redisContext *c, int type, const char *str);
-
 void redisAsyncHandleTimeout(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     redisCallback cb;
@@ -685,6 +706,9 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
         /* Add every channel/pattern to the list of subscription callbacks. */
         while ((p = nextArgument(p,&astr,&alen)) != NULL) {
             sname = sdsnewlen(astr,alen);
+            if (sname == NULL)
+                goto oom;
+
             if (pvariant)
                 cbdict = ac->sub.patterns;
             else
@@ -728,6 +752,9 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     _EL_ADD_WRITE(ac);
 
     return REDIS_OK;
+oom:
+    __redisSetError(&(ac->c), REDIS_ERR_OOM, "Out of memory");
+    return REDIS_ERR;
 }
 
 int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, va_list ap) {
