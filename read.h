@@ -71,7 +71,7 @@ extern "C" {
 
 typedef struct redisReadTask {
     int type;
-    int elements; /* number of elements in multibulk container */
+    long long elements; /* number of elements in multibulk container */
     int idx; /* index in parent (array) object */
     void *obj; /* holds user-generated value for a read task */
     struct redisReadTask *parent; /* parent task */
