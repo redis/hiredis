@@ -541,6 +541,8 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
 
     c->connection_type = REDIS_CONN_UNIX;
     if (c->unix_sock.path != path) {
+        hi_free(c->unix_sock.path);
+
         c->unix_sock.path = hi_strdup(path);
         if (c->unix_sock.path == NULL)
             goto oom;
