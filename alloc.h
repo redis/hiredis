@@ -33,6 +33,10 @@
 
 #include <stddef.h> /* for size_t */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Hiredis allocation/deallocation function pointers */
 typedef void*(*hiredisMallocFn)(size_t);
 typedef void*(*hiredisCallocFn)(size_t,size_t);
@@ -74,5 +78,9 @@ static inline void hi_free(void *ptr) {
 
 hiredisAllocators hiredisSetAllocators(hiredisAllocators *ha);
 void hiredisResetAllocators(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* HIREDIS_ALLOC_H */
