@@ -95,7 +95,7 @@ IF(ENABLE_SSL)
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(hiredis_ssl_sources 
-        alloc.c ssl.c)
+        ssl.c)
     ADD_LIBRARY(hiredis_ssl SHARED
             ${hiredis_ssl_sources})
 
@@ -147,7 +147,7 @@ ENDIF()
 
 IF(NOT DISABLE_TESTS)
     ENABLE_TESTING()
-    ADD_EXECUTABLE(hiredis-test alloc.c test.c)
+    ADD_EXECUTABLE(hiredis-test test.c)
     TARGET_LINK_LIBRARIES(hiredis-test hiredis)
     ADD_TEST(NAME hiredis-test
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test.sh)

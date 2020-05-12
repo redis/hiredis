@@ -28,6 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _WIN32
+
 #include "fmacros.h"
 #include "alloc.h"
 #include <string.h>
@@ -69,3 +71,5 @@ void hiredisResetAllocators(void) {
         .free = free,
     };
 }
+
+#endif

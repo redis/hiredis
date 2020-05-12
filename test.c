@@ -519,6 +519,8 @@ static void *hi_realloc_fail(void *ptr, size_t size) {
     return NULL;
 }
 
+#ifndef _WIN32
+
 static void test_allocator_injection(void) {
     hiredisAllocators ha = {
         .malloc = hi_malloc_fail,
@@ -541,6 +543,8 @@ static void test_allocator_injection(void) {
     // Return allocators to default
     hiredisResetAllocators();
 }
+
+#endif
 
 #define HIREDIS_BAD_DOMAIN "idontexist-noreally.com"
 static void test_blocking_connection_errors(void) {
@@ -1085,12 +1089,12 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
 
     test_unix_socket = access(cfg.unix_sock.path, F_OK) == 0;
+
+    test_allocator_injection();
 #else
     /* Unix sockets don't exist in Windows */
     test_unix_socket = 0;
 #endif
-
-    test_allocator_injection();
 
     test_format_commands();
     test_reply_reader();

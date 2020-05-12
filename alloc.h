@@ -37,6 +37,8 @@
 extern "C" {
 #endif
 
+#ifndef _WIN32
+
 /* Hiredis allocation/deallocation function pointers */
 typedef void*(*hiredisMallocFn)(size_t);
 typedef void*(*hiredisCallocFn)(size_t,size_t);
@@ -78,6 +80,32 @@ static inline void hi_free(void *ptr) {
 
 hiredisAllocators hiredisSetAllocators(hiredisAllocators *ha);
 void hiredisResetAllocators(void);
+
+#else
+
+#include <stdlib.h>
+#include <string.h>
+
+static inline void *hi_malloc(size_t size) {
+    return malloc(size);
+}
+
+static inline void *hi_calloc(size_t nmemb, size_t size) {
+    return calloc(nmemb, size);
+}
+
+static inline void *hi_realloc(void *ptr, size_t size) {
+    return realloc(ptr, size);
+}
+
+static inline char *hi_strdup(char *str) {
+    return strdup(str);
+}
+
+static inline void hi_free(void *ptr) {
+    free(ptr);
+}
+#endif
 
 #ifdef __cplusplus
 }
