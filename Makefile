@@ -3,7 +3,7 @@
 # Copyright (C) 2010-2011 Pieter Noordhuis <pcnoordhuis at gmail dot com>
 # This file is released under the BSD license, see the COPYING file
 
-OBJ=net.o hiredis.o sds.o async.o read.o sockcompat.o
+OBJ=alloc.o net.o hiredis.o sds.o async.o read.o sockcompat.o
 SSL_OBJ=ssl.o
 EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib
 ifeq ($(USE_SSL),1)
@@ -102,6 +102,7 @@ all: $(SSL_DYLIBNAME) $(SSL_STLIBNAME) $(SSL_PKGCONFNAME)
 endif
 
 # Deps (use make dep to generate this)
+alloc.o: alloc.c fmacros.h alloc.h
 async.o: async.c fmacros.h alloc.h async.h hiredis.h read.h sds.h net.h dict.c dict.h win32.h async_private.h
 dict.o: dict.c fmacros.h alloc.h dict.h
 hiredis.o: hiredis.c fmacros.h hiredis.h read.h sds.h alloc.h net.h async.h win32.h

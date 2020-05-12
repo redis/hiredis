@@ -502,6 +502,46 @@ static void test_free_null(void) {
     test_cond(reply == NULL);
 }
 
+static void *hi_malloc_fail(size_t size) {
+    (void)size;
+    return NULL;
+}
+
+static void *hi_calloc_fail(size_t nmemb, size_t size) {
+    (void)nmemb;
+    (void)size;
+    return NULL;
+}
+
+static void *hi_realloc_fail(void *ptr, size_t size) {
+    (void)ptr;
+    (void)size;
+    return NULL;
+}
+
+static void test_allocator_injection(void) {
+    hiredisAllocators ha = {
+        .malloc = hi_malloc_fail,
+        .calloc = hi_calloc_fail,
+        .realloc = hi_realloc_fail,
+        .free = NULL,
+    };
+
+    // Override hiredis allocators
+    hiredisSetAllocators(&ha);
+
+    test("redisContext uses injected allocators: ");
+    redisContext *c = redisConnect("localhost", 6379);
+    test_cond(c == NULL);
+
+    test("redisReader uses injected allocators: ");
+    redisReader *reader = redisReaderCreate();
+    test_cond(reader == NULL);
+
+    // Return allocators to default
+    hiredisResetAllocators();
+}
+
 #define HIREDIS_BAD_DOMAIN "idontexist-noreally.com"
 static void test_blocking_connection_errors(void) {
     redisContext *c;
@@ -1049,6 +1089,8 @@ int main(int argc, char **argv) {
     /* Unix sockets don't exist in Windows */
     test_unix_socket = 0;
 #endif
+
+    test_allocator_injection();
 
     test_format_commands();
     test_reply_reader();
