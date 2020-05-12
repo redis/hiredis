@@ -418,6 +418,16 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("Can configure maximum multi-bulk elements: ");
+    reader = redisReaderCreate();
+    reader->maxelements = 1024;
+    redisReaderFeed(reader, "*1025\r\n", 7);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr, "Multi-bulk length out of range") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
 #if LLONG_MAX > SIZE_MAX
     test("Set error when array > SIZE_MAX: ");
     reader = redisReaderCreate();
