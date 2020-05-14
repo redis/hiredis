@@ -478,8 +478,8 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
-    /* RESP3 verbatum strings (GitHub issue #802) */
-    test("Can parse RESP3 verbatum strings: ");
+    /* RESP3 verbatim strings (GitHub issue #802) */
+    test("Can parse RESP3 verbatim strings: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader,(char*)"=10\r\ntxt:LOLWUT\r\n",17);
     ret = redisReaderGetReply(reader,&reply);
