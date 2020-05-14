@@ -28,8 +28,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _WIN32
-
 #include "fmacros.h"
 #include "alloc.h"
 #include <string.h>
@@ -70,6 +68,28 @@ void hiredisResetAllocators(void) {
         .strdup = strdup,
         .free = free,
     };
+}
+
+#ifdef _WIN32
+
+void *hi_malloc(size_t size) {
+    return hiredisAllocFns.malloc(size);
+}
+
+void *hi_calloc(size_t nmemb, size_t size) {
+    return hiredisAllocFns.calloc(nmemb, size);
+}
+
+void *hi_realloc(void *ptr, size_t size) {
+    return hiredisAllocFns.realloc(ptr, size);
+}
+
+char *hi_strdup(const char *str) {
+    return hiredisAllocFns.strdup(str);
+}
+
+void hi_free(void *ptr) {
+    hiredisAllocFns.free(ptr);
 }
 
 #endif
