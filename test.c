@@ -520,7 +520,7 @@ static void *hi_realloc_fail(void *ptr, size_t size) {
 }
 
 static void test_allocator_injection(void) {
-    hiredisAllocators ha = {
+    hiredisAllocFuncs ha = {
         .malloc = hi_malloc_fail,
         .calloc = hi_calloc_fail,
         .realloc = hi_realloc_fail,

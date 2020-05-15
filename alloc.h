@@ -37,29 +37,22 @@
 extern "C" {
 #endif
 
-/* Hiredis allocation/deallocation function pointers */
-typedef void*(*hiredisMallocFn)(size_t);
-typedef void*(*hiredisCallocFn)(size_t,size_t);
-typedef void*(*hiredisReallocFn)(void*,size_t);
-typedef char*(*hiredisStrdupFn)(const char*);
-typedef void (*hiredisFreeFn)(void*);
-
 /* Structure pointing to our actually configured allocators */
-typedef struct hiredisAllocators {
-    hiredisMallocFn malloc;
-    hiredisCallocFn calloc;
-    hiredisReallocFn realloc;
-    hiredisStrdupFn strdup;
-    hiredisFreeFn free;
-} hiredisAllocators;
+typedef struct hiredisAlloFuncs {
+    void *(*malloc)(size_t);
+    void *(*calloc)(size_t,size_t);
+    void *(*realloc)(void*,size_t);
+    char *(*strdup)(const char*);
+    void (*free)(void*);
+} hiredisAllocFuncs;
 
-hiredisAllocators hiredisSetAllocators(hiredisAllocators *ha);
+hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *ha);
 void hiredisResetAllocators(void);
 
 #ifndef _WIN32
 
 /* Hiredis' configured allocator function pointer struct */
-extern hiredisAllocators hiredisAllocFns;
+extern hiredisAllocFuncs hiredisAllocFns;
 
 static inline void *hi_malloc(size_t size) {
     return hiredisAllocFns.malloc(size);

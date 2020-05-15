@@ -33,7 +33,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-hiredisAllocators hiredisAllocFns = {
+hiredisAllocFuncs hiredisAllocFns = {
     .malloc = malloc,
     .calloc = calloc,
     .realloc = realloc,
@@ -42,8 +42,8 @@ hiredisAllocators hiredisAllocFns = {
 };
 
 /* Override one or more of hireids' allocators */
-hiredisAllocators hiredisSetAllocators(hiredisAllocators *ha) {
-    hiredisAllocators orig = hiredisAllocFns;
+hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *ha) {
+    hiredisAllocFuncs orig = hiredisAllocFns;
 
     if (ha->malloc)
         hiredisAllocFns.malloc = ha->malloc;
@@ -61,7 +61,7 @@ hiredisAllocators hiredisSetAllocators(hiredisAllocators *ha) {
 
 /* Reset allocators to use libc defaults */
 void hiredisResetAllocators(void) {
-    hiredisAllocFns = (hiredisAllocators) {
+    hiredisAllocFns = (hiredisAllocFuncs) {
         .malloc = malloc,
         .calloc = calloc,
         .realloc = realloc,
