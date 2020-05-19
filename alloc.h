@@ -38,7 +38,7 @@ extern "C" {
 #endif
 
 /* Structure pointing to our actually configured allocators */
-typedef struct hiredisAlloFuncs {
+typedef struct hiredisAllocFuncs {
     void *(*malloc)(size_t);
     void *(*calloc)(size_t,size_t);
     void *(*realloc)(void*,size_t);
