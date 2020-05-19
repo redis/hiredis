@@ -487,6 +487,17 @@ static void test_reply_reader(void) {
         ((redisReply*)reply)->elements == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    /* RESP3 verbatim strings (GitHub issue #802) */
+    test("Can parse RESP3 verbatim strings: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader,(char*)"=10\r\ntxt:LOLWUT\r\n",17);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_VERB &&
+         !memcmp(((redisReply*)reply)->str,"LOLWUT", 6));
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
