@@ -97,6 +97,7 @@ void freeReplyObject(void *reply) {
     case REDIS_REPLY_ARRAY:
     case REDIS_REPLY_MAP:
     case REDIS_REPLY_SET:
+    case REDIS_REPLY_PUSH:
         if (r->element != NULL) {
             for (j = 0; j < r->elements; j++)
                 freeReplyObject(r->element[j]);
@@ -155,7 +156,8 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_SET);
+               parent->type == REDIS_REPLY_SET ||
+               parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
@@ -201,7 +203,8 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_SET);
+               parent->type == REDIS_REPLY_SET ||
+               parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;

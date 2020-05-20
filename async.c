@@ -374,7 +374,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
 
     /* Custom reply functions are not supported for pub/sub. This will fail
      * very hard when they are used... */
-    if (reply->type == REDIS_REPLY_ARRAY) {
+    if (reply->type == REDIS_REPLY_ARRAY || reply->type == REDIS_REPLY_PUSH) {
         assert(reply->elements >= 2);
         assert(reply->element[0]->type == REDIS_REPLY_STRING);
         stype = reply->element[0]->str;

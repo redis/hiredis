@@ -250,7 +250,8 @@ static void moveToNextTask(redisReader *r) {
         prv = r->task[r->ridx-1];
         assert(prv->type == REDIS_REPLY_ARRAY ||
                prv->type == REDIS_REPLY_MAP ||
-               prv->type == REDIS_REPLY_SET);
+               prv->type == REDIS_REPLY_SET ||
+               prv->type == REDIS_REPLY_PUSH);
         if (cur->idx == prv->elements-1) {
             r->ridx--;
         } else {
@@ -562,6 +563,9 @@ static int processItem(redisReader *r) {
             case '=':
                 cur->type = REDIS_REPLY_VERB;
                 break;
+            case '>':
+                cur->type = REDIS_REPLY_PUSH;
+                break;
             default:
                 __redisReaderSetErrorProtocolByte(r,*p);
                 return REDIS_ERR;
@@ -587,6 +591,7 @@ static int processItem(redisReader *r) {
     case REDIS_REPLY_ARRAY:
     case REDIS_REPLY_MAP:
     case REDIS_REPLY_SET:
+    case REDIS_REPLY_PUSH:
         return processAggregateItem(r);
     default:
         assert(NULL);
