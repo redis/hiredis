@@ -488,6 +488,21 @@ static void test_reply_reader(void) {
          !memcmp(((redisReply*)reply)->str,"LOLWUT", 6));
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    /* RESP3 push messages (Github issue #815) */
+    test("Can parse RESP3 push messages: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader,(char*)">2\r\n$6\r\nLOLWUT\r\n:42\r\n",21);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_PUSH &&
+        ((redisReply*)reply)->elements == 2 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_STRING &&
+        !memcmp(((redisReply*)reply)->element[0]->str,"LOLWUT",6) &&
+        ((redisReply*)reply)->element[1]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[1]->integer == 42);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
