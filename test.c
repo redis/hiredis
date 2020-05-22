@@ -48,6 +48,10 @@ struct config {
     } ssl;
 };
 
+#ifdef HIREDIS_TEST_SSL
+redisSSLContext *_ssl_ctx = NULL;
+#endif
+
 /* The following lines make up our testing "framework" :) */
 static int tests = 0, fails = 0, skips = 0;
 #define test(_s) { printf("#%02d ", ++tests); printf(_s); }
@@ -113,9 +117,9 @@ static int disconnect(redisContext *c, int keep_fd) {
     return -1;
 }
 
-static void do_ssl_handshake(redisContext *c, struct config config) {
+static void do_ssl_handshake(redisContext *c) {
 #ifdef HIREDIS_TEST_SSL
-    redisSecureConnection(c, config.ssl.ca_cert, config.ssl.cert, config.ssl.key, NULL);
+    redisInitiateSSLWithContext(c, _ssl_ctx);
     if (c->err) {
         printf("SSL error: %s\n", c->errstr);
         redisFree(c);
@@ -123,7 +127,6 @@ static void do_ssl_handshake(redisContext *c, struct config config) {
     }
 #else
     (void) c;
-    (void) config;
 #endif
 }
 
@@ -158,7 +161,7 @@ static redisContext *do_connect(struct config config) {
     }
 
     if (config.type == CONN_SSL) {
-        do_ssl_handshake(c, config);
+        do_ssl_handshake(c);
     }
 
     return select_database(c);
@@ -168,7 +171,7 @@ static void do_reconnect(redisContext *c, struct config config) {
     redisReconnect(c);
 
     if (config.type == CONN_SSL) {
-        do_ssl_handshake(c, config);
+        do_ssl_handshake(c);
     }
 }
 
@@ -1147,6 +1150,11 @@ int main(int argc, char **argv) {
 
 #ifdef HIREDIS_TEST_SSL
     if (cfg.ssl.port && cfg.ssl.host) {
+
+        redisInitOpenSSL();
+        _ssl_ctx = redisCreateSSLContext(cfg.ssl.ca_cert, NULL, cfg.ssl.cert, cfg.ssl.key, NULL, NULL);
+        assert(_ssl_ctx != NULL);
+
         printf("\nTesting against SSL connection (%s:%d):\n", cfg.ssl.host, cfg.ssl.port);
         cfg.type = CONN_SSL;
 
@@ -1156,6 +1164,9 @@ int main(int argc, char **argv) {
         test_invalid_timeout_errors(cfg);
         test_append_formatted_commands(cfg);
         if (throughput) test_throughput(cfg);
+
+        redisFreeSSLContext(_ssl_ctx);
+        _ssl_ctx = NULL;
     }
 #endif
 
