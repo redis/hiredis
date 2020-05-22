@@ -122,12 +122,6 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     if (r == NULL)
         return NULL;
 
-    buf = hi_malloc(len+1);
-    if (buf == NULL) {
-        freeReplyObject(r);
-        return NULL;
-    }
-
     assert(task->type == REDIS_REPLY_ERROR  ||
            task->type == REDIS_REPLY_STATUS ||
            task->type == REDIS_REPLY_STRING ||
@@ -135,22 +129,18 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
 
     /* Copy string value */
     if (task->type == REDIS_REPLY_VERB) {
-        buf = malloc(len-4+1); /* Skip 4 bytes of verbatim type header. */
-        if (buf == NULL) {
-            freeReplyObject(r);
-            return NULL;
-        }
+        buf = hi_malloc(len-4+1); /* Skip 4 bytes of verbatim type header. */
+        if (buf == NULL) goto oom;
+
         memcpy(r->vtype,str,3);
         r->vtype[3] = '\0';
         memcpy(buf,str+4,len-4);
         buf[len-4] = '\0';
         r->len = len - 4;
     } else {
-        buf = malloc(len+1);
-        if (buf == NULL) {
-            freeReplyObject(r);
-            return NULL;
-        }
+        buf = hi_malloc(len+1);
+        if (buf == NULL) goto oom;
+
         memcpy(buf,str,len);
         buf[len] = '\0';
         r->len = len;
@@ -165,6 +155,10 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
         parent->element[task->idx] = r;
     }
     return r;
+
+oom:
+    freeReplyObject(r);
+    return NULL;
 }
 
 static void *createArrayObject(const redisReadTask *task, size_t elements) {
