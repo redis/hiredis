@@ -116,7 +116,7 @@ static void redisLibevCleanup(void *privdata) {
     redisLibevDelRead(privdata);
     redisLibevDelWrite(privdata);
     redisLibevStopTimer(privdata);
-    free(e);
+    hi_free(e);
 }
 
 static void redisLibevTimeout(EV_P_ ev_timer *timer, int revents) {
@@ -149,6 +149,9 @@ static int redisLibevAttach(EV_P_ redisAsyncContext *ac) {
 
     /* Create container for context and r/w events */
     e = (redisLibevEvents*)hi_calloc(1, sizeof(*e));
+    if (e == NULL)
+        return REDIS_ERR;
+
     e->context = ac;
 #if EV_MULTIPLICITY
     e->loop = loop;

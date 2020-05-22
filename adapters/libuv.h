@@ -73,7 +73,7 @@ static void redisLibuvDelWrite(void *privdata) {
 static void on_close(uv_handle_t* handle) {
   redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
 
-  free(p);
+  hi_free(p);
 }
 
 
@@ -98,11 +98,9 @@ static int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
   ac->ev.delWrite = redisLibuvDelWrite;
   ac->ev.cleanup  = redisLibuvCleanup;
 
-  redisLibuvEvents* p = (redisLibuvEvents*)malloc(sizeof(*p));
-
-  if (!p) {
-    return REDIS_ERR;
-  }
+  redisLibuvEvents* p = (redisLibuvEvents*)hi_malloc(sizeof(*p));
+  if (p == NULL)
+      return REDIS_ERR;
 
   memset(p, 0, sizeof(*p));
 

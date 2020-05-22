@@ -42,6 +42,7 @@
 #include <limits.h>
 #include <math.h>
 
+#include "alloc.h"
 #include "read.h"
 #include "sds.h"
 #include "win32.h"
@@ -425,7 +426,7 @@ static int redisReaderGrow(redisReader *r) {
 
     /* Grow our stack size */
     newlen = r->tasks + REDIS_READER_STACK_SIZE;
-    aux = realloc(r->task, sizeof(*r->task) * newlen);
+    aux = hi_realloc(r->task, sizeof(*r->task) * newlen);
     if (aux == NULL)
         goto oom;
 
@@ -433,7 +434,7 @@ static int redisReaderGrow(redisReader *r) {
 
     /* Allocate new tasks */
     for (; r->tasks < newlen; r->tasks++) {
-        r->task[r->tasks] = calloc(1, sizeof(**r->task));
+        r->task[r->tasks] = hi_calloc(1, sizeof(**r->task));
         if (r->task[r->tasks] == NULL)
             goto oom;
     }
@@ -467,7 +468,9 @@ static int processAggregateItem(redisReader *r) {
 
         root = (r->ridx == 0);
 
-        if (elements < -1 || (LLONG_MAX > SIZE_MAX && elements > SIZE_MAX)) {
+        if (elements < -1 || (LLONG_MAX > SIZE_MAX && elements > SIZE_MAX) ||
+            (r->maxelements > 0 && elements > r->maxelements))
+        {
             __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                     "Multi-bulk length out of range");
             return REDIS_ERR;
@@ -602,7 +605,7 @@ static int processItem(redisReader *r) {
 redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     redisReader *r;
 
-    r = calloc(1,sizeof(redisReader));
+    r = hi_calloc(1,sizeof(redisReader));
     if (r == NULL)
         return NULL;
 
@@ -610,22 +613,22 @@ redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     if (r->buf == NULL)
         goto oom;
 
-    r->task = calloc(REDIS_READER_STACK_SIZE, sizeof(*r->task));
+    r->task = hi_calloc(REDIS_READER_STACK_SIZE, sizeof(*r->task));
     if (r->task == NULL)
         goto oom;
 
     for (; r->tasks < REDIS_READER_STACK_SIZE; r->tasks++) {
-        r->task[r->tasks] = calloc(1, sizeof(**r->task));
+        r->task[r->tasks] = hi_calloc(1, sizeof(**r->task));
         if (r->task[r->tasks] == NULL)
             goto oom;
     }
 
     r->fn = fn;
     r->maxbuf = REDIS_READER_MAX_BUF;
-
+    r->maxelements = REDIS_READER_MAX_ARRAY_ELEMENTS;
     r->ridx = -1;
-    return r;
 
+    return r;
 oom:
     redisReaderFree(r);
     return NULL;
@@ -640,14 +643,14 @@ void redisReaderFree(redisReader *r) {
 
     /* We know r->task[i] is allocatd if i < r->tasks */
     for (int i = 0; i < r->tasks; i++) {
-        free(r->task[i]);
+        hi_free(r->task[i]);
     }
 
     if (r->task)
-        free(r->task);
+        hi_free(r->task);
 
     sdsfree(r->buf);
-    free(r);
+    hi_free(r);
 }
 
 int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
@@ -663,23 +666,22 @@ int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
         if (r->len == 0 && r->maxbuf != 0 && sdsavail(r->buf) > r->maxbuf) {
             sdsfree(r->buf);
             r->buf = sdsempty();
-            r->pos = 0;
+            if (r->buf == 0) goto oom;
 
-            /* r->buf should not be NULL since we just free'd a larger one. */
-            assert(r->buf != NULL);
+            r->pos = 0;
         }
 
         newbuf = sdscatlen(r->buf,buf,len);
-        if (newbuf == NULL) {
-            __redisReaderSetErrorOOM(r);
-            return REDIS_ERR;
-        }
+        if (newbuf == NULL) goto oom;
 
         r->buf = newbuf;
         r->len = sdslen(r->buf);
     }
 
     return REDIS_OK;
+oom:
+    __redisReaderSetErrorOOM(r);
+    return REDIS_ERR;
 }
 
 int redisReaderGetReply(redisReader *r, void **reply) {

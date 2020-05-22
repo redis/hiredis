@@ -404,6 +404,16 @@ This should be done only in order to maximize performances when working with
 large payloads. The context should be set back to `REDIS_READER_MAX_BUF` again
 as soon as possible in order to prevent allocation of useless memory.
 
+### Reader max array elements
+
+By default the hiredis reply parser sets the maximum number of multi-bulk elements
+to 2^32 - 1 or 4,294,967,295 entries.  If you need to process multi-bulk replies
+with more than this many elements you can set the value higher or to zero, meaning
+unlimited with:
+```c
+context->reader->maxelements = 0;
+```
+
 ## SSL/TLS Support
 
 ### Building
