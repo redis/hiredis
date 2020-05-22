@@ -754,6 +754,9 @@ static int __redisAsyncAppend(redisAsyncContext *ac, redisCallbackFn *fn, void *
 
             if (de != NULL) {
                 existcb = dictGetEntryVal(de);
+                if (existcb == NULL)
+                    goto oom_error;
+
                 cb.pending_subs = existcb->pending_subs + 1;
             }
 
