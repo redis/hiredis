@@ -293,7 +293,7 @@ static void __redisRunCallback(redisAsyncContext *ac, redisCallback *cb, redisRe
 /* Helper function to free the context. */
 static void __redisAsyncFree(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    redisCallback cb;
+    redisCallback cb, *pcb;
     dictIterator *it;
     dictEntry *de;
 
@@ -309,8 +309,10 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     if (ac->sub.channels) {
         it = dictGetIterator(ac->sub.channels);
         if (it != NULL) {
-            while ((de = dictNext(it)) != NULL)
-                __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+            while ((de = dictNext(it)) != NULL) {
+                pcb = dictGetEntryVal(de);
+                if (pcb) __redisRunCallback(ac,pcb,NULL);
+            }
             dictReleaseIterator(it);
         }
 
@@ -320,8 +322,10 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     if (ac->sub.patterns) {
         it = dictGetIterator(ac->sub.patterns);
         if (it != NULL) {
-            while ((de = dictNext(it)) != NULL)
-                __redisRunCallback(ac,dictGetEntryVal(de),NULL);
+            while ((de = dictNext(it)) != NULL) {
+                pcb = dictGetEntryVal(de);
+                if (pcb) __redisRunCallback(ac,pcb,NULL);
+            }
             dictReleaseIterator(it);
         }
 
@@ -435,6 +439,8 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
         de = dictFind(callbacks,sname);
         if (de != NULL) {
             cb = dictGetEntryVal(de);
+            if (cb == NULL)
+                goto oom;
 
             /* If this is an subscribe reply decrease pending counter. */
             if (strcasecmp(stype+pvariant,"subscribe") == 0) {
@@ -466,6 +472,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
     }
     return REDIS_OK;
 oom:
+    sdsfree(sname);
     __redisSetError(&(ac->c), REDIS_ERR_OOM, "Out of memory");
     return REDIS_ERR;
 }
