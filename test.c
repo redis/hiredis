@@ -547,10 +547,10 @@ static void *hi_realloc_fail(void *ptr, size_t size) {
 
 static void test_allocator_injection(void) {
     hiredisAllocFuncs ha = {
-        .malloc = hi_malloc_fail,
-        .calloc = hi_calloc_fail,
-        .realloc = hi_realloc_fail,
-        .free = NULL,
+        .mallocFn = hi_malloc_fail,
+        .callocFn = hi_calloc_fail,
+        .reallocFn = hi_realloc_fail,
+        .freeFn = NULL,
     };
 
     // Override hiredis allocators

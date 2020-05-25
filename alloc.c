@@ -34,11 +34,11 @@
 #include <stdlib.h>
 
 hiredisAllocFuncs hiredisAllocFns = {
-    .malloc = malloc,
-    .calloc = calloc,
-    .realloc = realloc,
-    .strdup = strdup,
-    .free = free,
+    .mallocFn = malloc,
+    .callocFn = calloc,
+    .reallocFn = realloc,
+    .strdupFn = strdup,
+    .freeFn = free,
 };
 
 /* Override hiredis' allocators with ones supplied by the user */
@@ -53,34 +53,34 @@ hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *override) {
 /* Reset allocators to use libc defaults */
 void hiredisResetAllocators(void) {
     hiredisAllocFns = (hiredisAllocFuncs) {
-        .malloc = malloc,
-        .calloc = calloc,
-        .realloc = realloc,
-        .strdup = strdup,
-        .free = free,
+        .mallocFn = malloc,
+        .callocFn = calloc,
+        .reallocFn = realloc,
+        .strdupFn = strdup,
+        .freeFn = free,
     };
 }
 
 #ifdef _WIN32
 
 void *hi_malloc(size_t size) {
-    return hiredisAllocFns.malloc(size);
+    return hiredisAllocFns.mallocFn(size);
 }
 
 void *hi_calloc(size_t nmemb, size_t size) {
-    return hiredisAllocFns.calloc(nmemb, size);
+    return hiredisAllocFns.callocFn(nmemb, size);
 }
 
 void *hi_realloc(void *ptr, size_t size) {
-    return hiredisAllocFns.realloc(ptr, size);
+    return hiredisAllocFns.reallocFn(ptr, size);
 }
 
 char *hi_strdup(const char *str) {
-    return hiredisAllocFns.strdup(str);
+    return hiredisAllocFns.strdupFn(str);
 }
 
 void hi_free(void *ptr) {
-    hiredisAllocFns.free(ptr);
+    hiredisAllocFns.freeFn(ptr);
 }
 
 #endif
