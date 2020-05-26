@@ -474,6 +474,36 @@ Instead, use `redisInitiateSSL()` which also provides greater control over the
 configuration of the SSL connection, as the caller is responsible to create a
 connection context using `SSL_new()` and configure it as required.
 
+## Allocator injection
+
+Hiredis uses a pass-thru structure of function pointers defined in
+[alloc.h](https://github.com/redis/hiredis/blob/f5d25850/alloc.h#L41) that conttain
+the currently configured allocation and deallocation functions.  By default they
+just point to libc (`malloc`, `calloc`, `realloc`, etc).
+
+### Overriding
+
+One can override the allocators like so:
+
+```c
+hiredisAllocFuncs myfuncs = {
+    .mallocFn = my_malloc,
+    .callocFn = my_calloc,
+    .reallocFn = my_realloc,
+    .strdupFn = my_strdup,
+    .freeFn = my_free,
+};
+
+// Override allocators (function returns current allocators if needed)
+hiredisAllocFuncs orig = hiredisSetAllocators(&myfuncs);
+```
+
+To reset the allocators to their default libc function simply call:
+
+```c
+hiredisResetAllocators();
+```
+
 ## AUTHORS
 
 Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
