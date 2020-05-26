@@ -550,7 +550,8 @@ static void test_allocator_injection(void) {
         .mallocFn = hi_malloc_fail,
         .callocFn = hi_calloc_fail,
         .reallocFn = hi_realloc_fail,
-        .freeFn = NULL,
+        .strdupFn = strdup,
+        .freeFn = free,
     };
 
     // Override hiredis allocators
