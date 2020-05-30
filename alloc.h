@@ -39,11 +39,11 @@ extern "C" {
 
 /* Structure pointing to our actually configured allocators */
 typedef struct hiredisAllocFuncs {
-    void *(*malloc)(size_t);
-    void *(*calloc)(size_t,size_t);
-    void *(*realloc)(void*,size_t);
-    char *(*strdup)(const char*);
-    void (*free)(void*);
+    void *(*mallocFn)(size_t);
+    void *(*callocFn)(size_t,size_t);
+    void *(*reallocFn)(void*,size_t);
+    char *(*strdupFn)(const char*);
+    void (*freeFn)(void*);
 } hiredisAllocFuncs;
 
 hiredisAllocFuncs hiredisSetAllocators(hiredisAllocFuncs *ha);
@@ -55,23 +55,23 @@ void hiredisResetAllocators(void);
 extern hiredisAllocFuncs hiredisAllocFns;
 
 static inline void *hi_malloc(size_t size) {
-    return hiredisAllocFns.malloc(size);
+    return hiredisAllocFns.mallocFn(size);
 }
 
 static inline void *hi_calloc(size_t nmemb, size_t size) {
-    return hiredisAllocFns.calloc(nmemb, size);
+    return hiredisAllocFns.callocFn(nmemb, size);
 }
 
 static inline void *hi_realloc(void *ptr, size_t size) {
-    return hiredisAllocFns.realloc(ptr, size);
+    return hiredisAllocFns.reallocFn(ptr, size);
 }
 
 static inline char *hi_strdup(const char *str) {
-    return hiredisAllocFns.strdup(str);
+    return hiredisAllocFns.strdupFn(str);
 }
 
 static inline void hi_free(void *ptr) {
-    hiredisAllocFns.free(ptr);
+    hiredisAllocFns.freeFn(ptr);
 }
 
 #else
