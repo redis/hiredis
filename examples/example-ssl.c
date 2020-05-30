@@ -7,6 +7,8 @@
 
 int main(int argc, char **argv) {
     unsigned int j;
+    redisSSLContext *ssl;
+    redisSSLContextError ssl_error;
     redisContext *c;
     redisReply *reply;
     if (argc < 4) {
@@ -18,6 +20,14 @@ int main(int argc, char **argv) {
     const char *cert = argv[3];
     const char *key = argv[4];
     const char *ca = argc > 4 ? argv[5] : NULL;
+
+    redisInitOpenSSL();
+    ssl = redisCreateSSLContext(ca, NULL, cert, key, NULL, &ssl_error);
+    if (!ssl) {
+        printf("SSL Context error: %s\n",
+                redisSSLContextGetError(ssl_error));
+        exit(1);
+    }
 
     struct timeval tv = { 1, 500000 }; // 1.5 seconds
     redisOptions options = {0};
@@ -35,7 +45,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    if (redisSecureConnection(c, ca, cert, key, "sni") != REDIS_OK) {
+    if (redisInitiateSSLWithContext(c, ssl) != REDIS_OK) {
         printf("Couldn't initialize SSL!\n");
         printf("Error: %s\n", c->errstr);
         redisFree(c);
@@ -92,6 +102,8 @@ int main(int argc, char **argv) {
 
     /* Disconnects and frees the context */
     redisFree(c);
+
+    redisFreeSSLContext(ssl);
 
     return 0;
 }

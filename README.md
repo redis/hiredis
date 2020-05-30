@@ -438,41 +438,67 @@ First, you'll need to make sure you include the SSL header file:
 #include "hiredis_ssl.h"
 ```
 
-SSL can only be enabled on a `redisContext` connection after the connection has
-been established and before any command has been processed.  For example:
+You will also need to link against `libhiredis_ssl`, **in addition** to
+`libhiredis` and add `-lssl -lcrypto` to satisfy its dependencies.
+
+Hiredis implements SSL/TLS on top of its normal `redisContext` or
+`redisAsyncContext`, so you will need to establish a connection first and then
+initiate an SSL/TLS handshake.
+
+#### Hiredis OpenSSL Wrappers
+
+Before Hiredis can negotiate an SSL/TLS connection, it is necessary to
+initialize OpenSSL and create a context. You can do that in two ways:
+
+1. Work directly with the OpenSSL API to initialize the library's global context
+   and create `SSL_CTX *` and `SSL *` contexts. With an `SSL *` object you can
+   call `redisInitiateSSL()`.
+2. Work with a set of Hiredis-provided wrappers around OpenSSL, create a
+   `redisSSLContext` object to hold configuration and use
+   `redisInitiateSSLWithContext()` to initiate the SSL/TLS handshake.
 
 ```c
+/* An Hiredis SSL context. It holds SSL configuration and can be reused across
+ * many contexts.
+ */
+redisSSLContext *ssl;
+
+/* An error variable to indicate what went wrong, if the context fails to
+ * initialize.
+ */
+redisSSLContextError ssl_error;
+
+/* Initialize global OpenSSL state.
+ *
+ * You should call this only once when your app initializes, and only if
+ * you don't explicitly or implicitly initialize OpenSSL it elsewhere.
+ */
+redisInitOpenSSL();
+
+/* Create SSL context */
+ssl = redisCreateSSLContext(
+    "cacertbundle.crt",     /* File name of trusted CA/ca bundle file, optional */
+    "/path/to/certs",       /* Path of trusted certificates, optional */
+    "client_cert.pem",      /* File name of client certificate file, optional */
+    "client_key.pem",       /* File name of client private key, optional */
+    "redis.mydomain.com",   /* Server name to request (SNI), optional */
+    &ssl_error
+    ) != REDIS_OK) {
+        printf("SSL error: %s\n", redisSSLContextGetError(ssl_error);
+        /* Abort... */
+    }
+
+/* Create Redis context and establish connection */
 c = redisConnect("localhost", 6443);
 if (c == NULL || c->err) {
     /* Handle error and abort... */
 }
 
-if (redisSecureConnection(c,
-    "cacertbundle.crt",     /* File name of trusted CA/ca bundle file */
-    "client_cert.pem",      /* File name of client certificate file */
-    "client_key.pem",       /* File name of client private key */
-    "redis.mydomain.com"    /* Server name to request (SNI) */
-    ) != REDIS_OK) {
-    printf("SSL error: %s\n", c->errstr);
-    /* Abort... */
+/* Negotiate SSL/TLS */
+if (redisInitiateSSLWithContext(c, ssl) != REDIS_OK) {
+    /* Handle error, in c->err / c->errstr */
 }
 ```
-
-You will also need to link against `libhiredis_ssl`, **in addition** to
-`libhiredis` and add `-lssl -lcrypto` to satisfy its dependencies.
-
-### OpenSSL Global State Initialization
-
-OpenSSL needs to have certain global state initialized before it can be used.
-Using `redisSecureConnection()` will handle this automatically on the first
-call.
-
-**If the calling application itself also initializes and uses OpenSSL directly,
-`redisSecureConnection()` must not be used.**
-
-Instead, use `redisInitiateSSL()` which also provides greater control over the
-configuration of the SSL connection, as the caller is responsible to create a
-connection context using `SSL_new()` and configure it as required.
 
 ## Allocator injection
 
