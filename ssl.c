@@ -215,6 +215,8 @@ redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *
         const char *server_name, redisSSLContextError *error)
 {
     redisSSLContext *ctx = hi_calloc(1, sizeof(redisSSLContext));
+    if (ctx == NULL)
+        goto error;
 
     ctx->ssl_ctx = SSL_CTX_new(SSLv23_client_method());
     if (!ctx->ssl_ctx) {
