@@ -1,8 +1,7 @@
-/* SDSLib 2.0 -- A C dynamic strings library
+
+/*
+ * Copyright (c) 2019, Redis Labs
  *
- * Copyright (c) 2006-2015, Salvatore Sanfilippo <antirez at gmail dot com>
- * Copyright (c) 2015, Oran Agra
- * Copyright (c) 2015, Redis Labs, Inc
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,15 +29,33 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* SDS allocator selection.
- *
- * This file is used in order to change the SDS allocator at compile time.
- * Just define the following defines to what you want to use. Also add
- * the include of your alternate allocator if needed (not needed in order
- * to use the default libc allocator). */
+#ifndef __HIREDIS_SSL_H
+#define __HIREDIS_SSL_H
 
-#include "alloc.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define s_malloc hi_malloc
-#define s_realloc hi_realloc
-#define s_free hi_free
+/* This is the underlying struct for SSL in ssl.h, which is not included to
+ * keep build dependencies short here.
+ */
+struct ssl_st;
+
+/**
+ * Secure the connection using SSL. This should be done before any command is
+ * executed on the connection.
+ */
+int redisSecureConnection(redisContext *c, const char *capath, const char *certpath,
+                          const char *keypath, const char *servername);
+
+/**
+ * Initiate SSL/TLS negotiation on a provided context.
+ */
+
+int redisInitiateSSL(redisContext *c, struct ssl_st *ssl);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  /* __HIREDIS_SSL_H */

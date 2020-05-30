@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
 
-**This Readme reflects the latest changed in the master branch. See [v0.13.3](https://github.com/redis/hiredis/tree/v0.13.3) for the Readme and documentation for the latest release.**
+**This Readme reflects the latest changed in the master branch. See [v0.13.3](https://github.com/redis/hiredis/tree/v0.13.3) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
 
 # HIREDIS
 
@@ -205,16 +205,16 @@ a single call to `read(2)`):
 redisReply *reply;
 redisAppendCommand(context,"SET foo bar");
 redisAppendCommand(context,"GET foo");
-redisGetReply(context,&reply); // reply for SET
+redisGetReply(context,(void *)&reply); // reply for SET
 freeReplyObject(reply);
-redisGetReply(context,&reply); // reply for GET
+redisGetReply(context,(void *)&reply); // reply for GET
 freeReplyObject(reply);
 ```
 This API can also be used to implement a blocking subscriber:
 ```c
 reply = redisCommand(context,"SUBSCRIBE foo");
 freeReplyObject(reply);
-while(redisGetReply(context,&reply) == REDIS_OK) {
+while(redisGetReply(context,(void *)&reply) == REDIS_OK) {
     // consume message
     freeReplyObject(reply);
 }
@@ -286,6 +286,7 @@ return `REDIS_ERR`. The function to set the disconnect callback has the followin
 ```c
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 ```
+`ac->data` may be used to pass user data to this callback, the same can be done for redisConnectCallback.
 ### Sending commands and their callbacks
 
 In an asynchronous context, commands are automatically pipelined due to the nature of an event loop.
@@ -403,9 +404,107 @@ This should be done only in order to maximize performances when working with
 large payloads. The context should be set back to `REDIS_READER_MAX_BUF` again
 as soon as possible in order to prevent allocation of useless memory.
 
+### Reader max array elements
+
+By default the hiredis reply parser sets the maximum number of multi-bulk elements
+to 2^32 - 1 or 4,294,967,295 entries.  If you need to process multi-bulk replies
+with more than this many elements you can set the value higher or to zero, meaning
+unlimited with:
+```c
+context->reader->maxelements = 0;
+```
+
+## SSL/TLS Support
+
+### Building
+
+SSL/TLS support is not built by default and requires an explicit flag:
+
+    make USE_SSL=1
+
+This requires OpenSSL development package (e.g. including header files to be
+available.
+
+When enabled, SSL/TLS support is built into extra `libhiredis_ssl.a` and
+`libhiredis_ssl.so` static/dynamic libraries. This leaves the original libraries
+unaffected so no additional dependencies are introduced.
+
+### Using it
+
+First, you'll need to make sure you include the SSL header file:
+
+```c
+#include "hiredis.h"
+#include "hiredis_ssl.h"
+```
+
+SSL can only be enabled on a `redisContext` connection after the connection has
+been established and before any command has been processed.  For example:
+
+```c
+c = redisConnect("localhost", 6443);
+if (c == NULL || c->err) {
+    /* Handle error and abort... */
+}
+
+if (redisSecureConnection(c,
+    "cacertbundle.crt",     /* File name of trusted CA/ca bundle file */
+    "client_cert.pem",      /* File name of client certificate file */
+    "client_key.pem",       /* File name of client private key */
+    "redis.mydomain.com"    /* Server name to request (SNI) */
+    ) != REDIS_OK) {
+    printf("SSL error: %s\n", c->errstr);
+    /* Abort... */
+}
+```
+
+You will also need to link against `libhiredis_ssl`, **in addition** to
+`libhiredis` and add `-lssl -lcrypto` to satisfy its dependencies.
+
+### OpenSSL Global State Initialization
+
+OpenSSL needs to have certain global state initialized before it can be used.
+Using `redisSecureConnection()` will handle this automatically on the first
+call.
+
+**If the calling application itself also initializes and uses OpenSSL directly,
+`redisSecureConnection()` must not be used.**
+
+Instead, use `redisInitiateSSL()` which also provides greater control over the
+configuration of the SSL connection, as the caller is responsible to create a
+connection context using `SSL_new()` and configure it as required.
+
+## Allocator injection
+
+Hiredis uses a pass-thru structure of function pointers defined in
+[alloc.h](https://github.com/redis/hiredis/blob/f5d25850/alloc.h#L41) that conttain
+the currently configured allocation and deallocation functions.  By default they
+just point to libc (`malloc`, `calloc`, `realloc`, etc).
+
+### Overriding
+
+One can override the allocators like so:
+
+```c
+hiredisAllocFuncs myfuncs = {
+    .mallocFn = my_malloc,
+    .callocFn = my_calloc,
+    .reallocFn = my_realloc,
+    .strdupFn = my_strdup,
+    .freeFn = my_free,
+};
+
+// Override allocators (function returns current allocators if needed)
+hiredisAllocFuncs orig = hiredisSetAllocators(&myfuncs);
+```
+
+To reset the allocators to their default libc function simply call:
+
+```c
+hiredisResetAllocators();
+```
+
 ## AUTHORS
 
 Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
-Pieter Noordhuis (pcnoordhuis at gmail) and is released under the BSD license.  
-Hiredis is currently maintained by Matt Stancliff (matt at genges dot com) and
-Jan-Erik Rediger (janerik at fnordig dot com)
+Pieter Noordhuis (pcnoordhuis at gmail) and is released under the BSD license.

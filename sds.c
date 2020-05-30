@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "fmacros.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -219,10 +220,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
     hdrlen = sdsHdrSize(type);
     if (oldtype==type) {
         newsh = s_realloc(sh, hdrlen+newlen+1);
-        if (newsh == NULL) {
-            s_free(sh);
-            return NULL;
-        }
+        if (newsh == NULL) return NULL;
         s = (char*)newsh+hdrlen;
     } else {
         /* Since the header size changes, need to move the string forward,
@@ -889,13 +887,6 @@ sds sdscatrepr(sds s, const char *p, size_t len) {
     return sdscatlen(s,"\"",1);
 }
 
-/* Helper function for sdssplitargs() that returns non zero if 'c'
- * is a valid hex digit. */
-int is_hex_digit(char c) {
-    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-           (c >= 'A' && c <= 'F');
-}
-
 /* Helper function for sdssplitargs() that converts a hex digit into an
  * integer from 0 to 15 */
 int hex_digit_to_int(char c) {
@@ -958,8 +949,8 @@ sds *sdssplitargs(const char *line, int *argc) {
             while(!done) {
                 if (inq) {
                     if (*p == '\\' && *(p+1) == 'x' &&
-                                             is_hex_digit(*(p+2)) &&
-                                             is_hex_digit(*(p+3)))
+                                             isxdigit(*(p+2)) &&
+                                             isxdigit(*(p+3)))
                     {
                         unsigned char byte;
 
@@ -1035,7 +1026,7 @@ sds *sdssplitargs(const char *line, int *argc) {
                     s_free(vector);
                     return NULL;
                 }
-                
+
                 vector = new_vector;
                 vector[*argc] = current;
                 (*argc)++;
