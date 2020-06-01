@@ -121,12 +121,12 @@ static void redisLibevCleanup(void *privdata) {
 
 static void redisLibevTimeout(EV_P_ ev_timer *timer, int revents) {
     ((void)revents);
-    redisLibevEvents *e = timer->data;
+    redisLibevEvents *e = (redisLibevEvents*)timer->data;
     redisAsyncHandleTimeout(e->context);
 }
 
 static void redisLibevSetTimeout(void *privdata, struct timeval tv) {
-    redisLibevEvents *e = privdata;
+    redisLibevEvents *e = (redisLibevEvents*)privdata;
     struct ev_loop *loop = e->loop;
     ((void)loop);
 
