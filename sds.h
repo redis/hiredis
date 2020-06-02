@@ -36,6 +36,7 @@
 #define SDS_MAX_PREALLOC (1024*1024)
 #ifdef _MSC_VER
 #define __attribute__(x)
+typedef long long ssize_t;
 #endif
 
 #include <sys/types.h>
