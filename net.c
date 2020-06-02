@@ -57,8 +57,8 @@ void redisNetClose(redisContext *c) {
     }
 }
 
-int redisNetRead(redisContext *c, char *buf, size_t bufcap) {
-    int nread = recv(c->fd, buf, bufcap, 0);
+ssize_t redisNetRead(redisContext *c, char *buf, size_t bufcap) {
+    ssize_t nread = recv(c->fd, buf, bufcap, 0);
     if (nread == -1) {
         if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
@@ -79,8 +79,8 @@ int redisNetRead(redisContext *c, char *buf, size_t bufcap) {
     }
 }
 
-int redisNetWrite(redisContext *c) {
-    int nwritten = send(c->fd, c->obuf, sdslen(c->obuf), 0);
+ssize_t redisNetWrite(redisContext *c) {
+    ssize_t nwritten = send(c->fd, c->obuf, sdslen(c->obuf), 0);
     if (nwritten < 0) {
         if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
