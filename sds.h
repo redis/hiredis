@@ -37,6 +37,7 @@
 #ifdef _MSC_VER
 #define __attribute__(x)
 typedef long long ssize_t;
+#define SSIZE_MAX (LLONG_MAX >> 1)
 #endif
 
 #include <sys/types.h>

@@ -36,6 +36,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <limits.h>
 #include "sds.h"
 #include "sdsalloc.h"
 
@@ -724,7 +725,7 @@ sds sdstrim(sds s, const char *cset) {
  */
 int sdsrange(sds s, ssize_t start, ssize_t end) {
     size_t newlen, len = sdslen(s);
-    if (len > (SIZE_MAX >> 1)) return -1;
+    if (len > SSIZE_MAX) return -1;
 
     if (len == 0) return 0;
     if (start < 0) {
