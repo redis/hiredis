@@ -51,7 +51,7 @@
 #include <stddef.h>
 
 #ifdef _MSC_VER
-typedef signed long ssize_t;
+typedef long long ssize_t;
 #endif
 
 /* Emulate the parts of the BSD socket API that we need (override the winsock signatures). */

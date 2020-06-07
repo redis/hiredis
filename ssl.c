@@ -392,7 +392,7 @@ static void redisSSLFree(void *privdata){
     hi_free(rsc);
 }
 
-static int redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
+static ssize_t redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
     redisSSL *rssl = c->privdata;
 
     int nread = SSL_read(rssl->ssl, buf, bufcap);
@@ -434,7 +434,7 @@ static int redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
     }
 }
 
-static int redisSSLWrite(redisContext *c) {
+static ssize_t redisSSLWrite(redisContext *c) {
     redisSSL *rssl = c->privdata;
 
     size_t len = rssl->lastLen ? rssl->lastLen : sdslen(c->obuf);

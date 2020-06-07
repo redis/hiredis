@@ -39,6 +39,7 @@
 #include <sys/time.h> /* for struct timeval */
 #else
 struct timeval; /* forward declaration */
+typedef long long ssize_t;
 #endif
 #include <stdint.h> /* uintXX_t, etc */
 #include "sds.h" /* for sds */
@@ -200,8 +201,8 @@ typedef struct redisContextFuncs {
     void (*free_privdata)(void *);
     void (*async_read)(struct redisAsyncContext *);
     void (*async_write)(struct redisAsyncContext *);
-    int (*read)(struct redisContext *, char *, size_t);
-    int (*write)(struct redisContext *);
+    ssize_t (*read)(struct redisContext *, char *, size_t);
+    ssize_t (*write)(struct redisContext *);
 } redisContextFuncs;
 
 /* Context for a connection to Redis */
