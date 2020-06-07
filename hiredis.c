@@ -924,7 +924,7 @@ int redisBufferWrite(redisContext *c, int *done) {
         if (nwritten < 0) {
             return REDIS_ERR;
         } else if (nwritten > 0) {
-            if (nwritten == (signed)sdslen(c->obuf)) {
+            if (nwritten == (ssize_t)sdslen(c->obuf)) {
                 sdsfree(c->obuf);
                 c->obuf = sdsempty();
                 if (c->obuf == NULL)
