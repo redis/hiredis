@@ -51,4 +51,6 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
 int redisKeepAlive(redisContext *c, int interval);
 int redisCheckConnectDone(redisContext *c, int *completed);
 
+int redisSetTcpNoDelay(redisContext *c);
+
 #endif

@@ -203,7 +203,7 @@ int redisKeepAlive(redisContext *c, int interval) {
     return REDIS_OK;
 }
 
-static int redisSetTcpNoDelay(redisContext *c) {
+int redisSetTcpNoDelay(redisContext *c) {
     int yes = 1;
     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
@@ -487,11 +487,11 @@ addrretry:
                 wait_for_ready:
                 if (redisContextWaitReady(c,timeout_msec) != REDIS_OK)
                     goto error;
+                if (redisSetTcpNoDelay(c) != REDIS_OK)
+                    goto error;
             }
         }
         if (blocking && redisSetBlocking(c,1) != REDIS_OK)
-            goto error;
-        if (redisSetTcpNoDelay(c) != REDIS_OK)
             goto error;
 
         c->flags |= REDIS_CONNECTED;
