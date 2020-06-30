@@ -176,9 +176,10 @@ typedef struct {
     int type;
     /* bit field of REDIS_OPT_xxx */
     int options;
-    /* timeout value for connect operation. if NULL, no timeout is used */
+    /* timeout value for connect operation. If NULL, no timeout is used */
     const struct timeval *connect_timeout;
-    /* timeout value for commands. if NULL, no timeout is used. (can be set later on with redisSetTimeout/redisAsyncSetTimeout) */
+    /* timeout value for commands. If NULL, no timeout is used.  This can be
+     * updated at runtime with redisSetTimeout/redisAsyncSetTimeout. */
     const struct timeval *command_timeout;
     union {
         /** use this field for tcp/ip connections */
