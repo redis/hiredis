@@ -92,6 +92,11 @@ typedef long long ssize_t;
  * SO_REUSEADDR is being used. */
 #define REDIS_CONNECT_RETRIES  10
 
+/* RESP3 push helpers and callback prototype */
+#define redisIsPushReply(r) (((redisReply*)(r))->type == REDIS_REPLY_PUSH)
+typedef void (redisPushHandler)(void*);
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -180,6 +185,9 @@ typedef struct {
          * file descriptor */
         redisFD fd;
     } endpoint;
+
+    /* A user defined PUSH message callback */
+    redisPushHandler *push_cb;
 } redisOptions;
 
 /**
@@ -235,6 +243,9 @@ typedef struct redisContext {
 
     /* Additional private data for hiredis addons such as SSL */
     void *privdata;
+
+    /* An optional RESP3 PUSH handler */
+    redisPushHandler *push_cb;
 } redisContext;
 
 redisContext *redisConnectWithOptions(const redisOptions *options);
@@ -261,6 +272,7 @@ redisContext *redisConnectFd(redisFD fd);
  */
 int redisReconnect(redisContext *c);
 
+redisPushHandler *redisSetPushHandler(redisContext *c, redisPushHandler *fn);
 int redisSetTimeout(redisContext *c, const struct timeval tv);
 int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);

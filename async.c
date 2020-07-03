@@ -279,6 +279,14 @@ static void __redisRunCallback(redisAsyncContext *ac, redisCallback *cb, redisRe
     }
 }
 
+static void __redisRunPushCallback(redisAsyncContext *ac, redisReply *reply) {
+    redisContext *c = &(ac->c);
+
+    c->flags |= REDIS_IN_CALLBACK;
+    if (c->push_cb) c->push_cb(reply);
+    c->flags &= ~REDIS_IN_CALLBACK;
+}
+
 /* Helper function to free the context. */
 static void __redisAsyncFree(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
@@ -294,7 +302,7 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     while (__redisShiftCallback(&ac->sub.invalid,&cb) == REDIS_OK)
         __redisRunCallback(ac,&cb,NULL);
 
-    /* Run subscription callbacks callbacks with NULL reply */
+    /* Run subscription callbacks with NULL reply */
     if (ac->sub.channels) {
         it = dictGetIterator(ac->sub.channels);
         if (it != NULL) {
@@ -459,6 +467,27 @@ oom:
     return REDIS_ERR;
 }
 
+static inline int redisIsSubscribeReply(redisReply *reply) {
+    char *str;
+    size_t len, off;
+
+    /* We will always have at least one string with the subscribe/message type */
+    if (reply->elements < 1 || reply->element[0]->type != REDIS_REPLY_STRING ||
+        reply->element[0]->len < sizeof("message") - 1)
+    {
+        return 0;
+    }
+
+    /* Get the string/len moving past 'p' if needed */
+    off = tolower(reply->element[0]->str[0]) == 'p';
+    str = reply->element[0]->str + off;
+    len = reply->element[0]->len - off;
+
+    return !strncasecmp(str, "subscribe", len) ||
+           !strncasecmp(str, "message", len);
+
+}
+
 void redisProcessCallbacks(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     redisCallback cb = {NULL, NULL, 0, NULL};
@@ -485,8 +514,18 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
             break;
         }
 
-        /* Even if the context is subscribed, pending regular callbacks will
-         * get a reply before pub/sub messages arrive. */
+        /* Send any non-subscribe related PUSH messages to our PUSH handler
+         * while allowing subscribe related PUSH messages to pass through.
+         * This allows existing code to be backward compatible and work in
+         * either RESP2 or RESP3 mode. */
+        if (redisIsPushReply(reply) && !redisIsSubscribeReply(reply)) {
+            __redisRunPushCallback(ac, reply);
+            c->reader->fn->freeObject(reply);
+            continue;
+        }
+
+        /* Even if the context is subscribed, pending regular
+         * callbacks will get a reply before pub/sub messages arrive. */
         if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
             /*
              * A spontaneous reply in a not-subscribed context can be the error
@@ -807,6 +846,10 @@ int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *priv
 int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
     int status = __redisAsyncCommand(ac,fn,privdata,cmd,len);
     return status;
+}
+
+redisPushHandler *redisAsyncSetPushHandler(redisAsyncContext *ac, redisPushHandler *fn) {
+    return redisSetPushHandler(&ac->c, fn);
 }
 
 int redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {

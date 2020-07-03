@@ -184,7 +184,8 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_SET);
+               parent->type == REDIS_REPLY_SET ||
+               parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
@@ -687,6 +688,8 @@ static redisContext *redisContextInit(const redisOptions *options) {
         return NULL;
 
     c->funcs = &redisContextDefaultFuncs;
+    c->push_cb = options->push_cb;
+
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
     c->fd = REDIS_INVALID_FD;
@@ -773,7 +776,7 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
         c->flags |= REDIS_REUSEADDR;
     }
     if (options->options & REDIS_OPT_NOAUTOFREE) {
-      c->flags |= REDIS_NO_AUTO_FREE;
+        c->flags |= REDIS_NO_AUTO_FREE;
     }
 
     if (options->type == REDIS_CONN_TCP) {
@@ -876,6 +879,13 @@ int redisEnableKeepAlive(redisContext *c) {
     return REDIS_OK;
 }
 
+/* Set a user provided RESP3 PUSH handler and return any old one set. */
+redisPushHandler *redisSetPushHandler(redisContext *c, redisPushHandler *fn) {
+    redisPushHandler *old = c->push_cb;
+    c->push_cb = fn;
+    return old;
+}
+
 /* Use this function to handle a read event on the descriptor. It will try
  * and read some bytes from the socket and feed them to the reply parser.
  *
@@ -947,7 +957,19 @@ int redisGetReplyFromReader(redisContext *c, void **reply) {
         __redisSetError(c,c->reader->err,c->reader->errstr);
         return REDIS_ERR;
     }
+
     return REDIS_OK;
+}
+
+/* Internal helper that returns 1 if the reply was a RESP3 PUSH
+ * message and we handled it with a user-provided callback. */
+static int redisHandledPushReply(redisContext *c, void *reply) {
+    if (reply && c->push_cb && redisIsPushReply(reply)) {
+        c->push_cb(reply);
+        return 1;
+    }
+
+    return 0;
 }
 
 int redisGetReply(redisContext *c, void **reply) {
@@ -970,8 +992,13 @@ int redisGetReply(redisContext *c, void **reply) {
         do {
             if (redisBufferRead(c) == REDIS_ERR)
                 return REDIS_ERR;
-            if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
-                return REDIS_ERR;
+
+            /* We loop here in case the user has specified a RESP3
+             * PUSH handler (e.g. for client tracking). */
+            do {
+                if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
+                    return REDIS_ERR;
+            } while (redisHandledPushReply(c, aux));
         } while (aux == NULL);
     }
 
