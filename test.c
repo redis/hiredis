@@ -52,6 +52,8 @@ struct config {
 redisSSLContext *_ssl_ctx = NULL;
 #endif
 
+static int push_counter;
+
 /* The following lines make up our testing "framework" :) */
 static int tests = 0, fails = 0, skips = 0;
 #define test(_s) { printf("#%02d ", ++tests); printf(_s); }
@@ -77,6 +79,49 @@ static long long usec(void) {
 #define assert(e) (void)(e)
 #endif
 
+/* Attempt to get an INFO field */
+sds get_info_value(redisContext *c, const char *field, size_t len) {
+    redisReply *reply;
+    sds val;
+    char *s, *e;
+
+    reply = redisCommand(c, "INFO");
+    if (reply == NULL || c->err) {
+        fprintf(stderr, "Error:  Can't execute INFO, aborting!\n");
+        exit(1);
+    }
+
+    if ((s = strstr(reply->str, field)) == NULL || *(s+len) != ':' ||
+        (e = strstr(s+len, "\r\n")) == NULL)
+    {
+        freeReplyObject(reply);
+        return NULL;
+    }
+
+    /* We're now pointing at :<value>\r\n */
+    val = sdsnewlen(s+len+1, e-s-len-1);
+    freeReplyObject(reply);
+
+    return val;
+}
+
+/* Helper to extract Redis version information.  Aborts on any failure */
+void get_redis_version(redisContext *c, int *major, int *minor) {
+    char *eptr;
+    sds vstr;
+
+    vstr = get_info_value(c, "redis_version", sizeof("redis_version") - 1);
+    if (vstr == NULL) {
+        fprintf(stderr, "Error:  Can't determine Redis version, aborting!\n");
+        exit(1);
+    }
+
+    if (major)
+        *major = strtol(vstr, &eptr, 10);
+    if (minor)
+        *minor = strtol(eptr+1, &eptr, 10);
+}
+
 static redisContext *select_database(redisContext *c) {
     redisReply *reply;
 
@@ -97,6 +142,26 @@ static redisContext *select_database(redisContext *c) {
     }
 
     return c;
+}
+
+/* Switch protocol */
+static void send_hello(redisContext *c, int version) {
+    redisReply *reply;
+    int expected;
+
+    reply = redisCommand(c, "HELLO %d", version);
+    expected = version == 3 ? REDIS_REPLY_MAP : REDIS_REPLY_ARRAY;
+    assert(reply != NULL && reply->type == expected);
+    freeReplyObject(reply);
+}
+
+/* Togggle client tracking */
+static void send_client_tracking(redisContext *c, const char *str) {
+    redisReply *reply;
+
+    reply = redisCommand(c, "CLIENT TRACKING %s", str);
+    assert(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    freeReplyObject(reply);
 }
 
 static int disconnect(redisContext *c, int keep_fd) {
@@ -615,9 +680,53 @@ static void test_blocking_connection_errors(void) {
 #endif
 }
 
+void push_handler(void *r) {
+    (void)r;
+    push_counter++;
+}
+
+static void test_resp3_push_handler(redisContext *c) {
+    redisPushHandler *old = NULL;
+    redisReply *reply;
+    int n;
+
+    /* Switch to RESP3 and turn on client tracking */
+    send_hello(c, 3);
+    send_client_tracking(c, "ON");
+
+    reply = redisCommand(c, "GET key:0");
+    assert(reply != NULL);
+    freeReplyObject(reply);
+
+    test("RESP3 PUSH messages are handled out of band by default: ");
+    reply = redisCommand(c, "SET key:0 val:0");
+    test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+
+    reply = redisCommand(c, "GET key:0");
+    assert(reply != NULL);
+    freeReplyObject(reply);
+
+    n = push_counter;
+    old = redisSetPushHandler(c, push_handler);
+    test("We can set a custom RESP3 PUSH handler: ");
+    reply = redisCommand(c, "SET key:0 val:0");
+    test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS &&
+              push_counter == n + 1);
+    freeReplyObject(reply);
+
+    /* Return to the originally set PUSH handler */
+    assert(old != NULL);
+    redisSetPushHandler(c, old);
+
+    /* Switch back to RESP2 and disable tracking */
+    send_client_tracking(c, "OFF");
+    send_hello(c, 2);
+}
+
 static void test_blocking_connection(struct config config) {
     redisContext *c;
     redisReply *reply;
+    int major;
 
     c = do_connect(config);
 
@@ -694,6 +803,11 @@ static void test_blocking_connection(struct config config) {
     test("Can pass NULL to redisGetReply: ");
     assert(redisAppendCommand(c, "PING") == REDIS_OK);
     test_cond(redisGetReply(c, NULL) == REDIS_OK);
+
+    get_redis_version(c, &major, NULL);
+    if (major >= 6) {
+        test_resp3_push_handler(c);
+    }
 
     disconnect(c, 0);
 }
@@ -780,18 +894,7 @@ static void test_blocking_io_errors(struct config config) {
 
     /* Connect to target given by config. */
     c = do_connect(config);
-    {
-        /* Find out Redis version to determine the path for the next test */
-        const char *field = "redis_version:";
-        char *p, *eptr;
-
-        reply = redisCommand(c,"INFO");
-        p = strstr(reply->str,field);
-        major = strtol(p+strlen(field),&eptr,10);
-        p = eptr+1; /* char next to the first "." */
-        minor = strtol(p,&eptr,10);
-        freeReplyObject(reply);
-    }
+    get_redis_version(c, &major, &minor);
 
     test("Returns I/O error when the connection is lost: ");
     reply = redisCommand(c,"QUIT");

@@ -19,6 +19,8 @@ before_script:
 
 addons:
   apt:
+    sources:
+    - sourceline: 'ppa:chris-lea/redis-server'
     packages:
     - libc6-dbg
     - libc6-dev
@@ -30,6 +32,7 @@ addons:
     - libssl-dev
     - libssl-dev:i386
     - valgrind
+    - redis
 
 env:
   - BITS="32"
