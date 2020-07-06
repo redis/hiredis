@@ -120,6 +120,8 @@ void get_redis_version(redisContext *c, int *major, int *minor) {
         *major = strtol(vstr, &eptr, 10);
     if (minor)
         *minor = strtol(eptr+1, &eptr, 10);
+
+    sdsfree(vstr);
 }
 
 static redisContext *select_database(redisContext *c) {
@@ -681,8 +683,8 @@ static void test_blocking_connection_errors(void) {
 }
 
 void push_handler(void *r) {
-    (void)r;
     push_counter++;
+    freeReplyObject(r);
 }
 
 static void test_resp3_push_handler(redisContext *c) {
@@ -701,6 +703,7 @@ static void test_resp3_push_handler(redisContext *c) {
     test("RESP3 PUSH messages are handled out of band by default: ");
     reply = redisCommand(c, "SET key:0 val:0");
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    freeReplyObject(reply);
 
     reply = redisCommand(c, "GET key:0");
     assert(reply != NULL);
