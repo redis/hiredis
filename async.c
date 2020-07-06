@@ -167,6 +167,11 @@ redisAsyncContext *redisAsyncConnectWithOptions(const redisOptions *options) {
     redisContext *c;
     redisAsyncContext *ac;
 
+    /* If the user hasn't specified a PUSH handler, then flag that we don't
+     * want one at all (we will still free the reply with freeReplyObject) */
+    if (myOptions.push_cb == NULL)
+        myOptions.options |= REDIS_OPT_NO_PUSH_HANDLER;
+
     myOptions.options |= REDIS_OPT_NONBLOCK;
     c = redisConnectWithOptions(&myOptions);
     if (c == NULL) {
@@ -282,9 +287,11 @@ static void __redisRunCallback(redisAsyncContext *ac, redisCallback *cb, redisRe
 static void __redisRunPushCallback(redisAsyncContext *ac, redisReply *reply) {
     redisContext *c = &(ac->c);
 
-    c->flags |= REDIS_IN_CALLBACK;
-    if (c->push_cb) c->push_cb(reply);
-    c->flags &= ~REDIS_IN_CALLBACK;
+    if (c->push_cb != NULL) {
+        c->flags |= REDIS_IN_CALLBACK;
+        c->push_cb(reply);
+        c->flags &= ~REDIS_IN_CALLBACK;
+    }
 }
 
 /* Helper function to free the context. */
@@ -467,6 +474,9 @@ oom:
     return REDIS_ERR;
 }
 
+#define redisIsSpontaneousPushReply(r) \
+    (redisIsPushReply(r) && !redisIsSubscribeReply(r))
+
 static inline int redisIsSubscribeReply(redisReply *reply) {
     char *str;
     size_t len, off;
@@ -518,7 +528,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
          * while allowing subscribe related PUSH messages to pass through.
          * This allows existing code to be backward compatible and work in
          * either RESP2 or RESP3 mode. */
-        if (redisIsPushReply(reply) && !redisIsSubscribeReply(reply)) {
+        if (redisIsSpontaneousPushReply(reply)) {
             __redisRunPushCallback(ac, reply);
             c->reader->fn->freeObject(reply);
             continue;
