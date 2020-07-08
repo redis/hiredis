@@ -477,7 +477,7 @@ oom:
 #define redisIsSpontaneousPushReply(r) \
     (redisIsPushReply(r) && !redisIsSubscribeReply(r))
 
-static inline int redisIsSubscribeReply(redisReply *reply) {
+static int redisIsSubscribeReply(redisReply *reply) {
     char *str;
     size_t len, off;
 
