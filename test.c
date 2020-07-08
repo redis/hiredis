@@ -79,49 +79,41 @@ static long long usec(void) {
 #define assert(e) (void)(e)
 #endif
 
-/* Attempt to get an INFO field */
-sds get_info_value(redisContext *c, const char *field, size_t len) {
+/* Helper to extract Redis version information.  Aborts on any failure. */
+#define REDIS_VERSION_FIELD "redis_version:"
+void get_redis_version(redisContext *c, int *majorptr, int *minorptr) {
     redisReply *reply;
-    sds val;
-    char *s, *e;
+    char *eptr, *s, *e;
+    int major, minor;
 
     reply = redisCommand(c, "INFO");
-    if (reply == NULL || c->err) {
-        fprintf(stderr, "Error:  Can't execute INFO, aborting!\n");
-        exit(1);
-    }
+    if (reply == NULL || c->err || reply->type != REDIS_REPLY_STRING)
+        goto abort;
+    if ((s = strstr(reply->str, REDIS_VERSION_FIELD)) == NULL)
+        goto abort;
 
-    if ((s = strstr(reply->str, field)) == NULL || *(s+len) != ':' ||
-        (e = strstr(s+len, "\r\n")) == NULL)
-    {
-        freeReplyObject(reply);
-        return NULL;
-    }
+    s += strlen(REDIS_VERSION_FIELD);
 
-    /* We're now pointing at :<value>\r\n */
-    val = sdsnewlen(s+len+1, e-s-len-1);
+    /* We need a field terminator and at least 'x.y.z' (5) bytes of data */
+    if ((e = strstr(s, "\r\n")) == NULL || (e - s) < 5)
+        goto abort;
+
+    /* Extract version info */
+    major = strtol(s, &eptr, 10);
+    if (*eptr != '.') goto abort;
+    minor = strtol(eptr+1, NULL, 10);
+
+    /* Push info the caller wants */
+    if (majorptr) *majorptr = major;
+    if (minorptr) *minorptr = minor;
+
     freeReplyObject(reply);
+    return;
 
-    return val;
-}
-
-/* Helper to extract Redis version information.  Aborts on any failure */
-void get_redis_version(redisContext *c, int *major, int *minor) {
-    char *eptr;
-    sds vstr;
-
-    vstr = get_info_value(c, "redis_version", sizeof("redis_version") - 1);
-    if (vstr == NULL) {
-        fprintf(stderr, "Error:  Can't determine Redis version, aborting!\n");
-        exit(1);
-    }
-
-    if (major)
-        *major = strtol(vstr, &eptr, 10);
-    if (minor)
-        *minor = strtol(eptr+1, &eptr, 10);
-
-    sdsfree(vstr);
+abort:
+    freeReplyObject(reply);
+    fprintf(stderr, "Error:  Cannot determine Redis version, aborting\n");
+    exit(1);
 }
 
 static redisContext *select_database(redisContext *c) {
