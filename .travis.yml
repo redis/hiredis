@@ -99,10 +99,7 @@ jobs:
         - eval "${MATRIX_EVAL}"
       install:
         - choco install ninja
-        - choco install redis-64 -y
-      before_script:
-        - redis-server --service-install --service-name Redis --port 6379
-        - redis-server --service-start
+        - choco install -y memurai-developer
       script:
         - mkdir build && cd build
         - cmd.exe //C 'C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat' amd64 '&&'
