@@ -36,7 +36,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #else
 #include <pthread.h>
@@ -95,7 +95,7 @@ redisContextFuncs redisContextSSLFuncs;
 #endif
 
 #ifdef HIREDIS_USE_CRYPTO_LOCKS
-#ifdef WIN32
+#ifdef _WIN32
 typedef CRITICAL_SECTION sslLockType;
 static void sslLockInit(sslLockType* l) {
     InitializeCriticalSection(l);
