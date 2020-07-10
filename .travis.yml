@@ -108,5 +108,5 @@ jobs:
       script:
         - mkdir build && cd build
         - cmd.exe //C 'C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat' amd64 '&&'
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release '&&' ninja -v
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_EXAMPLES=ON '&&' ninja -v
         - ./hiredis-test.exe

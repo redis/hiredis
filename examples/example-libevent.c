@@ -38,7 +38,10 @@ void disconnectCallback(const redisAsyncContext *c, int status) {
 }
 
 int main (int argc, char **argv) {
+#ifndef _WIN32
     signal(SIGPIPE, SIG_IGN);
+#endif
+
     struct event_base *base = event_base_new();
     redisOptions options = {0};
     REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", 6379);

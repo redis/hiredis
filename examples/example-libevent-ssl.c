@@ -34,7 +34,10 @@ void disconnectCallback(const redisAsyncContext *c, int status) {
 }
 
 int main (int argc, char **argv) {
+#ifndef _WIN32
     signal(SIGPIPE, SIG_IGN);
+#endif
+
     struct event_base *base = event_base_new();
     if (argc < 5) {
         fprintf(stderr,
