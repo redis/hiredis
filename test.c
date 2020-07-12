@@ -735,13 +735,13 @@ static void test_resp3_push_options(struct config config) {
     redisContext *c;
     redisOptions options;
 
-    test("RESP3 push handler defaults to freeReplyObject for redisContext: ");
+    test("We set a default RESP3 handler for redisContext: ");
     options = get_redis_tcp_options(config);
     assert((c = redisConnectWithOptions(&options)) != NULL);
-    test_cond(c->push_cb == freeReplyObject);
+    test_cond(c->push_cb != NULL);
     redisFree(c);
 
-    test("RESP3 push handler defaults to NULL for redisAsyncContext: ");
+    test("We don't set a default RESP3 push handler for redisAsyncContext: ");
     options = get_redis_tcp_options(config);
     assert((ac = redisAsyncConnectWithOptions(&options)) != NULL);
     test_cond(ac->c.push_cb == NULL);
