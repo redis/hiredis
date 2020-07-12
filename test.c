@@ -13,6 +13,7 @@
 #include <limits.h>
 
 #include "hiredis.h"
+#include "async.h"
 #ifdef HIREDIS_TEST_SSL
 #include "hiredis_ssl.h"
 #endif
@@ -718,6 +719,56 @@ static void test_resp3_push_handler(redisContext *c) {
     send_hello(c, 2);
 }
 
+redisOptions get_redis_tcp_options(struct config config) {
+    redisOptions options = {0};
+    REDIS_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
+    return options;
+}
+
+/* Dummy function just to test setting a callback with redisOptions */
+void push_handler_async(void *reply) {
+    (void)reply;
+}
+
+static void test_resp3_push_options(struct config config) {
+    redisAsyncContext *ac;
+    redisContext *c;
+    redisOptions options;
+
+    test("RESP3 push handler defaults to freeReplyObject for redisContext: ");
+    options = get_redis_tcp_options(config);
+    assert((c = redisConnectWithOptions(&options)) != NULL);
+    test_cond(c->push_cb == freeReplyObject);
+    redisFree(c);
+
+    test("RESP3 push handler defaults to NULL for redisAsyncContext: ");
+    options = get_redis_tcp_options(config);
+    assert((ac = redisAsyncConnectWithOptions(&options)) != NULL);
+    test_cond(ac->c.push_cb == NULL);
+    redisAsyncFree(ac);
+
+    test("Our REDIS_OPT_NO_PUSH_AUTOFREE flag works: ");
+    options = get_redis_tcp_options(config);
+    options.options |= REDIS_OPT_NO_PUSH_AUTOFREE;
+    assert((c = redisConnectWithOptions(&options)) != NULL);
+    test_cond(c->push_cb == NULL);
+    redisFree(c);
+
+    test("We can use redisOptions to set a custom PUSH handler for redisContext: ");
+    options = get_redis_tcp_options(config);
+    options.push_cb = push_handler;
+    assert((c = redisConnectWithOptions(&options)) != NULL);
+    test_cond(c->push_cb == push_handler);
+    redisFree(c);
+
+    test("We can use redisOptions to set a custom PUSH handler for redisAsyncContext: ");
+    options = get_redis_tcp_options(config);
+    options.push_cb = push_handler_async;
+    assert((ac = redisAsyncConnectWithOptions(&options)) != NULL);
+    test_cond(ac->c.push_cb == push_handler_async);
+    redisAsyncFree(ac);
+}
+
 static void test_blocking_connection(struct config config) {
     redisContext *c;
     redisReply *reply;
@@ -800,9 +851,8 @@ static void test_blocking_connection(struct config config) {
     test_cond(redisGetReply(c, NULL) == REDIS_OK);
 
     get_redis_version(c, &major, NULL);
-    if (major >= 6) {
-        test_resp3_push_handler(c);
-    }
+    if (major >= 6) test_resp3_push_handler(c);
+    test_resp3_push_options(config);
 
     disconnect(c, 0);
 }

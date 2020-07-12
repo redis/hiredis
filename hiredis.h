@@ -145,8 +145,8 @@ struct redisSsl;
  */
 #define REDIS_OPT_NOAUTOFREE 0x04
 
-/* Don't specify a RESP3 PUSH handler */
-#define REDIS_OPT_NO_PUSH_HANDLER 0x08
+/* Don't automatically intercept and free RESP3 PUSH replies. */
+#define REDIS_OPT_NO_PUSH_AUTOFREE 0x08
 
 /* In Unix systems a file descriptor is a regular signed int, with -1
  * representing an invalid descriptor. In Windows it is a SOCKET

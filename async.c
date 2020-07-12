@@ -167,10 +167,9 @@ redisAsyncContext *redisAsyncConnectWithOptions(const redisOptions *options) {
     redisContext *c;
     redisAsyncContext *ac;
 
-    /* If the user hasn't specified a PUSH handler, then flag that we don't
-     * want one at all (we will still free the reply with freeReplyObject) */
-    if (myOptions.push_cb == NULL)
-        myOptions.options |= REDIS_OPT_NO_PUSH_HANDLER;
+    /* We always free replies for the user in async hiredis so don't default
+     * to freeReplyObject if the user doesn't set a handler. */
+    myOptions.options |= REDIS_OPT_NO_PUSH_AUTOFREE;
 
     myOptions.options |= REDIS_OPT_NONBLOCK;
     c = redisConnectWithOptions(&myOptions);

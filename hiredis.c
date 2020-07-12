@@ -691,9 +691,9 @@ static redisContext *redisContextInit(const redisOptions *options) {
 
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
-    if (c->push_cb != NULL)
+    if (options->push_cb != NULL)
         redisSetPushHandler(c, options->push_cb);
-    else if (!(options->options & REDIS_OPT_NO_PUSH_HANDLER))
+    else if (!(options->options & REDIS_OPT_NO_PUSH_AUTOFREE))
         redisSetPushHandler(c, freeReplyObject);
 
     c->obuf = sdsempty();
