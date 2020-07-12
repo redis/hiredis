@@ -15,7 +15,12 @@ branches:
     - /^release\/.*$/
 
 before_script:
-    - if [ "$TRAVIS_OS_NAME" == "osx" ] ; then brew update; brew install redis openssl; fi
+    - if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+        curl -O https://distfiles.macports.org/MacPorts/MacPorts-2.6.2-10.13-HighSierra.pkg;
+        sudo installer -pkg MacPorts-2.6.2-10.13-HighSierra.pkg -target /;
+        export PATH=$PATH:/opt/local/bin && sudo port -v selfupdate;
+        sudo port -N install openssl redis;
+      fi;
 
 addons:
   apt:
@@ -106,5 +111,5 @@ jobs:
       script:
         - mkdir build && cd build
         - cmd.exe //C 'C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat' amd64 '&&'
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release '&&' ninja -v
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_EXAMPLES=ON '&&' ninja -v
         - ./hiredis-test.exe
