@@ -32,6 +32,7 @@
 #include "sockcompat.h"
 
 #ifdef _WIN32
+#include <errno.h>
 static int _wsaErrorToErrno(int err) {
     switch (err) {
         case WSAEWOULDBLOCK:
