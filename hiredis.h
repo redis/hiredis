@@ -92,10 +92,14 @@ typedef long long ssize_t;
  * SO_REUSEADDR is being used. */
 #define REDIS_CONNECT_RETRIES  10
 
-/* RESP3 push helpers and callback prototype */
-#define redisIsPushReply(r) (((redisReply*)(r))->type == REDIS_REPLY_PUSH)
-typedef void (redisPushHandler)(void*);
+/* Forward declarations for structs defined elsewhere */
+struct redisAsyncContext;
+struct redisContext;
 
+/* RESP3 push helpers and callback prototypes */
+#define redisIsPushReply(r) (((redisReply*)(r))->type == REDIS_REPLY_PUSH)
+typedef void (redisPushFn)(void *, void *);
+typedef void (redisAsyncPushFn)(struct redisAsyncContext *, void *, void *);
 
 #ifdef __cplusplus
 extern "C" {
@@ -190,7 +194,8 @@ typedef struct {
     } endpoint;
 
     /* A user defined PUSH message callback */
-    redisPushHandler *push_cb;
+    redisPushFn *push_cb;
+    redisAsyncPushFn *async_push_cb;
 } redisOptions;
 
 /**
@@ -204,9 +209,6 @@ typedef struct {
 #define REDIS_OPTIONS_SET_UNIX(opts, path) \
     (opts)->type = REDIS_CONN_UNIX;        \
     (opts)->endpoint.unix_socket = path;
-
-struct redisAsyncContext;
-struct redisContext;
 
 typedef struct redisContextFuncs {
     void (*free_privdata)(void *);
@@ -248,7 +250,7 @@ typedef struct redisContext {
     void *privdata;
 
     /* An optional RESP3 PUSH handler */
-    redisPushHandler *push_cb;
+    redisPushFn *push_cb;
 } redisContext;
 
 redisContext *redisConnectWithOptions(const redisOptions *options);
@@ -275,7 +277,7 @@ redisContext *redisConnectFd(redisFD fd);
  */
 int redisReconnect(redisContext *c);
 
-redisPushHandler *redisSetPushHandler(redisContext *c, redisPushHandler *fn);
+redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn);
 int redisSetTimeout(redisContext *c, const struct timeval tv);
 int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);

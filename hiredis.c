@@ -680,6 +680,11 @@ redisReader *redisReaderCreate(void) {
     return redisReaderCreateWithFunctions(&defaultFunctions);
 }
 
+static void redisPushAutoFree(void *privdata, void *reply) {
+    (void)privdata;
+    freeReplyObject(reply);
+}
+
 static redisContext *redisContextInit(const redisOptions *options) {
     redisContext *c;
 
@@ -692,9 +697,9 @@ static redisContext *redisContextInit(const redisOptions *options) {
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
     if (options->push_cb != NULL)
-        redisSetPushHandler(c, options->push_cb);
+        redisSetPushCallback(c, options->push_cb);
     else if (!(options->options & REDIS_OPT_NO_PUSH_AUTOFREE))
-        redisSetPushHandler(c, freeReplyObject);
+        redisSetPushCallback(c, redisPushAutoFree);
 
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
@@ -886,8 +891,8 @@ int redisEnableKeepAlive(redisContext *c) {
 }
 
 /* Set a user provided RESP3 PUSH handler and return any old one set. */
-redisPushHandler *redisSetPushHandler(redisContext *c, redisPushHandler *fn) {
-    redisPushHandler *old = c->push_cb;
+redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn) {
+    redisPushFn *old = c->push_cb;
     c->push_cb = fn;
     return old;
 }
@@ -971,7 +976,7 @@ int redisGetReplyFromReader(redisContext *c, void **reply) {
  * message and we handled it with a user-provided callback. */
 static int redisHandledPushReply(redisContext *c, void *reply) {
     if (reply && c->push_cb && redisIsPushReply(reply)) {
-        c->push_cb(reply);
+        c->push_cb(c->privdata, reply);
         return 1;
     }
 

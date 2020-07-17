@@ -167,8 +167,9 @@ redisAsyncContext *redisAsyncConnectWithOptions(const redisOptions *options) {
     redisContext *c;
     redisAsyncContext *ac;
 
-    /* We always free replies for the user in async hiredis so don't default
-     * to freeReplyObject if the user doesn't set a handler. */
+    /* Clear any erroneously set sync callback and flag that we don't want to
+     * use freeReplyObject by default. */
+    myOptions.push_cb = NULL;
     myOptions.options |= REDIS_OPT_NO_PUSH_AUTOFREE;
 
     myOptions.options |= REDIS_OPT_NONBLOCK;
@@ -176,11 +177,16 @@ redisAsyncContext *redisAsyncConnectWithOptions(const redisOptions *options) {
     if (c == NULL) {
         return NULL;
     }
+
     ac = redisAsyncInitialize(c);
     if (ac == NULL) {
         redisFree(c);
         return NULL;
     }
+
+    /* Set any configured async push handler */
+    redisAsyncSetPushCallback(ac, myOptions.async_push_cb);
+
     __redisAsyncCopyError(ac);
     return ac;
 }
@@ -284,12 +290,10 @@ static void __redisRunCallback(redisAsyncContext *ac, redisCallback *cb, redisRe
 }
 
 static void __redisRunPushCallback(redisAsyncContext *ac, redisReply *reply) {
-    redisContext *c = &(ac->c);
-
-    if (c->push_cb != NULL) {
-        c->flags |= REDIS_IN_CALLBACK;
-        c->push_cb(reply);
-        c->flags &= ~REDIS_IN_CALLBACK;
+    if (ac->push_cb != NULL) {
+        ac->c.flags |= REDIS_IN_CALLBACK;
+        ac->push_cb(ac, reply, NULL);
+        ac->c.flags &= ~REDIS_IN_CALLBACK;
     }
 }
 
@@ -857,8 +861,10 @@ int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     return status;
 }
 
-redisPushHandler *redisAsyncSetPushHandler(redisAsyncContext *ac, redisPushHandler *fn) {
-    return redisSetPushHandler(&ac->c, fn);
+redisAsyncPushFn *redisAsyncSetPushCallback(redisAsyncContext *ac, redisAsyncPushFn *fn) {
+    redisAsyncPushFn *old = ac->push_cb;
+    ac->push_cb = fn;
+    return old;
 }
 
 int redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {

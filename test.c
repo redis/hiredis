@@ -675,13 +675,22 @@ static void test_blocking_connection_errors(void) {
 #endif
 }
 
-void push_handler(void *r) {
+/* Dummy push handler */
+void push_handler(void *privdata, void *reply) {
+    (void)privdata;
+    freeReplyObject(reply);
     push_counter++;
-    freeReplyObject(r);
+}
+
+/* Dummy function just to test setting a callback with redisOptions */
+void push_handler_async(redisAsyncContext *ac, void *reply, void *reserved) {
+    (void)ac;
+    (void)reply;
+    (void)reserved;
 }
 
 static void test_resp3_push_handler(redisContext *c) {
-    redisPushHandler *old = NULL;
+    redisPushFn *old = NULL;
     redisReply *reply;
     int n;
 
@@ -698,21 +707,35 @@ static void test_resp3_push_handler(redisContext *c) {
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS);
     freeReplyObject(reply);
 
-    reply = redisCommand(c, "GET key:0");
-    assert(reply != NULL);
+    assert((reply = redisCommand(c, "GET key:0")) != NULL);
     freeReplyObject(reply);
 
     n = push_counter;
-    old = redisSetPushHandler(c, push_handler);
+    old = redisSetPushCallback(c, push_handler);
     test("We can set a custom RESP3 PUSH handler: ");
     reply = redisCommand(c, "SET key:0 val:0");
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS &&
               push_counter == n + 1);
     freeReplyObject(reply);
 
+    /* Unset the push callback and generate an invalidate message making
+     * sure it is not handled out of band. */
+    test("With no handler, PUSH replies come in-band: ");
+    redisSetPushCallback(c, NULL);
+    assert((reply = redisCommand(c, "GET key:0")) != NULL);
+    freeReplyObject(reply);
+    assert((reply = redisCommand(c, "SET key:0 invalid")) != NULL);
+    test_cond(reply->type == REDIS_REPLY_PUSH);
+    freeReplyObject(reply);
+
+    test("With no PUSH handler, no replies are lost: ");
+    assert(redisGetReply(c, (void**)&reply) == REDIS_OK);
+    test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    freeReplyObject(reply);
+
     /* Return to the originally set PUSH handler */
     assert(old != NULL);
-    redisSetPushHandler(c, old);
+    redisSetPushCallback(c, old);
 
     /* Switch back to RESP2 and disable tracking */
     send_client_tracking(c, "OFF");
@@ -723,11 +746,6 @@ redisOptions get_redis_tcp_options(struct config config) {
     redisOptions options = {0};
     REDIS_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
     return options;
-}
-
-/* Dummy function just to test setting a callback with redisOptions */
-void push_handler_async(void *reply) {
-    (void)reply;
 }
 
 static void test_resp3_push_options(struct config config) {
@@ -763,9 +781,9 @@ static void test_resp3_push_options(struct config config) {
 
     test("We can use redisOptions to set a custom PUSH handler for redisAsyncContext: ");
     options = get_redis_tcp_options(config);
-    options.push_cb = push_handler_async;
+    options.async_push_cb = push_handler_async;
     assert((ac = redisAsyncConnectWithOptions(&options)) != NULL);
-    test_cond(ac->c.push_cb == push_handler_async);
+    test_cond(ac->push_cb == push_handler_async);
     redisAsyncFree(ac);
 }
 
