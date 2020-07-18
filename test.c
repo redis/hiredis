@@ -53,8 +53,6 @@ struct config {
 redisSSLContext *_ssl_ctx = NULL;
 #endif
 
-static int push_counter;
-
 /* The following lines make up our testing "framework" :) */
 static int tests = 0, fails = 0, skips = 0;
 #define test(_s) { printf("#%02d ", ++tests); printf(_s); }
@@ -677,9 +675,9 @@ static void test_blocking_connection_errors(void) {
 
 /* Dummy push handler */
 void push_handler(void *privdata, void *reply) {
-    (void)privdata;
+    int *counter = privdata;
     freeReplyObject(reply);
-    push_counter++;
+    *counter += 1;
 }
 
 /* Dummy function just to test setting a callback with redisOptions */
@@ -692,11 +690,14 @@ void push_handler_async(redisAsyncContext *ac, void *reply, void *reserved) {
 static void test_resp3_push_handler(redisContext *c) {
     redisPushFn *old = NULL;
     redisReply *reply;
-    int n;
+    void *privdata;
+    int n = 0;
 
     /* Switch to RESP3 and turn on client tracking */
     send_hello(c, 3);
     send_client_tracking(c, "ON");
+    privdata = c->privdata;
+    c->privdata = &n;
 
     reply = redisCommand(c, "GET key:0");
     assert(reply != NULL);
@@ -710,12 +711,10 @@ static void test_resp3_push_handler(redisContext *c) {
     assert((reply = redisCommand(c, "GET key:0")) != NULL);
     freeReplyObject(reply);
 
-    n = push_counter;
     old = redisSetPushCallback(c, push_handler);
     test("We can set a custom RESP3 PUSH handler: ");
     reply = redisCommand(c, "SET key:0 val:0");
-    test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS &&
-              push_counter == n + 1);
+    test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && n == 1);
     freeReplyObject(reply);
 
     /* Unset the push callback and generate an invalidate message making
@@ -738,6 +737,7 @@ static void test_resp3_push_handler(redisContext *c) {
     redisSetPushCallback(c, old);
 
     /* Switch back to RESP2 and disable tracking */
+    c->privdata = privdata;
     send_client_tracking(c, "OFF");
     send_hello(c, 2);
 }
