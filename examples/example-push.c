@@ -30,7 +30,7 @@ static void assertReplyAndFree(redisContext *context, redisReply *reply, int typ
 static void enableClientTracking(redisContext *c) {
     redisReply *reply = redisCommand(c, "HELLO 3");
     if (reply == NULL || c->err) {
-        panicAbort("NULL reply or server error (error: %s)", c->err ? c->errstr : "(none)");
+        panicAbort("NULL reply or server error (error: %s)", c->errstr);
     }
 
     if (reply->type != REDIS_REPLY_MAP) {
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
      * time our PUSH handler is called, hiredis will pass the privdata for context */
     c->privdata = &invalidations;
 
-    /* Set some keys and then read their data back.  Once we do that, Redis will deliver
+    /* Set some keys and then read them back.  Once we do that, Redis will deliver
      * invalidation push messages whenever the key is modified */
     for (j = 0; j < KEY_COUNT; j++) {
         reply = redisCommand(c, "SET key:%d initial:%d", j, j);
@@ -103,8 +103,7 @@ int main(int argc, char **argv) {
         assertReplyAndFree(c, reply, REDIS_REPLY_STRING);
     }
 
-    /* Now each of these SET commands will generate an invalidation message, which
-     * will trigger pushReplyHandler. */
+    /* Trigger invalidation messages by updating keys we just read */
     for (j = 0; j < KEY_COUNT; j++) {
         printf("            main(): SET key:%d update:%d\n", j, j);
         reply = redisCommand(c, "SET key:%d update:%d", j, j);
