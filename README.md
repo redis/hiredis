@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
 
-**This Readme reflects the latest changed in the master branch. See [v0.13.3](https://github.com/redis/hiredis/tree/v0.13.3) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
+**This Readme reflects the latest changed in the master branch. See [v0.14.1](https://github.com/redis/hiredis/tree/v0.14.1) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
 
 # HIREDIS
 
@@ -500,12 +500,75 @@ if (redisInitiateSSLWithContext(c, ssl) != REDIS_OK) {
 }
 ```
 
+## RESP3 PUSH replies
+Redis 6.0 introduced PUSH replies with the reply-type `>`.  These messages are generated spontaneously and can arrive at any time, so must be handled using callbacks.
+
+### Default behavior
+Hiredis installs handlers on `redisContext` and `redisAsyncContext` by default, which will intercept and free any PUSH replies detected.  This means existing code will work as-is after upgrading to Redis 6 and switching to `RESP3`.
+
+### Custom PUSH handler prototypes
+The callback prototypes differ between `redisContext` and `redisAsyncContext`.
+
+#### redisContext
+```c
+void my_push_handler(void *privdata, void *reply) {
+    /* Handle the reply */
+
+    /* Note: We need to free the reply in our custom handler for
+             blocking contexts.  This lets us keep the reply if
+             we want. */
+    freeReplyObject(reply);
+}
+```
+
+#### redisAsyncContext
+```c
+void my_async_push_handler(redisAsyncContext *ac, void *reply) {
+    /* Handle the reply */
+
+	/* Note:  Because async hiredis always frees replies, you should
+	          not call freeReplyObject in an async push callback. */
+}
+```
+
+### Installing a custom handler
+There are two ways to set your own PUSH handlers.
+
+1. Set `push_cb` or `async_push_cb` in the `redisOptions` struct and connect with `redisConnectWithOptions` or `redisAsyncConnectWithOptions`.
+    ```c
+    redisOptions = {0};
+    REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", 6379);
+    options->push_cb = my_push_handler;
+    redisContext *context = redisConnectWithOptions(&options);
+    ```
+2.  Call `redisSetPushCallback` or `redisAsyncSetPushCallback` on a connected context.
+    ```c
+    redisContext *context = redisConnect("127.0.0.1", 6379);
+    redisSetPushCallback(context, my_push_handler);
+    ```
+
+    _Note `redisSetPushCallback` and `redisAsyncSetPushCallback` both return any currently configured handler,  making it easy to override and then return to the old value._
+
+### Specifying no handler
+If you have a unique use-case where you don't want hiredis to automatically intercept and free PUSH replies, you will want to configure no handler at all.  This can be done in two ways.
+1.  Set the `REDIS_OPT_NO_PUSH_AUTOFREE` flag in `redisOptions` and leave the callback function pointer `NULL`.
+    ```c
+    redisOptions = {0};
+    REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", 6379);
+    options->options |= REDIS_OPT_NO_PUSH_AUTOFREE;
+    redisContext *context = redisConnectWithOptions(&options);
+    ```
+3.  Call `redisSetPushCallback` with `NULL` once connected.
+    ```c
+    redisContext *context = redisConnect("127.0.0.1", 6379);
+    redisSetPushCallback(context, NULL);
+    ```
+
+    _Note:  With no handler configured, calls to `redisCommand` may generate more than one reply, so this strategy is only applicable when there's some kind of blocking`redisGetReply()` loop (e.g. `MONITOR` or `SUBSCRIBE` workloads)._
+
 ## Allocator injection
 
-Hiredis uses a pass-thru structure of function pointers defined in
-[alloc.h](https://github.com/redis/hiredis/blob/f5d25850/alloc.h#L41) that conttain
-the currently configured allocation and deallocation functions.  By default they
-just point to libc (`malloc`, `calloc`, `realloc`, etc).
+Hiredis uses a pass-thru structure of function pointers defined in [alloc.h](https://github.com/redis/hiredis/blob/f5d25850/alloc.h#L41) that contain the currently configured allocation and deallocation functions.  By default they just point to libc (`malloc`, `calloc`, `realloc`, etc).
 
 ### Overriding
 
@@ -532,5 +595,6 @@ hiredisResetAllocators();
 
 ## AUTHORS
 
-Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
-Pieter Noordhuis (pcnoordhuis at gmail) and is released under the BSD license.
+Hiredis was written by Salvatore Sanfilippo (antirez at gmail),
+Pieter Noordhuis (pcnoordhuis at gmail), and Michael Grunder
+(michael dot grunder at gmail) and is released under the BSD license.
