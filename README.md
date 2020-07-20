@@ -526,8 +526,8 @@ void my_push_handler(void *privdata, void *reply) {
 void my_async_push_handler(redisAsyncContext *ac, void *reply) {
     /* Handle the reply */
 
-	/* Note:  Because async hiredis always frees replies, you should
-	          not call freeReplyObject in an async push callback. */
+    /* Note:  Because async hiredis always frees replies, you should
+              not call freeReplyObject in an async push callback. */
 }
 ```
 
