@@ -681,10 +681,9 @@ void push_handler(void *privdata, void *reply) {
 }
 
 /* Dummy function just to test setting a callback with redisOptions */
-void push_handler_async(redisAsyncContext *ac, void *reply, void *reserved) {
+void push_handler_async(redisAsyncContext *ac, void *reply) {
     (void)ac;
     (void)reply;
-    (void)reserved;
 }
 
 static void test_resp3_push_handler(redisContext *c) {

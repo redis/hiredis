@@ -292,7 +292,7 @@ static void __redisRunCallback(redisAsyncContext *ac, redisCallback *cb, redisRe
 static void __redisRunPushCallback(redisAsyncContext *ac, redisReply *reply) {
     if (ac->push_cb != NULL) {
         ac->c.flags |= REDIS_IN_CALLBACK;
-        ac->push_cb(ac, reply, NULL);
+        ac->push_cb(ac, reply);
         ac->c.flags &= ~REDIS_IN_CALLBACK;
     }
 }

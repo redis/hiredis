@@ -99,7 +99,7 @@ struct redisContext;
 /* RESP3 push helpers and callback prototypes */
 #define redisIsPushReply(r) (((redisReply*)(r))->type == REDIS_REPLY_PUSH)
 typedef void (redisPushFn)(void *, void *);
-typedef void (redisAsyncPushFn)(struct redisAsyncContext *, void *, void *);
+typedef void (redisAsyncPushFn)(struct redisAsyncContext *, void *);
 
 #ifdef __cplusplus
 extern "C" {
