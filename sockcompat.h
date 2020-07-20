@@ -49,6 +49,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <stddef.h>
+#include <errno.h>
 
 #ifdef _MSC_VER
 typedef long long ssize_t;
