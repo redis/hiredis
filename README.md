@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
 
-**This Readme reflects the latest changed in the master branch. See [v0.14.1](https://github.com/redis/hiredis/tree/v0.14.1) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
+**This Readme reflects the latest changed in the master branch. See [v1.0.0-rc1](https://github.com/redis/hiredis/tree/v1.0.0-rc1) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
 
 # HIREDIS
 
@@ -22,13 +22,32 @@ Redis version >= 1.2.0.
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
 
-## Upgrading to `1.0.0`
+## Upgrading to `1.0.0-rc1`
 
-Version 1.0.0 marks a stable release of hiredis.
+Version 1.0.0-rc1 marks the first release candidate for the first stable release of Hiredis.
 It includes some minor breaking changes, mostly to make the exposed API more uniform and self-explanatory.
 It also bundles the updated `sds` library, to sync up with upstream and Redis.
-For most applications a recompile against the new hiredis should be enough.
 For code changes see the [Changelog](CHANGELOG.md).
+
+_Note:  As described below, a few member names have been changed but most applications should be able to upgrade with minor code changes and recompiling._
+
+## IMPORTANT:  Breaking change from `0.14.1` -> `1.0.0-rc1`
+
+* `redisContext` has two additional members (`free_privdata`, and `privctx`).
+* `redisOptions.timeout` has been renamed to `redisOptions.connect_timeout`, and we've added `redisOptions.command_timeout`.
+* `redisReplyObjectFunctions.createArray` now takes `size_t` instead of `int` for its length parameter.
+
+## IMPORTANT:  Breaking changes when upgrading from 0.13.x -> 0.14.x
+
+Bulk and multi-bulk lengths less than -1 or greater than `LLONG_MAX` are now
+protocol errors. This is consistent with the RESP specification. On 32-bit
+platforms, the upper bound is lowered to `SIZE_MAX`.
+
+Change `redisReply.len` to `size_t`, as it denotes the the size of a string
+
+User code should compare this to `size_t` values as well.  If it was used to
+compare to other values, casting might be necessary or can be removed, if
+casting was applied before.
 
 ## Upgrading from `<0.9.0`
 
@@ -110,6 +129,8 @@ The standard replies that `redisCommand` are of the type `redisReply`. The
 `type` field in the `redisReply` should be used to test what kind of reply
 was received:
 
+### RESP2
+
 * **`REDIS_REPLY_STATUS`**:
     * The command replied with a status reply. The status string can be accessed using `reply->str`.
       The length of this string can be accessed using `reply->len`.
@@ -134,16 +155,51 @@ was received:
       and can be accessed via `reply->element[..index..]`.
       Redis may reply with nested arrays but this is fully supported.
 
+### RESP3
+
+Hiredis also supports every new `RESP3` data type which are as follows.  For more information about the protocol see the `RESP3` [specification.](https://github.com/antirez/RESP3/blob/master/spec.md)
+
+* **`REDIS_REPLY_DOUBLE`**:
+    * The command replied with a double-precision floating point number.
+      The value is stored as a string in the `str` member, and can be converted with `strtod` or similar.
+
+* **`REDIS_REPLY_BOOL`**:
+    * A boolean true/false reply.
+      The value is stored in the `integer` member and will be either `0` or `1`.
+
+* **`REDIS_REPLY_MAP`**:
+    * An array with the added invariant that there will always be an even number of elements.
+      The MAP is functionally equivelant to `REDIS_REPLY_ARRAY` except for the previously mentioned invariant.
+
+* **`REDIS_REPLY_SET`**:
+    * An array response where each entry is unique.
+      Like the MAP type, the data is identical to an array response except there are no duplicate values.
+
+* **`REDIS_REPLY_PUSH`**:
+    * An array that can be generated spontaneously by Redis.
+      This array response will always contain at least two subelements.  The first contains the type of `PUSH` message (e.g. `message`, or `invalidate`), and the second being a sub-array with the `PUSH` payload itself.
+
+* **`REDIS_REPLY_ATTR`**:
+    * An array structurally identical to a `MAP` but intended as meta-data about a reply.
+      _As of Redis 6.0.6 this reply type is not used in Redis_
+
+* **`REDIS_REPLY_BIGNUM`**:
+    * A string representing an arbitrarily large signed or unsigned integer value.
+      The number will be encoded as a string in the `str` member of `redisReply`.
+
+* **`REDIS_REPLY_VERB`**:
+    * A verbatim string, intended to be presented to the user without modification.
+      The string payload is stored in the `str` memeber, and type data is stored in the `vtype` member (e.g. `txt` for raw text or `md` for markdown).
+
 Replies should be freed using the `freeReplyObject()` function.
 Note that this function will take care of freeing sub-reply objects
 contained in arrays and nested arrays, so there is no need for the user to
 free the sub replies (it is actually harmful and will corrupt the memory).
 
-**Important:** the current version of hiredis (0.10.0) frees replies when the
+**Important:** the current version of hiredis (1.0.0-rc1) frees replies when the
 asynchronous API is used. This means you should not call `freeReplyObject` when
 you use this API. The reply is cleaned up by hiredis _after_ the callback
-returns. This behavior will probably change in future releases, so make sure to
-keep an eye on the changelog when upgrading (see issue #39).
+returns.  We may introduce a flag to make this configurable in future versions of the library.
 
 ### Cleaning up
 
@@ -595,6 +651,8 @@ hiredisResetAllocators();
 
 ## AUTHORS
 
-Hiredis was written by Salvatore Sanfilippo (antirez at gmail),
-Pieter Noordhuis (pcnoordhuis at gmail), and Michael Grunder
-(michael dot grunder at gmail) and is released under the BSD license.
+Salvatore Sanfilippo (antirez at gmail),\
+Pieter Noordhuis (pcnoordhuis at gmail)\
+Michael Grunder (michael dot grunder at gmail)
+
+_Hiredis is released under the BSD license._

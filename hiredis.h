@@ -45,10 +45,10 @@ typedef long long ssize_t;
 #include "sds.h" /* for sds */
 #include "alloc.h" /* for allocation wrappers */
 
-#define HIREDIS_MAJOR 0
-#define HIREDIS_MINOR 15
+#define HIREDIS_MAJOR 1
+#define HIREDIS_MINOR 0
 #define HIREDIS_PATCH 0
-#define HIREDIS_SONAME 0.15
+#define HIREDIS_SONAME 1.0.0-rc1
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
