@@ -641,13 +641,14 @@ void redisReaderFree(redisReader *r) {
     if (r->reply != NULL && r->fn && r->fn->freeObject)
         r->fn->freeObject(r->reply);
 
-    /* We know r->task[i] is allocatd if i < r->tasks */
-    for (int i = 0; i < r->tasks; i++) {
-        hi_free(r->task[i]);
-    }
+    if (r->task) {
+        /* We know r->task[i] is allocated if i < r->tasks */
+        for (int i = 0; i < r->tasks; i++) {
+            hi_free(r->task[i]);
+        }
 
-    if (r->task)
         hi_free(r->task);
+    }
 
     sdsfree(r->buf);
     hi_free(r);
