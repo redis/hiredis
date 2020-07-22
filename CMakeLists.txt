@@ -40,6 +40,7 @@ IF(WIN32)
 ENDIF()
 
 ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
+ADD_LIBRARY(hiredis_static STATIC ${hiredis_sources})
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
@@ -48,15 +49,46 @@ IF(WIN32 OR MINGW)
     TARGET_LINK_LIBRARIES(hiredis PRIVATE ws2_32)
 ENDIF()
 
-TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:.> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+TARGET_INCLUDE_DIRECTORIES(hiredis_static PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
-INSTALL(TARGETS hiredis
+set(CPACK_PACKAGE_VENDOR "Redis")
+set(CPACK_PACKAGE_DESCRIPTION "\
+Hiredis is a minimalistic C client library for the Redis database.
+
+It is minimalistic because it just adds minimal support for the protocol, \
+but at the same time it uses a high level printf-alike API in order to make \
+it much higher level than otherwise suggested by its minimal code base and the \
+lack of explicit bindings for every Redis command.
+
+Apart from supporting sending commands and receiving replies, it comes with a \
+reply parser that is decoupled from the I/O layer. It is a stream parser designed \
+for easy reusability, which can for instance be used in higher level language bindings \
+for efficient reply parsing.
+
+Hiredis only supports the binary-safe Redis protocol, so you can use it with any Redis \
+version >= 1.2.0.
+
+The library comes with multiple APIs. There is the synchronous API, the asynchronous API \
+and the reply parsing API.")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/redis/hiredis")
+set(CPACK_PACKAGE_CONTACT "michael dot grunder at gmail dot com")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_RPM_PACKAGE_AUTOREQPROV ON)
+
+include(CPack)
+
+INSTALL(TARGETS hiredis hiredis_static
     EXPORT hiredis-targets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+# For NuGet packages
+INSTALL(FILES hiredis.targets
+    DESTINATION build/native)
 
 INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
@@ -98,6 +130,8 @@ IF(ENABLE_SSL)
         ssl.c)
     ADD_LIBRARY(hiredis_ssl SHARED
             ${hiredis_ssl_sources})
+    ADD_LIBRARY(hiredis_ssl_static STATIC
+            ${hiredis_ssl_sources})
 
     IF (APPLE)
         SET_PROPERTY(TARGET hiredis_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
@@ -109,13 +143,15 @@ IF(ENABLE_SSL)
         VERSION "${HIREDIS_SONAME}")
 
     TARGET_INCLUDE_DIRECTORIES(hiredis_ssl PRIVATE "${OPENSSL_INCLUDE_DIR}")
+    TARGET_INCLUDE_DIRECTORIES(hiredis_ssl_static PRIVATE "${OPENSSL_INCLUDE_DIR}")
+    
     TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE ${OPENSSL_LIBRARIES})
     IF (WIN32 OR MINGW)
         TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE hiredis)
     ENDIF()
     CONFIGURE_FILE(hiredis_ssl.pc.in hiredis_ssl.pc @ONLY)
 
-    INSTALL(TARGETS hiredis_ssl
+    INSTALL(TARGETS hiredis_ssl hiredis_ssl_static
         EXPORT hiredis_ssl-targets
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
