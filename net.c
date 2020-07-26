@@ -217,7 +217,7 @@ int redisSetTcpNoDelay(redisContext *c) {
 
 static int redisContextTimeoutMsec(redisContext *c, long *result)
 {
-    const struct timeval *timeout = c->timeout;
+    const struct timeval *timeout = c->connect_timeout;
     long msec = -1;
 
     /* Only use timeout when not NULL. */
@@ -328,19 +328,35 @@ int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
     return REDIS_OK;
 }
 
-static int _redisContextUpdateTimeout(redisContext *c, const struct timeval *timeout) {
+int redisContextUpdateConnectTimeout(redisContext *c, const struct timeval *timeout) {
     /* Same timeval struct, short circuit */
-    if (c->timeout == timeout)
+    if (c->connect_timeout == timeout)
         return REDIS_OK;
 
     /* Allocate context timeval if we need to */
-    if (c->timeout == NULL) {
-        c->timeout = hi_malloc(sizeof(*c->timeout));
-        if (c->timeout == NULL)
+    if (c->connect_timeout == NULL) {
+        c->connect_timeout = hi_malloc(sizeof(*c->connect_timeout));
+        if (c->connect_timeout == NULL)
             return REDIS_ERR;
     }
 
-    memcpy(c->timeout, timeout, sizeof(*c->timeout));
+    memcpy(c->connect_timeout, timeout, sizeof(*c->connect_timeout));
+    return REDIS_OK;
+}
+
+int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout) {
+    /* Same timeval struct, short circuit */
+    if (c->command_timeout == timeout)
+        return REDIS_OK;
+
+    /* Allocate context timeval if we need to */
+    if (c->command_timeout == NULL) {
+        c->command_timeout = hi_malloc(sizeof(*c->command_timeout));
+        if (c->command_timeout == NULL)
+            return REDIS_ERR;
+    }
+
+    memcpy(c->command_timeout, timeout, sizeof(*c->command_timeout));
     return REDIS_OK;
 }
 
@@ -376,11 +392,11 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     }
 
     if (timeout) {
-        if (_redisContextUpdateTimeout(c, timeout) == REDIS_ERR)
+        if (redisContextUpdateConnectTimeout(c, timeout) == REDIS_ERR)
             goto oom;
     } else {
-        hi_free(c->timeout);
-        c->timeout = NULL;
+        hi_free(c->connect_timeout);
+        c->connect_timeout = NULL;
     }
 
     if (redisContextTimeoutMsec(c, &timeout_msec) != REDIS_OK) {
@@ -549,11 +565,11 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
     }
 
     if (timeout) {
-        if (_redisContextUpdateTimeout(c, timeout) == REDIS_ERR)
+        if (redisContextUpdateConnectTimeout(c, timeout) == REDIS_ERR)
             goto oom;
     } else {
-        hi_free(c->timeout);
-        c->timeout = NULL;
+        hi_free(c->connect_timeout);
+        c->connect_timeout = NULL;
     }
 
     if (redisContextTimeoutMsec(c,&timeout_msec) != REDIS_OK)

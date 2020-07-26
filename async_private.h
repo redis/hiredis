@@ -54,15 +54,14 @@
     } while(0);
 
 static inline void refreshTimeout(redisAsyncContext *ctx) {
-    if (ctx->c.timeout && ctx->ev.scheduleTimer &&
-        (ctx->c.timeout->tv_sec || ctx->c.timeout->tv_usec)) {
-        ctx->ev.scheduleTimer(ctx->ev.data, *ctx->c.timeout);
-    // } else {
-    //     printf("Not scheduling timer.. (tmo=%p)\n", ctx->c.timeout);
-    //     if (ctx->c.timeout){
-    //         printf("tv_sec: %u. tv_usec: %u\n", ctx->c.timeout->tv_sec,
-    //                ctx->c.timeout->tv_usec);
-    //     }
+    if (!(ctx->c.flags & REDIS_CONNECTED)) {
+        if (ctx->c.connect_timeout && ctx->ev.scheduleTimer &&
+            (ctx->c.connect_timeout->tv_sec || ctx->c.connect_timeout->tv_usec)) {
+            ctx->ev.scheduleTimer(ctx->ev.data, *ctx->c.connect_timeout);
+        }
+    } else if (ctx->c.command_timeout && ctx->ev.scheduleTimer &&
+               (ctx->c.command_timeout->tv_sec || ctx->c.command_timeout->tv_usec)) {
+            ctx->ev.scheduleTimer(ctx->ev.data, *ctx->c.command_timeout);
     }
 }
 

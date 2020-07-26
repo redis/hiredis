@@ -47,7 +47,7 @@ int main (int argc, char **argv) {
     REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", 6379);
     struct timeval tv = {0};
     tv.tv_sec = 1;
-    options.timeout = &tv;
+    options.connect_timeout = &tv;
 
 
     redisAsyncContext *c = redisAsyncConnectWithOptions(&options);

@@ -44,6 +44,9 @@
 #include "async.h"
 #include "win32.h"
 
+extern int redisContextUpdateConnectTimeout(redisContext *c, const struct timeval *timeout);
+extern int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
+
 static redisContextFuncs redisContextDefaultFuncs = {
     .free_privdata = NULL,
     .async_read = redisAsyncRead,
@@ -723,7 +726,8 @@ void redisFree(redisContext *c) {
     hi_free(c->tcp.host);
     hi_free(c->tcp.source_addr);
     hi_free(c->unix_sock.path);
-    hi_free(c->timeout);
+    hi_free(c->connect_timeout);
+    hi_free(c->command_timeout);
     hi_free(c->saddr);
     if (c->funcs->free_privdata) {
         c->funcs->free_privdata(c->privdata);
@@ -761,18 +765,24 @@ int redisReconnect(redisContext *c) {
         return REDIS_ERR;
     }
 
+    int ret = REDIS_ERR;
     if (c->connection_type == REDIS_CONN_TCP) {
-        return redisContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
-                c->timeout, c->tcp.source_addr);
+        ret = redisContextConnectBindTcp(c, c->tcp.host, c->tcp.port,
+               c->connect_timeout, c->tcp.source_addr);
     } else if (c->connection_type == REDIS_CONN_UNIX) {
-        return redisContextConnectUnix(c, c->unix_sock.path, c->timeout);
+        ret = redisContextConnectUnix(c, c->unix_sock.path, c->connect_timeout);
     } else {
         /* Something bad happened here and shouldn't have. There isn't
            enough information in the context to reconnect. */
         __redisSetError(c,REDIS_ERR_OTHER,"Not enough information to reconnect");
+        ret = REDIS_ERR;
     }
 
-    return REDIS_ERR;
+    if (c->command_timeout != NULL && (c->flags & REDIS_BLOCK) && c->fd != REDIS_INVALID_FD) {
+        redisContextSetTimeout(c, *c->command_timeout);
+    }
+
+    return ret;
 }
 
 redisContext *redisConnectWithOptions(const redisOptions *options) {
@@ -790,19 +800,29 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
         c->flags |= REDIS_NO_AUTO_FREE;
     }
 
+    if (redisContextUpdateConnectTimeout(c, options->connect_timeout) != REDIS_OK ||
+        redisContextUpdateCommandTimeout(c, options->command_timeout) != REDIS_OK) {
+        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+        return c;
+    }
+
     if (options->type == REDIS_CONN_TCP) {
         redisContextConnectBindTcp(c, options->endpoint.tcp.ip,
-                                   options->endpoint.tcp.port, options->timeout,
+                                   options->endpoint.tcp.port, options->connect_timeout,
                                    options->endpoint.tcp.source_addr);
     } else if (options->type == REDIS_CONN_UNIX) {
         redisContextConnectUnix(c, options->endpoint.unix_socket,
-                                options->timeout);
+                                options->connect_timeout);
     } else if (options->type == REDIS_CONN_USERFD) {
         c->fd = options->endpoint.fd;
         c->flags |= REDIS_CONNECTED;
     } else {
         // Unknown type - FIXME - FREE
         return NULL;
+    }
+
+    if (options->command_timeout != NULL && (c->flags & REDIS_BLOCK) && c->fd != REDIS_INVALID_FD) {
+        redisContextSetTimeout(c, *options->command_timeout);
     }
 
     return c;
@@ -820,7 +840,7 @@ redisContext *redisConnect(const char *ip, int port) {
 redisContext *redisConnectWithTimeout(const char *ip, int port, const struct timeval tv) {
     redisOptions options = {0};
     REDIS_OPTIONS_SET_TCP(&options, ip, port);
-    options.timeout = &tv;
+    options.connect_timeout = &tv;
     return redisConnectWithOptions(&options);
 }
 
@@ -858,7 +878,7 @@ redisContext *redisConnectUnix(const char *path) {
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv) {
     redisOptions options = {0};
     REDIS_OPTIONS_SET_UNIX(&options, path);
-    options.timeout = &tv;
+    options.connect_timeout = &tv;
     return redisConnectWithOptions(&options);
 }
 
