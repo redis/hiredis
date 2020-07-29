@@ -48,7 +48,7 @@ extern int redisContextUpdateConnectTimeout(redisContext *c, const struct timeva
 extern int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
 
 static redisContextFuncs redisContextDefaultFuncs = {
-    .free_privdata = NULL,
+    .free_privctx = NULL,
     .async_read = redisAsyncRead,
     .async_write = redisAsyncWrite,
     .read = redisNetRead,
@@ -688,7 +688,7 @@ static void redisPushAutoFree(void *privdata, void *reply) {
     freeReplyObject(reply);
 }
 
-static redisContext *redisContextInit(const redisOptions *options) {
+static redisContext *redisContextInit(void) {
     redisContext *c;
 
     c = hi_calloc(1, sizeof(*c));
@@ -696,13 +696,6 @@ static redisContext *redisContextInit(const redisOptions *options) {
         return NULL;
 
     c->funcs = &redisContextDefaultFuncs;
-
-    /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
-     * as a default unless specifically flagged that we don't want one. */
-    if (options->push_cb != NULL)
-        redisSetPushCallback(c, options->push_cb);
-    else if (!(options->options & REDIS_OPT_NO_PUSH_AUTOFREE))
-        redisSetPushCallback(c, redisPushAutoFree);
 
     c->obuf = sdsempty();
     c->reader = redisReaderCreate();
@@ -712,7 +705,7 @@ static redisContext *redisContextInit(const redisOptions *options) {
         redisFree(c);
         return NULL;
     }
-    (void)options; /* options are used in other functions */
+
     return c;
 }
 
@@ -729,9 +722,13 @@ void redisFree(redisContext *c) {
     hi_free(c->connect_timeout);
     hi_free(c->command_timeout);
     hi_free(c->saddr);
-    if (c->funcs->free_privdata) {
-        c->funcs->free_privdata(c->privdata);
-    }
+
+    if (c->privdata && c->free_privdata)
+        c->free_privdata(c->privdata);
+
+    if (c->funcs->free_privctx)
+        c->funcs->free_privctx(c->privctx);
+
     memset(c, 0xff, sizeof(*c));
     hi_free(c);
 }
@@ -747,9 +744,9 @@ int redisReconnect(redisContext *c) {
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
-    if (c->privdata && c->funcs->free_privdata) {
-        c->funcs->free_privdata(c->privdata);
-        c->privdata = NULL;
+    if (c->privctx && c->funcs->free_privctx) {
+        c->funcs->free_privctx(c->privctx);
+        c->privctx = NULL;
     }
 
     redisNetClose(c);
@@ -786,7 +783,7 @@ int redisReconnect(redisContext *c) {
 }
 
 redisContext *redisConnectWithOptions(const redisOptions *options) {
-    redisContext *c = redisContextInit(options);
+    redisContext *c = redisContextInit();
     if (c == NULL) {
         return NULL;
     }
@@ -799,6 +796,16 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
     if (options->options & REDIS_OPT_NOAUTOFREE) {
         c->flags |= REDIS_NO_AUTO_FREE;
     }
+
+    /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
+     * as a default unless specifically flagged that we don't want one. */
+    if (options->push_cb != NULL)
+        redisSetPushCallback(c, options->push_cb);
+    else if (!(options->options & REDIS_OPT_NO_PUSH_AUTOFREE))
+        redisSetPushCallback(c, redisPushAutoFree);
+
+    c->privdata = options->privdata;
+    c->free_privdata = options->free_privdata;
 
     if (redisContextUpdateConnectTimeout(c, options->connect_timeout) != REDIS_OK ||
         redisContextUpdateCommandTimeout(c, options->command_timeout) != REDIS_OK) {

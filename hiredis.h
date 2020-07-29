@@ -196,6 +196,10 @@ typedef struct {
         redisFD fd;
     } endpoint;
 
+    /* Optional user defined data/destructor */
+    void *privdata;
+    void (*free_privdata)(void *);
+
     /* A user defined PUSH message callback */
     redisPushFn *push_cb;
     redisAsyncPushFn *async_push_cb;
@@ -213,8 +217,12 @@ typedef struct {
     (opts)->type = REDIS_CONN_UNIX;        \
     (opts)->endpoint.unix_socket = path;
 
+#define REDIS_OPTIONS_SET_PRIVDATA(opts, data, dtor) \
+    (opts)->privdata = data;                         \
+    (opts)->free_privdata = dtor;                    \
+
 typedef struct redisContextFuncs {
-    void (*free_privdata)(void *);
+    void (*free_privctx)(void *);
     void (*async_read)(struct redisAsyncContext *);
     void (*async_write)(struct redisAsyncContext *);
     ssize_t (*read)(struct redisContext *, char *, size_t);
@@ -250,8 +258,14 @@ typedef struct redisContext {
     struct sockadr *saddr;
     size_t addrlen;
 
-    /* Additional private data for hiredis addons such as SSL */
+    /* Optional data and corresponding destructor users can use to provide
+     * context to a given redisContext.  Not used by hiredis. */
     void *privdata;
+    void (*free_privdata)(void *);
+
+    /* Internal context pointer presently used by hiredis to manage
+     * SSL connections. */
+    void *privctx;
 
     /* An optional RESP3 PUSH handler */
     redisPushFn *push_cb;

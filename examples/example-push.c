@@ -97,6 +97,13 @@ void pushReplyHandler(void *privdata, void *r) {
     freeReplyObject(reply);
 }
 
+/* We aren't actually freeing anything here, but it is included to show that we can
+ * have hiredis call our data destructor when freeing the context */
+void privdata_dtor(void *privdata) {
+    unsigned int *icount = privdata;
+    printf("privdata_dtor():  In context privdata dtor (invalidations: %u)\n", *icount);
+}
+
 int main(int argc, char **argv) {
     unsigned int j, invalidations = 0;
     redisContext *c;
@@ -108,6 +115,16 @@ int main(int argc, char **argv) {
     redisOptions o = {0};
     REDIS_OPTIONS_SET_TCP(&o, hostname, port);
 
+    /* Set our context privdata to the address of our invalidation counter.  Each
+     * time our PUSH handler is called, hiredis will pass the privdata for context.
+     *
+     * This could also be done after we create the context like so:
+     *
+     *    c->privdata = &invalidations;
+     *    c->free_privdata = privdata_dtor;
+     */
+    REDIS_OPTIONS_SET_PRIVDATA(&o, &invalidations, privdata_dtor);
+
     /* Set our custom PUSH message handler */
     o.push_cb = pushReplyHandler;
 
@@ -117,10 +134,6 @@ int main(int argc, char **argv) {
 
     /* Enable RESP3 and turn on client tracking */
     enableClientTracking(c);
-
-    /* Set our context privdata to the address of our invalidation counter.  Each
-     * time our PUSH handler is called, hiredis will pass the privdata for context */
-    c->privdata = &invalidations;
 
     /* Set some keys and then read them back.  Once we do that, Redis will deliver
      * invalidation push messages whenever the key is modified */

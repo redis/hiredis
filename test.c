@@ -49,6 +49,10 @@ struct config {
     } ssl;
 };
 
+struct privdata {
+    int dtor_counter;
+};
+
 #ifdef HIREDIS_TEST_SSL
 redisSSLContext *_ssl_ctx = NULL;
 #endif
@@ -786,6 +790,27 @@ static void test_resp3_push_options(struct config config) {
     redisAsyncFree(ac);
 }
 
+void free_privdata(void *privdata) {
+    struct privdata *data = privdata;
+    data->dtor_counter++;
+}
+
+static void test_privdata_hooks(struct config config) {
+    struct privdata data = {0};
+    redisOptions options;
+    redisContext *c;
+
+    test("We can use redisOptions to set privdata: ");
+    options = get_redis_tcp_options(config);
+    REDIS_OPTIONS_SET_PRIVDATA(&options, &data, free_privdata);
+    assert((c = redisConnectWithOptions(&options)) != NULL);
+    test_cond(c->privdata == &data);
+
+    test("Our privdata destructor fires when we free the context: ");
+    redisFree(c);
+    test_cond(data.dtor_counter == 1);
+}
+
 static void test_blocking_connection(struct config config) {
     redisContext *c;
     redisReply *reply;
@@ -870,6 +895,8 @@ static void test_blocking_connection(struct config config) {
     get_redis_version(c, &major, NULL);
     if (major >= 6) test_resp3_push_handler(c);
     test_resp3_push_options(config);
+
+    test_privdata_hooks(config);
 
     disconnect(c, 0);
 }
