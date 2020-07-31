@@ -47,6 +47,11 @@
 
 #include "async_private.h"
 
+#ifdef NDEBUG
+#undef assert
+#define assert(e) (void)(e)
+#endif
+
 /* Forward declarations of hiredis.c functions */
 int __redisAppendCommand(redisContext *c, const char *cmd, size_t len);
 void __redisSetError(redisContext *c, int type, const char *str);
