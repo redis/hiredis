@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
 
-**This Readme reflects the latest changed in the master branch. See [v1.0.0-rc1](https://github.com/redis/hiredis/tree/v1.0.0-rc1) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
+**This Readme reflects the latest changed in the master branch. See [v1.0.0](https://github.com/redis/hiredis/tree/v1.0.0) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
 
 # HIREDIS
 
@@ -22,16 +22,16 @@ Redis version >= 1.2.0.
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
 
-## Upgrading to `1.0.0-rc1`
+## Upgrading to `1.0.0`
 
-Version 1.0.0-rc1 marks the first release candidate for the first stable release of Hiredis.
+Version 1.0.0 marks the first stable release of Hiredis.
 It includes some minor breaking changes, mostly to make the exposed API more uniform and self-explanatory.
 It also bundles the updated `sds` library, to sync up with upstream and Redis.
 For code changes see the [Changelog](CHANGELOG.md).
 
 _Note:  As described below, a few member names have been changed but most applications should be able to upgrade with minor code changes and recompiling._
 
-## IMPORTANT:  Breaking change from `0.14.1` -> `1.0.0-rc1`
+## IMPORTANT:  Breaking changes from `0.14.1` -> `1.0.0`
 
 * `redisContext` has two additional members (`free_privdata`, and `privctx`).
 * `redisOptions.timeout` has been renamed to `redisOptions.connect_timeout`, and we've added `redisOptions.command_timeout`.
@@ -196,7 +196,7 @@ Note that this function will take care of freeing sub-reply objects
 contained in arrays and nested arrays, so there is no need for the user to
 free the sub replies (it is actually harmful and will corrupt the memory).
 
-**Important:** the current version of hiredis (1.0.0-rc1) frees replies when the
+**Important:** the current version of hiredis (1.0.0) frees replies when the
 asynchronous API is used. This means you should not call `freeReplyObject` when
 you use this API. The reply is cleaned up by hiredis _after_ the callback
 returns.  We may introduce a flag to make this configurable in future versions of the library.
