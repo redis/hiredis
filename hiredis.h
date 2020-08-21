@@ -255,7 +255,7 @@ typedef struct redisContext {
     } unix_sock;
 
     /* For non-blocking connect */
-    struct sockadr *saddr;
+    struct sockaddr *saddr;
     size_t addrlen;
 
     /* Optional data and corresponding destructor users can use to provide
