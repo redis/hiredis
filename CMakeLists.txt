@@ -4,6 +4,7 @@ PROJECT(hiredis)
 
 OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
+OPTION(ENABLE_SSL_TESTS, "Should we test SSL connections" OFF)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
@@ -20,6 +21,9 @@ SET(VERSION "${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
 MESSAGE("Detected version: ${VERSION}")
 
 PROJECT(hiredis VERSION "${VERSION}")
+
+# Hiredis requires C99
+SET(CMAKE_C_STANDARD 99)
 
 SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 
@@ -92,10 +96,10 @@ INSTALL(FILES hiredis.targets
 
 INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
-    
+
 INSTALL(DIRECTORY adapters
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
-    
+
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis.pc
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
@@ -126,7 +130,7 @@ IF(ENABLE_SSL)
         ENDIF()
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
-    SET(hiredis_ssl_sources 
+    SET(hiredis_ssl_sources
         ssl.c)
     ADD_LIBRARY(hiredis_ssl SHARED
             ${hiredis_ssl_sources})
@@ -159,7 +163,7 @@ IF(ENABLE_SSL)
 
     INSTALL(FILES hiredis_ssl.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
-    
+
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl.pc
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
@@ -184,7 +188,12 @@ ENDIF()
 IF(NOT DISABLE_TESTS)
     ENABLE_TESTING()
     ADD_EXECUTABLE(hiredis-test test.c)
-    TARGET_LINK_LIBRARIES(hiredis-test hiredis)
+    IF(ENABLE_SSL_TESTS)
+        ADD_DEFINITIONS(-DHIREDIS_TEST_SSL=1)
+        TARGET_LINK_LIBRARIES(hiredis-test hiredis hiredis_ssl)
+    ELSE()
+        TARGET_LINK_LIBRARIES(hiredis-test hiredis)
+    ENDIF()
     ADD_TEST(NAME hiredis-test
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test.sh)
 ENDIF()

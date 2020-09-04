@@ -45,10 +45,10 @@ typedef long long ssize_t;
 #include "sds.h" /* for sds */
 #include "alloc.h" /* for allocation wrappers */
 
-#define HIREDIS_MAJOR 0
-#define HIREDIS_MINOR 15
-#define HIREDIS_PATCH 0
-#define HIREDIS_SONAME 0.15
+#define HIREDIS_MAJOR 1
+#define HIREDIS_MINOR 0
+#define HIREDIS_PATCH 1
+#define HIREDIS_SONAME 1.0.1-dev
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
@@ -176,8 +176,11 @@ typedef struct {
     int type;
     /* bit field of REDIS_OPT_xxx */
     int options;
-    /* timeout value. if NULL, no timeout is used */
-    const struct timeval *timeout;
+    /* timeout value for connect operation. If NULL, no timeout is used */
+    const struct timeval *connect_timeout;
+    /* timeout value for commands. If NULL, no timeout is used.  This can be
+     * updated at runtime with redisSetTimeout/redisAsyncSetTimeout. */
+    const struct timeval *command_timeout;
     union {
         /** use this field for tcp/ip connections */
         struct {
@@ -192,6 +195,10 @@ typedef struct {
          * file descriptor */
         redisFD fd;
     } endpoint;
+
+    /* Optional user defined data/destructor */
+    void *privdata;
+    void (*free_privdata)(void *);
 
     /* A user defined PUSH message callback */
     redisPushFn *push_cb;
@@ -210,8 +217,12 @@ typedef struct {
     (opts)->type = REDIS_CONN_UNIX;        \
     (opts)->endpoint.unix_socket = path;
 
+#define REDIS_OPTIONS_SET_PRIVDATA(opts, data, dtor) \
+    (opts)->privdata = data;                         \
+    (opts)->free_privdata = dtor;                    \
+
 typedef struct redisContextFuncs {
-    void (*free_privdata)(void *);
+    void (*free_privctx)(void *);
     void (*async_read)(struct redisAsyncContext *);
     void (*async_write)(struct redisAsyncContext *);
     ssize_t (*read)(struct redisContext *, char *, size_t);
@@ -230,7 +241,8 @@ typedef struct redisContext {
     redisReader *reader; /* Protocol reader */
 
     enum redisConnectionType connection_type;
-    struct timeval *timeout;
+    struct timeval *connect_timeout;
+    struct timeval *command_timeout;
 
     struct {
         char *host;
@@ -243,11 +255,17 @@ typedef struct redisContext {
     } unix_sock;
 
     /* For non-blocking connect */
-    struct sockadr *saddr;
+    struct sockaddr *saddr;
     size_t addrlen;
 
-    /* Additional private data for hiredis addons such as SSL */
+    /* Optional data and corresponding destructor users can use to provide
+     * context to a given redisContext.  Not used by hiredis. */
     void *privdata;
+    void (*free_privdata)(void *);
+
+    /* Internal context pointer presently used by hiredis to manage
+     * SSL connections. */
+    void *privctx;
 
     /* An optional RESP3 PUSH handler */
     redisPushFn *push_cb;

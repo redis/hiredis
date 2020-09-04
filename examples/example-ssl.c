@@ -4,7 +4,10 @@
 
 #include <hiredis.h>
 #include <hiredis_ssl.h>
-#include <win32.h>
+
+#ifdef _MSC_VER
+#include <winsock2.h> /* For struct timeval */
+#endif
 
 int main(int argc, char **argv) {
     unsigned int j;
@@ -33,7 +36,7 @@ int main(int argc, char **argv) {
     struct timeval tv = { 1, 500000 }; // 1.5 seconds
     redisOptions options = {0};
     REDIS_OPTIONS_SET_TCP(&options, hostname, port);
-    options.timeout = &tv;
+    options.connect_timeout = &tv;
     c = redisConnectWithOptions(&options);
 
     if (c == NULL || c->err) {

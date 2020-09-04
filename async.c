@@ -47,6 +47,11 @@
 
 #include "async_private.h"
 
+#ifdef NDEBUG
+#undef assert
+#define assert(e) (void)(e)
+#endif
+
 /* Forward declarations of hiredis.c functions */
 int __redisAppendCommand(redisContext *c, const char *cmd, size_t len);
 void __redisSetError(redisContext *c, int type, const char *str);
@@ -868,19 +873,19 @@ redisAsyncPushFn *redisAsyncSetPushCallback(redisAsyncContext *ac, redisAsyncPus
 }
 
 int redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {
-    if (!ac->c.timeout) {
-        ac->c.timeout = hi_calloc(1, sizeof(tv));
-        if (ac->c.timeout == NULL) {
+    if (!ac->c.command_timeout) {
+        ac->c.command_timeout = hi_calloc(1, sizeof(tv));
+        if (ac->c.command_timeout == NULL) {
             __redisSetError(&ac->c, REDIS_ERR_OOM, "Out of memory");
             __redisAsyncCopyError(ac);
             return REDIS_ERR;
         }
     }
 
-    if (tv.tv_sec != ac->c.timeout->tv_sec ||
-        tv.tv_usec != ac->c.timeout->tv_usec)
+    if (tv.tv_sec != ac->c.command_timeout->tv_sec ||
+        tv.tv_usec != ac->c.command_timeout->tv_usec)
     {
-        *ac->c.timeout = tv;
+        *ac->c.command_timeout = tv;
     }
 
     return REDIS_OK;

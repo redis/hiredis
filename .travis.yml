@@ -7,12 +7,21 @@ os:
   - linux
   - osx
 
+dist: bionic
+
 branches:
   only:
     - staging
     - trying
     - master
     - /^release\/.*$/
+
+install:
+    - if [ "$TRAVIS_COMPILER" != "mingw" ]; then
+        wget https://github.com/redis/redis/archive/6.0.6.tar.gz;
+        tar -xzvf 6.0.6.tar.gz;
+        pushd redis-6.0.6 && BUILD_TLS=yes make && export PATH=$PWD/src:$PATH && popd;
+      fi;
 
 before_script:
     - if [ "$TRAVIS_OS_NAME" == "osx" ]; then
@@ -24,8 +33,6 @@ before_script:
 
 addons:
   apt:
-    sources:
-    - sourceline: 'ppa:chris-lea/redis-server'
     packages:
     - libc6-dbg
     - libc6-dev
@@ -37,14 +44,13 @@ addons:
     - libssl-dev
     - libssl-dev:i386
     - valgrind
-    - redis
 
 env:
   - BITS="32"
   - BITS="64"
 
 script:
-  - EXTRA_CMAKE_OPTS="-DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON";
+  - EXTRA_CMAKE_OPTS="-DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON";
     if [ "$TRAVIS_OS_NAME" == "osx" ]; then
       if [ "$BITS" == "32" ]; then
         CFLAGS="-m32 -Werror";
@@ -79,7 +85,11 @@ script:
   - mkdir build/ && cd build/
   - cmake .. ${EXTRA_CMAKE_OPTS}
   - make VERBOSE=1
-  - SKIPS_AS_FAILS=1 ctest -V
+  - if [ "$BITS" == "64" ]; then
+      TEST_SSL=1 SKIPS_AS_FAILS=1 ctest -V;
+    else
+      SKIPS_AS_FAILS=1 ctest -V;
+    fi;
 
 jobs:
   include:
