@@ -24,7 +24,8 @@ PROJECT(hiredis VERSION "${VERSION}")
 
 # Hiredis requires C99
 SET(CMAKE_C_STANDARD 99)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
+SET(CMAKE_DEBUG_POSTFIX d) # so debug and optimized can be packaged together
 
 SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 
