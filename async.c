@@ -703,6 +703,7 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
 
     if (!c->err) {
         __redisSetError(c, REDIS_ERR_TIMEOUT, "Timeout");
+        __redisAsyncCopyError(ac);
     }
 
     if (!(c->flags & REDIS_CONNECTED) && ac->onConnect) {
