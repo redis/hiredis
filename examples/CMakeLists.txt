@@ -42,6 +42,15 @@ IF (ENABLE_SSL)
     TARGET_LINK_LIBRARIES(example-ssl hiredis hiredis_ssl)
 ENDIF()
 
+find_package(Qt5Core)
+IF (Qt5Core_FOUND)
+    SET(CMAKE_AUTOMOC ON)
+    ADD_EXECUTABLE(example-qt example-qt.cpp ../adapters/qt.h)
+    TARGET_COMPILE_DEFINITIONS(example-qt PRIVATE ${Qt5Core_DEFINITIONS})
+    TARGET_INCLUDE_DIRECTORIES(example-qt PRIVATE ${Qt5Core_INCLUDES})
+    TARGET_LINK_LIBRARIES(example-qt hiredis ${Qt5Core_LIBRARIES})
+ENDIF()
+
 ADD_EXECUTABLE(example example.c)
 TARGET_LINK_LIBRARIES(example hiredis)
 
