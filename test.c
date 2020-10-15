@@ -658,6 +658,26 @@ static void test_reply_reader(void) {
               strcasecmp(reader->errstr,"Bad bool value") == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    test("Can parse RESP3 map: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "%2\r\n+first\r\n:123\r\n$6\r\nsecond\r\n#t\r\n",34);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_MAP &&
+        ((redisReply*)reply)->elements == 4 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_STATUS &&
+        ((redisReply*)reply)->element[0]->len == 5 &&
+        !strcmp(((redisReply*)reply)->element[0]->str,"first") &&
+        ((redisReply*)reply)->element[1]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[1]->integer == 123 &&
+        ((redisReply*)reply)->element[2]->type == REDIS_REPLY_STRING &&
+        ((redisReply*)reply)->element[2]->len == 6 &&
+        !strcmp(((redisReply*)reply)->element[2]->str,"second") &&
+        ((redisReply*)reply)->element[3]->type == REDIS_REPLY_BOOL &&
+        ((redisReply*)reply)->element[3]->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
