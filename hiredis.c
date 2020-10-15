@@ -235,6 +235,7 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
      * decimal string conversion artifacts. */
     memcpy(r->str, str, len);
     r->str[len] = '\0';
+    r->len = len;
 
     if (task->parent) {
         parent = task->parent->obj;
