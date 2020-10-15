@@ -611,6 +611,24 @@ static void test_reply_reader(void) {
               strcasecmp(reader->errstr,"Bad double value") == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    test("Can parse RESP3 nil: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "_\r\n",3);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_NIL);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error on invalid RESP3 nil: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "_nil\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad nil value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
