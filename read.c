@@ -320,6 +320,12 @@ static int processLineItem(redisReader *r) {
                 obj = (void*)REDIS_REPLY_DOUBLE;
             }
         } else if (cur->type == REDIS_REPLY_NIL) {
+            if (len != 0) {
+                __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                        "Bad nil value");
+                return REDIS_ERR;
+            }
+
             if (r->fn && r->fn->createNil)
                 obj = r->fn->createNil(cur);
             else
