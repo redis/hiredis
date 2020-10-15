@@ -596,6 +596,26 @@ static void test_reply_reader(void) {
               strcmp(((redisReply*)reply)->str, "3.14159265358979323846") == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    test("Correctly parses RESP3 double INFINITY: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",inf\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+              isinf(((redisReply*)reply)->dval) &&
+              ((redisReply*)reply)->dval > 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error when RESP3 double is NaN: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",nan\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad double value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
