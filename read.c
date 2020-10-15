@@ -331,7 +331,15 @@ static int processLineItem(redisReader *r) {
             else
                 obj = (void*)REDIS_REPLY_NIL;
         } else if (cur->type == REDIS_REPLY_BOOL) {
-            int bval = p[0] == 't' || p[0] == 'T';
+            int bval;
+
+            if (len != 1 || !strchr("tTfF", p[0])) {
+                __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                        "Bad bool value");
+                return REDIS_ERR;
+            }
+
+            bval = p[0] == 't' || p[0] == 'T';
             if (r->fn && r->fn->createBool)
                 obj = r->fn->createBool(cur,bval);
             else
