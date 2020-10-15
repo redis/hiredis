@@ -629,6 +629,35 @@ static void test_reply_reader(void) {
               strcasecmp(reader->errstr,"Bad nil value") == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    test("Can parse RESP3 bool (true): ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#t\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
+              ((redisReply*)reply)->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 bool (false): ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#f\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
+              !((redisReply*)reply)->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error on invalid RESP3 bool: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#foobar\r\n",9);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad bool value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
