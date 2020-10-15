@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 
 #include "hiredis.h"
 #include "async.h"
@@ -576,6 +577,18 @@ static void test_reply_reader(void) {
         !memcmp(((redisReply*)reply)->element[0]->str,"LOLWUT",6) &&
         ((redisReply*)reply)->element[1]->type == REDIS_REPLY_INTEGER &&
         ((redisReply*)reply)->element[1]->integer == 42);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 doubles: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",3.14159265358979323846\r\n",25);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+              fabs(((redisReply*)reply)->dval - 3.14159265358979323846) < 0.00000001 &&
+              ((redisReply*)reply)->len == 22 &&
+              strcmp(((redisReply*)reply)->str, "3.14159265358979323846") == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
 }
