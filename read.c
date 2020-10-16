@@ -267,47 +267,50 @@ static int processLineItem(redisReader *r) {
 
     if ((p = readLine(r,&len)) != NULL) {
         if (cur->type == REDIS_REPLY_INTEGER) {
+            long long v;
+
+            if (string2ll(p, len, &v) == REDIS_ERR) {
+                __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                        "Bad integer value");
+                return REDIS_ERR;
+            }
+
             if (r->fn && r->fn->createInteger) {
-                long long v;
-                if (string2ll(p, len, &v) == REDIS_ERR) {
-                    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
-                            "Bad integer value");
-                    return REDIS_ERR;
-                }
                 obj = r->fn->createInteger(cur,v);
             } else {
                 obj = (void*)REDIS_REPLY_INTEGER;
             }
         } else if (cur->type == REDIS_REPLY_DOUBLE) {
-            if (r->fn && r->fn->createDouble) {
-                char buf[326], *eptr;
-                double d;
+            char buf[326], *eptr;
+            double d;
 
-                if ((size_t)len >= sizeof(buf)) {
+            if ((size_t)len >= sizeof(buf)) {
+                __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                        "Double value is too large");
+                return REDIS_ERR;
+            }
+
+            memcpy(buf,p,len);
+            buf[len] = '\0';
+
+            if (len == 3 && strcasecmp(buf,"inf") == 0) {
+                d = INFINITY; /* Positive infinite. */
+            } else if (len == 4 && strcasecmp(buf,"-inf") == 0) {
+                d = -INFINITY; /* Negative infinite. */
+            } else {
+                d = strtod((char*)buf,&eptr);
+                /* RESP3 only allows "inf", "-inf", and finite values, while
+                 * strtod() allows other variations on infinity, NaN,
+                 * etc. We explicity handle our two allowed infinite cases
+                 * above, so strtod() should only result in finite values. */
+                if (buf[0] == '\0' || eptr != &buf[len] || !isfinite(d)) {
                     __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
-                            "Double value is too large");
+                            "Bad double value");
                     return REDIS_ERR;
                 }
+            }
 
-                memcpy(buf,p,len);
-                buf[len] = '\0';
-
-                if (len == 3 && strcasecmp(buf,"inf") == 0) {
-                    d = INFINITY; /* Positive infinite. */
-                } else if (len == 4 && strcasecmp(buf,"-inf") == 0) {
-                    d = -INFINITY; /* Negative infinite. */
-                } else {
-                    d = strtod((char*)buf,&eptr);
-                    /* RESP3 only allows "inf", "-inf", and finite values, while
-                     * strtod() allows other variations on infinity, NaN,
-                     * etc. We explicity handle our two allowed infinite cases
-                     * above, so strtod() should only result in finite values. */
-                    if (buf[0] == '\0' || eptr != &buf[len] || !isfinite(d)) {
-                        __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
-                                "Bad double value");
-                        return REDIS_ERR;
-                    }
-                }
+            if (r->fn && r->fn->createDouble) {
                 obj = r->fn->createDouble(cur,d,buf,len);
             } else {
                 obj = (void*)REDIS_REPLY_DOUBLE;
