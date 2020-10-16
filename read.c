@@ -339,6 +339,13 @@ static int processLineItem(redisReader *r) {
                 obj = (void*)REDIS_REPLY_BOOL;
         } else {
             /* Type will be error or status. */
+            for (int i = 0; i < len; i++) {
+                if (p[i] == '\r' || p[i] == '\n') {
+                    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                            "Bad simple string value");
+                    return REDIS_ERR;
+                }
+            }
             if (r->fn && r->fn->createString)
                 obj = r->fn->createString(cur,p,len);
             else
