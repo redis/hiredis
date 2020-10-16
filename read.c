@@ -487,7 +487,6 @@ static int processAggregateItem(redisReader *r) {
     long long elements;
     int root = 0, len;
 
-    /* Set error for nested multi bulks with depth > 7 */
     if (r->ridx == r->tasks - 1) {
         if (redisReaderGrow(r) == REDIS_ERR)
             return REDIS_ERR;
