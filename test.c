@@ -714,6 +714,17 @@ static void test_reply_reader(void) {
         ((redisReply*)reply)->element[4]->integer == 999);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    test("Can parse RESP3 bignum: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader,"(3492890328409238509324850943850943825024385\r\n",46);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_BIGNUM &&
+        ((redisReply*)reply)->len == 43 &&
+        !strcmp(((redisReply*)reply)->str,"3492890328409238509324850943850943825024385"));
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {

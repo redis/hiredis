@@ -337,6 +337,22 @@ static int processLineItem(redisReader *r) {
                 obj = r->fn->createBool(cur,bval);
             else
                 obj = (void*)REDIS_REPLY_BOOL;
+        } else if (cur->type == REDIS_REPLY_BIGNUM) {
+            /* Ensure all characters are decimal digits (with possible leading
+             * minus sign). */
+            for (int i = 0; i < len; i++) {
+                /* XXX Consider: Allow leading '+'? Error on leading '0's? */
+                if (i == 0 && p[0] == '-') continue;
+                if (p[i] < '0' || p[i] > '9') {
+                    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                            "Bad bignum value");
+                    return REDIS_ERR;
+                }
+            }
+            if (r->fn && r->fn->createString)
+                obj = r->fn->createString(cur,p,len);
+            else
+                obj = (void*)REDIS_REPLY_BIGNUM;
         } else {
             /* Type will be error or status. */
             for (int i = 0; i < len; i++) {
@@ -587,6 +603,9 @@ static int processItem(redisReader *r) {
             case '>':
                 cur->type = REDIS_REPLY_PUSH;
                 break;
+            case '(':
+                cur->type = REDIS_REPLY_BIGNUM;
+                break;
             default:
                 __redisReaderSetErrorProtocolByte(r,*p);
                 return REDIS_ERR;
@@ -605,6 +624,7 @@ static int processItem(redisReader *r) {
     case REDIS_REPLY_DOUBLE:
     case REDIS_REPLY_NIL:
     case REDIS_REPLY_BOOL:
+    case REDIS_REPLY_BIGNUM:
         return processLineItem(r);
     case REDIS_REPLY_STRING:
     case REDIS_REPLY_VERB:
