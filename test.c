@@ -597,6 +597,15 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("Set error on invalid RESP3 double: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",3.14159\000265358979323846\r\n",26);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad double value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
     test("Correctly parses RESP3 double INFINITY: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, ",inf\r\n",6);

@@ -292,9 +292,9 @@ static int processLineItem(redisReader *r) {
                 memcpy(buf,p,len);
                 buf[len] = '\0';
 
-                if (strcasecmp(buf,"inf") == 0) {
+                if (len == 3 && strcasecmp(buf,"inf") == 0) {
                     d = INFINITY; /* Positive infinite. */
-                } else if (strcasecmp(buf,"-inf") == 0) {
+                } else if (len == 4 && strcasecmp(buf,"-inf") == 0) {
                     d = -INFINITY; /* Negative infinite. */
                 } else {
                     d = strtod((char*)buf,&eptr);
@@ -302,7 +302,7 @@ static int processLineItem(redisReader *r) {
                      * strtod() allows other variations on infinity, NaN,
                      * etc. We explicity handle our two allowed infinite cases
                      * above, so strtod() should only result in finite values. */
-                    if (buf[0] == '\0' || eptr[0] != '\0' || !isfinite(d)) {
+                    if (buf[0] == '\0' || eptr != &buf[len] || !isfinite(d)) {
                         __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                                 "Bad double value");
                         return REDIS_ERR;
