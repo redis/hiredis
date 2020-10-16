@@ -683,6 +683,28 @@ static void test_reply_reader(void) {
         ((redisReply*)reply)->element[3]->integer);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    test("Can parse RESP3 set: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "~5\r\n+orange\r\n$5\r\napple\r\n#f\r\n:100\r\n:999\r\n",40);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_SET &&
+        ((redisReply*)reply)->elements == 5 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_STATUS &&
+        ((redisReply*)reply)->element[0]->len == 6 &&
+        !strcmp(((redisReply*)reply)->element[0]->str,"orange") &&
+        ((redisReply*)reply)->element[1]->type == REDIS_REPLY_STRING &&
+        ((redisReply*)reply)->element[1]->len == 5 &&
+        !strcmp(((redisReply*)reply)->element[1]->str,"apple") &&
+        ((redisReply*)reply)->element[2]->type == REDIS_REPLY_BOOL &&
+        !((redisReply*)reply)->element[2]->integer &&
+        ((redisReply*)reply)->element[3]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[3]->integer == 100 &&
+        ((redisReply*)reply)->element[4]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[4]->integer == 999);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
