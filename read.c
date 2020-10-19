@@ -123,21 +123,27 @@ static char *readBytes(redisReader *r, unsigned int bytes) {
 
 /* Find pointer to \r\n. */
 static char *seekNewline(char *s, size_t len) {
-    char *_s = s, *ret;
-    int _len = len-1;
+    char *ret;
 
-    /* Exclude the last character from the searched length because the found
-     * '\r' should be followed by a '\n' */
-    while ((ret = memchr(_s, '\r', _len)) != NULL) {
+    /* We cannot match with fewer than 2 bytes */
+    if (len < 2)
+        return NULL;
+
+    /* Search up to len - 1 characters */
+    len--;
+
+    /* Look for the \r */
+    while ((ret = memchr(s, '\r', len)) != NULL) {
         if (ret[1] == '\n') {
             /* Found. */
             break;
         }
         /* Continue searching. */
         ret++;
-        _len -= ret - _s;
-        _s = ret;
+        len -= ret - s;
+        s = ret;
     }
+
     return ret;
 }
 
