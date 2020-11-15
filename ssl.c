@@ -351,6 +351,7 @@ static int redisSSLConnect(redisContext *c, SSL *ssl) {
     }
 
     hi_free(rssl);
+    SSL_free(ssl);
     return REDIS_ERR;
 }
 
