@@ -36,10 +36,10 @@
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 	
-	if((int)size<3)
+	if(size<3)
 		return 0;
 	
-	char *new_str = (char *)malloc(size+1);
+	char *new_str = malloc(size+1);
 	if (new_str == NULL)
 		return 0;
 
