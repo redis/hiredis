@@ -994,17 +994,6 @@ oom:
     return REDIS_ERR;
 }
 
-/* Internal helper function to try and get a reply from the reader,
- * or set an error in the context otherwise. */
-int redisGetReplyFromReader(redisContext *c, void **reply) {
-    if (redisReaderGetReply(c->reader,reply) == REDIS_ERR) {
-        __redisSetError(c,c->reader->err,c->reader->errstr);
-        return REDIS_ERR;
-    }
-
-    return REDIS_OK;
-}
-
 /* Internal helper that returns 1 if the reply was a RESP3 PUSH
  * message and we handled it with a user-provided callback. */
 static int redisHandledPushReply(redisContext *c, void *reply) {
@@ -1014,6 +1003,19 @@ static int redisHandledPushReply(redisContext *c, void *reply) {
     }
 
     return 0;
+}
+
+/* Internal helper function to try and get a reply from the reader,
+ * or set an error in the context otherwise. */
+int redisGetReplyFromReader(redisContext *c, void **reply) {
+    do {
+        if (redisReaderGetReply(c->reader,reply) == REDIS_ERR) {
+            __redisSetError(c,c->reader->err,c->reader->errstr);
+            return REDIS_ERR;
+        }
+    } while (redisHandledPushReply(c, *reply));
+
+    return REDIS_OK;
 }
 
 int redisGetReply(redisContext *c, void **reply) {
@@ -1037,12 +1039,8 @@ int redisGetReply(redisContext *c, void **reply) {
             if (redisBufferRead(c) == REDIS_ERR)
                 return REDIS_ERR;
 
-            /* We loop here in case the user has specified a RESP3
-             * PUSH handler (e.g. for client tracking). */
-            do {
-                if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
-                    return REDIS_ERR;
-            } while (redisHandledPushReply(c, aux));
+            if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
+                return REDIS_ERR;
         } while (aux == NULL);
     }
 
