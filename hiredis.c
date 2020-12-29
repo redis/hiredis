@@ -825,7 +825,7 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
         c->fd = options->endpoint.fd;
         c->flags |= REDIS_CONNECTED;
     } else {
-        // Unknown type - FIXME - FREE
+        redisFree(c);
         return NULL;
     }
 
