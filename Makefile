@@ -81,6 +81,7 @@ ifeq ($(uname_S),Linux)
 else
   OPENSSL_PREFIX?=/usr/local/opt/openssl
   CFLAGS+=-I$(OPENSSL_PREFIX)/include
+  SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
 endif
 
 ifeq ($(findstring MINGW64,$(uname_S)),MINGW64)
