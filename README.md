@@ -517,7 +517,7 @@ initialize OpenSSL and create a context. You can do that in two ways:
 /* An Hiredis SSL context. It holds SSL configuration and can be reused across
  * many contexts.
  */
-redisSSLContext *ssl;
+redisSSLContext *ssl_context;
 
 /* An error variable to indicate what went wrong, if the context fails to
  * initialize.
@@ -532,17 +532,23 @@ redisSSLContextError ssl_error;
 redisInitOpenSSL();
 
 /* Create SSL context */
-ssl = redisCreateSSLContext(
+ssl_context = redisCreateSSLContext(
     "cacertbundle.crt",     /* File name of trusted CA/ca bundle file, optional */
     "/path/to/certs",       /* Path of trusted certificates, optional */
     "client_cert.pem",      /* File name of client certificate file, optional */
     "client_key.pem",       /* File name of client private key, optional */
     "redis.mydomain.com",   /* Server name to request (SNI), optional */
-    &ssl_error
-    ) != REDIS_OK) {
-        printf("SSL error: %s\n", redisSSLContextGetError(ssl_error);
-        /* Abort... */
-    }
+    &ssl_error);
+
+if(ssl_context == NULL || ssl_error != 0) {
+    /* Handle error and abort... */
+    /* e.g. 
+    printf("SSL error: %s\n", 
+        (ssl_error != 0) ? 
+            redisSSLContextGetError(ssl_error) : "Unknown error");
+    // Abort
+    */
+}
 
 /* Create Redis context and establish connection */
 c = redisConnect("localhost", 6443);
@@ -551,7 +557,7 @@ if (c == NULL || c->err) {
 }
 
 /* Negotiate SSL/TLS */
-if (redisInitiateSSLWithContext(c, ssl) != REDIS_OK) {
+if (redisInitiateSSLWithContext(c, ssl_context) != REDIS_OK) {
     /* Handle error, in c->err / c->errstr */
 }
 ```

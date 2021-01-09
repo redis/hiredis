@@ -72,7 +72,7 @@ static inline char sdsReqType(size_t string_size) {
  * and 'initlen'.
  * If NULL is used for 'init' the string is initialized with zero bytes.
  *
- * The string is always null-termined (all the sds strings are, always) so
+ * The string is always null-terminated (all the sds strings are, always) so
  * even if you create an sds string with:
  *
  * mystring = sdsnewlen("abc",3);
@@ -415,7 +415,7 @@ sds sdscpylen(sds s, const char *t, size_t len) {
     return s;
 }
 
-/* Like sdscpylen() but 't' must be a null-termined string so that the length
+/* Like sdscpylen() but 't' must be a null-terminated string so that the length
  * of the string is obtained with strlen(). */
 sds sdscpy(sds s, const char *t) {
     return sdscpylen(s, t, strlen(t));

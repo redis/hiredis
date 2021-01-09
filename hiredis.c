@@ -257,7 +257,8 @@ static void *createNilObject(const redisReadTask *task) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_SET);
+               parent->type == REDIS_REPLY_SET ||
+               parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
@@ -938,13 +939,11 @@ int redisBufferRead(redisContext *c) {
         return REDIS_ERR;
 
     nread = c->funcs->read(c, buf, sizeof(buf));
-    if (nread > 0) {
-        if (redisReaderFeed(c->reader, buf, nread) != REDIS_OK) {
-            __redisSetError(c, c->reader->err, c->reader->errstr);
-            return REDIS_ERR;
-        } else {
-        }
-    } else if (nread < 0) {
+    if (nread < 0) {
+        return REDIS_ERR;
+    }
+    if (nread > 0 && redisReaderFeed(c->reader, buf, nread) != REDIS_OK) {
+        __redisSetError(c, c->reader->err, c->reader->errstr);
         return REDIS_ERR;
     }
     return REDIS_OK;
