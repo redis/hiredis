@@ -84,8 +84,8 @@ else
   SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
 endif
 
-ifeq ($(findstring MINGW64,$(uname_S)),MINGW64)
-  OPENSSL_PREFIX?=/mingw64
+ifeq ($(findstring MINGW,$(uname_S)),MINGW)
+  OPENSSL_PREFIX?=$(MINGW_PREFIX)
   CFLAGS+=-I$(OPENSSL_PREFIX)/include/openssl
   REAL_LDFLAGS+= -lwsock32 -lws2_32
   SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto -lcrypt32
