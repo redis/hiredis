@@ -4,7 +4,7 @@
 # This file is released under the BSD license, see the COPYING file
 
 OBJ=alloc.o net.o hiredis.o sds.o async.o read.o sockcompat.o
-SSL_OBJ=ssl.o
+SSL_OBJ=alloc.o net.o hiredis.o sds.o async.o read.o sockcompat.o ssl.o
 EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib hiredis-example-push
 ifeq ($(USE_SSL),1)
 EXAMPLES+=hiredis-example-ssl hiredis-example-libevent-ssl
@@ -81,7 +81,13 @@ ifeq ($(uname_S),Linux)
 else
   OPENSSL_PREFIX?=/usr/local/opt/openssl
   CFLAGS+=-I$(OPENSSL_PREFIX)/include
-  SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+endif
+
+ifeq ($(findstring MINGW64,$(uname_S)),MINGW64)
+  OPENSSL_PREFIX?=/mingw64
+  CFLAGS+=-I$(OPENSSL_PREFIX)/include/openssl
+  REAL_LDFLAGS+= -lwsock32 -lws2_32
+  SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto -lcrypt32
 endif
 
 ifeq ($(uname_S),SunOS)
