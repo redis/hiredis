@@ -306,7 +306,7 @@ static void __redisRunPushCallback(redisAsyncContext *ac, redisReply *reply) {
 static void __redisAsyncFree(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     redisCallback cb;
-    dictIterator *it;
+    dictIterator it;
     dictEntry *de;
 
     /* Execute pending callbacks with NULL reply. */
@@ -319,23 +319,17 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
 
     /* Run subscription callbacks with NULL reply */
     if (ac->sub.channels) {
-        it = dictGetIterator(ac->sub.channels);
-        if (it != NULL) {
-            while ((de = dictNext(it)) != NULL)
-                __redisRunCallback(ac,dictGetEntryVal(de),NULL);
-            dictReleaseIterator(it);
-        }
+        dictInitIterator(&it,ac->sub.channels);
+        while ((de = dictNext(&it)) != NULL)
+            __redisRunCallback(ac,dictGetEntryVal(de),NULL);
 
         dictRelease(ac->sub.channels);
     }
 
     if (ac->sub.patterns) {
-        it = dictGetIterator(ac->sub.patterns);
-        if (it != NULL) {
-            while ((de = dictNext(it)) != NULL)
-                __redisRunCallback(ac,dictGetEntryVal(de),NULL);
-            dictReleaseIterator(it);
-        }
+        dictInitIterator(&it,ac->sub.patterns);
+        while ((de = dictNext(&it)) != NULL)
+            __redisRunCallback(ac,dictGetEntryVal(de),NULL);
 
         dictRelease(ac->sub.patterns);
     }
