@@ -802,17 +802,21 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
         /* (P)UNSUBSCRIBE does not have its own response: every channel or
          * pattern that is unsubscribed will receive a message. This means we
          * should not append a callback function for this command. */
-     } else if(strncasecmp(cstr,"monitor\r\n",9) == 0) {
-         /* Set monitor flag and push callback */
-         c->flags |= REDIS_MONITORING;
-         __redisPushCallback(&ac->replies,&cb);
+    } else if (strncasecmp(cstr,"monitor\r\n",9) == 0) {
+        /* Set monitor flag and push callback */
+        c->flags |= REDIS_MONITORING;
+        if (__redisPushCallback(&ac->replies,&cb) != REDIS_OK)
+            goto oom;
     } else {
-        if (c->flags & REDIS_SUBSCRIBED)
+        if (c->flags & REDIS_SUBSCRIBED) {
             /* This will likely result in an error reply, but it needs to be
              * received and passed to the callback. */
-            __redisPushCallback(&ac->sub.invalid,&cb);
-        else
-            __redisPushCallback(&ac->replies,&cb);
+            if (__redisPushCallback(&ac->sub.invalid,&cb) != REDIS_OK)
+                goto oom;
+        } else {
+            if (__redisPushCallback(&ac->replies,&cb) != REDIS_OK)
+                goto oom;
+        }
     }
 
     __redisAppendCommand(c,cmd,len);
@@ -823,6 +827,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     return REDIS_OK;
 oom:
     __redisSetError(&(ac->c), REDIS_ERR_OOM, "Out of memory");
+    __redisAsyncCopyError(ac);
     return REDIS_ERR;
 }
 
