@@ -89,6 +89,9 @@ typedef long long ssize_t;
 /* Flag that indicates the user does not want replies to be automatically freed */
 #define REDIS_NO_AUTO_FREE_REPLIES 0x400
 
+/* Flag that is set when an async finalizer is executed. */
+#define REDIS_IN_FINALIZER 0x800
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
