@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 
 #include "hiredis.h"
 #include "async.h"
@@ -581,6 +582,147 @@ static void test_reply_reader(void) {
         !memcmp(((redisReply*)reply)->element[0]->str,"LOLWUT",6) &&
         ((redisReply*)reply)->element[1]->type == REDIS_REPLY_INTEGER &&
         ((redisReply*)reply)->element[1]->integer == 42);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 doubles: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",3.14159265358979323846\r\n",25);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+              fabs(((redisReply*)reply)->dval - 3.14159265358979323846) < 0.00000001 &&
+              ((redisReply*)reply)->len == 22 &&
+              strcmp(((redisReply*)reply)->str, "3.14159265358979323846") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error on invalid RESP3 double: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",3.14159\000265358979323846\r\n",26);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad double value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Correctly parses RESP3 double INFINITY: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",inf\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+              isinf(((redisReply*)reply)->dval) &&
+              ((redisReply*)reply)->dval > 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error when RESP3 double is NaN: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",nan\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad double value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 nil: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "_\r\n",3);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_NIL);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error on invalid RESP3 nil: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "_nil\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad nil value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 bool (true): ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#t\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
+              ((redisReply*)reply)->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 bool (false): ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#f\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
+              !((redisReply*)reply)->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error on invalid RESP3 bool: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#foobar\r\n",9);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad bool value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 map: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "%2\r\n+first\r\n:123\r\n$6\r\nsecond\r\n#t\r\n",34);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_MAP &&
+        ((redisReply*)reply)->elements == 4 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_STATUS &&
+        ((redisReply*)reply)->element[0]->len == 5 &&
+        !strcmp(((redisReply*)reply)->element[0]->str,"first") &&
+        ((redisReply*)reply)->element[1]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[1]->integer == 123 &&
+        ((redisReply*)reply)->element[2]->type == REDIS_REPLY_STRING &&
+        ((redisReply*)reply)->element[2]->len == 6 &&
+        !strcmp(((redisReply*)reply)->element[2]->str,"second") &&
+        ((redisReply*)reply)->element[3]->type == REDIS_REPLY_BOOL &&
+        ((redisReply*)reply)->element[3]->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 set: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "~5\r\n+orange\r\n$5\r\napple\r\n#f\r\n:100\r\n:999\r\n",40);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_SET &&
+        ((redisReply*)reply)->elements == 5 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_STATUS &&
+        ((redisReply*)reply)->element[0]->len == 6 &&
+        !strcmp(((redisReply*)reply)->element[0]->str,"orange") &&
+        ((redisReply*)reply)->element[1]->type == REDIS_REPLY_STRING &&
+        ((redisReply*)reply)->element[1]->len == 5 &&
+        !strcmp(((redisReply*)reply)->element[1]->str,"apple") &&
+        ((redisReply*)reply)->element[2]->type == REDIS_REPLY_BOOL &&
+        !((redisReply*)reply)->element[2]->integer &&
+        ((redisReply*)reply)->element[3]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[3]->integer == 100 &&
+        ((redisReply*)reply)->element[4]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[4]->integer == 999);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 bignum: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader,"(3492890328409238509324850943850943825024385\r\n",46);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_BIGNUM &&
+        ((redisReply*)reply)->len == 43 &&
+        !strcmp(((redisReply*)reply)->str,"3492890328409238509324850943850943825024385"));
     freeReplyObject(reply);
     redisReaderFree(reader);
 }

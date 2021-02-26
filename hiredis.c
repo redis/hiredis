@@ -96,6 +96,8 @@ void freeReplyObject(void *reply) {
 
     switch(r->type) {
     case REDIS_REPLY_INTEGER:
+    case REDIS_REPLY_NIL:
+    case REDIS_REPLY_BOOL:
         break; /* Nothing to free */
     case REDIS_REPLY_ARRAY:
     case REDIS_REPLY_MAP:
@@ -112,6 +114,7 @@ void freeReplyObject(void *reply) {
     case REDIS_REPLY_STRING:
     case REDIS_REPLY_DOUBLE:
     case REDIS_REPLY_VERB:
+    case REDIS_REPLY_BIGNUM:
         hi_free(r->str);
         break;
     }
@@ -129,7 +132,8 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     assert(task->type == REDIS_REPLY_ERROR  ||
            task->type == REDIS_REPLY_STATUS ||
            task->type == REDIS_REPLY_STRING ||
-           task->type == REDIS_REPLY_VERB);
+           task->type == REDIS_REPLY_VERB   ||
+           task->type == REDIS_REPLY_BIGNUM);
 
     /* Copy string value */
     if (task->type == REDIS_REPLY_VERB) {
@@ -235,12 +239,14 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
      * decimal string conversion artifacts. */
     memcpy(r->str, str, len);
     r->str[len] = '\0';
+    r->len = len;
 
     if (task->parent) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_SET);
+               parent->type == REDIS_REPLY_SET ||
+               parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
@@ -277,7 +283,8 @@ static void *createBoolObject(const redisReadTask *task, int bval) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_SET);
+               parent->type == REDIS_REPLY_SET ||
+               parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
