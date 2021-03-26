@@ -277,12 +277,29 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
         *completed = 1;
         return REDIS_OK;
     }
-    switch (errno) {
+    int error = errno;
+    if (error == EINPROGRESS)
+    {
+        /* must check error to see if connect failed.  Get the socket error */
+        int fail, so_error, optlen;
+        optlen = sizeof(so_error);
+        fail = getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &so_error, &optlen);
+        if (fail == 0) {
+            if (so_error == 0) {
+                /* ocket is connected! */
+                *completed = 1;
+                return REDIS_OK;
+            }
+            /* connection error; */
+            errno = so_error; 
+            error = so_error;
+        }
+    }
+    switch (error) {
     case EISCONN:
         *completed = 1;
         return REDIS_OK;
     case EALREADY:
-    case EINPROGRESS:
     case EWOULDBLOCK:
         *completed = 0;
         return REDIS_OK;

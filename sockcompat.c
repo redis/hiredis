@@ -180,9 +180,16 @@ int win32_connect(SOCKET sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
     /* For Winsock connect(), the WSAEWOULDBLOCK error means the same thing as
      * EINPROGRESS for POSIX connect(), so we do that translation to keep POSIX
-     * logic consistent. */
-    if (errno == EWOULDBLOCK) {
+     * logic consistent.
+     * Additionally, WSAALREADY is can be reported as WSAEINVAL to  and this is
+     * translated to EIO.  Convert appropriately
+     */
+    int err = errno;
+    if (err == EWOULDBLOCK) {
         errno = EINPROGRESS;
+    }
+    else if (err == EIO) {
+        errno = EALREADY;
     }
 
     return ret != SOCKET_ERROR ? ret : -1;
@@ -204,6 +211,14 @@ int win32_getsockopt(SOCKET sockfd, int level, int optname, void *optval, sockle
         *optlen = sizeof (struct timeval);
     } else {
         ret = getsockopt(sockfd, level, optname, (char*)optval, optlen);
+    }
+    if (ret != SOCKET_ERROR && level == SOL_SOCKET && optname == SO_ERROR) {
+        /* translate SO_ERROR codes, if non-zero */
+        int err = *(int*)optval;
+        if (err != 0) {
+            err = _wsaErrorToErrno(err);
+            *(int*)optval = err;
+        }
     }
     _updateErrno(ret != SOCKET_ERROR);
     return ret != SOCKET_ERROR ? ret : -1;
