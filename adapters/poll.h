@@ -16,12 +16,14 @@ typedef struct redisPollEvents {
     int reading, writing;
     int in_tick;
     int deleted;
+    struct timeval deadline;
 } redisPollEvents;
 
 static int redisPollTick(redisAsyncContext *ac) {
     redisPollEvents *e = (redisPollEvents*)ac->ev.data;
     if (!e)
         return 0;
+    /* local flags, won't get changed during callbacks */
     int reading = e->reading;
     int writing = e->writing;
     if (!reading && !writing)
@@ -48,10 +50,9 @@ static int redisPollTick(redisAsyncContext *ac) {
     struct timeval timeout = { 0 };
     int ns = select(fd + 1, reading ? &sr : NULL, writing ? &sw : NULL, writing ? &se : NULL, &timeout);
     int handled = 0;
+    e->in_tick = 1;
     if (ns)
     {
-        /* check status before doing any callbacks that can change the flags */
-        e->in_tick = 1;
         if (reading && FD_ISSET(fd, &sr))
         {
             redisAsyncHandleRead(ac);
@@ -65,10 +66,24 @@ static int redisPollTick(redisAsyncContext *ac) {
                 handled != 2;
             }
         }
-        e->in_tick = 0;
-        if (e->deleted)
-            hi_free(e);
     }
+    /* perform timeouts */
+    if (!e->deleted && e->deadline.tv_sec != 0 && e->deadline.tv_usec == 0)
+    {
+        struct timeval now;
+        gettimeofday(&now, NULL);
+        if (now.tv_sec > e->deadline.tv_sec || (now.tv_sec == e->deadline.tv_sec && now.tv_usec >= e->deadline.tv_usec)) {
+            /* deadline has passed.  disable timeout and perform callback */
+            e->deadline.tv_sec = 0;
+            e->deadline.tv_usec = 0;
+            redisAsyncHandleTimeout(ac);
+        }
+    }
+    /* do a delayed cleanup if required */
+    if (e->deleted)
+            hi_free(e);
+    else
+        e->in_tick = 0;
     return handled;
 }
 
@@ -102,6 +117,20 @@ static void redisPollCleanup(void *data) {
         hi_free(e);
 }
 
+static void redisPollScheduleTimer(void *data, struct timeval tv)
+{
+    redisPollEvents *e = (redisPollEvents*)data;
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    e->deadline.tv_sec = now.tv_sec + tv.tv_sec;
+    e->deadline.tv_usec = now.tv_usec + tv.tv_usec;
+    if (e->deadline.tv_usec >= 1000000) {
+        e->deadline.tv_usec -= 1000000;
+        e->deadline.tv_sec += 1;
+    }
+}
+
+
 static int redisPollAttach(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     redisPollEvents *e;
@@ -118,12 +147,15 @@ static int redisPollAttach(redisAsyncContext *ac) {
     e->context = ac;
     e->fd = c->fd;
     e->reading = e->writing = 0;
+    e->deadline.tv_sec = 0;
+    e->deadline.tv_usec = 0;
 
     /* Register functions to start/stop listening for events */
     ac->ev.addRead = redisPollAddRead;
     ac->ev.delRead = redisPollDelRead;
     ac->ev.addWrite = redisPollAddWrite;
     ac->ev.delWrite = redisPollDelWrite;
+    ac->ev.scheduleTimer = redisPollScheduleTimer;
     ac->ev.cleanup = redisPollCleanup;
     ac->ev.data = e;
 
