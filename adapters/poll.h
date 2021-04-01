@@ -20,18 +20,24 @@ typedef struct redisPollEvents {
 } redisPollEvents;
 
 static int redisPollTick(redisAsyncContext *ac) {
+    int reading;
+    int writing;
+    int fd;
+    fd_set sr, sw, se;
+    int ns;
+    int handled;
+
     redisPollEvents *e = (redisPollEvents*)ac->ev.data;
     if (!e)
         return 0;
     /* local flags, won't get changed during callbacks */
-    int reading = e->reading;
-    int writing = e->writing;
+    reading = e->reading;
+    writing = e->writing;
     if (!reading && !writing)
     {
         return 0;
     }
-    int fd = e->fd;
-    fd_set sr, sw, se;
+    fd = e->fd;
     if (reading)
     {
         FD_ZERO(&sr);
@@ -48,22 +54,22 @@ static int redisPollTick(redisAsyncContext *ac) {
         FD_SET(fd, &se);
     }
     struct timeval timeout = { 0 };
-    int ns = select(fd + 1, reading ? &sr : NULL, writing ? &sw : NULL, writing ? &se : NULL, &timeout);
-    int handled = 0;
+    ns = select(fd + 1, reading ? &sr : NULL, writing ? &sw : NULL, writing ? &se : NULL, &timeout);
+    handled = 0;
     e->in_tick = 1;
     if (ns)
     {
         if (reading && FD_ISSET(fd, &sr))
         {
             redisAsyncHandleRead(ac);
-            handled != 1;
+            handled |= 1;
         }
         if (writing && (FD_ISSET(fd, &sw) || FD_ISSET(fd, &se)))
         {
             /* context Read callback may have caused context to be deleted, e.g. by doing an redisAsyncDisconnect() */
             if (!e->deleted) {
                 redisAsyncHandleWrite(ac);
-                handled != 2;
+                handled |= 2;
             }
         }
     }
@@ -77,6 +83,7 @@ static int redisPollTick(redisAsyncContext *ac) {
             e->deadline.tv_sec = 0;
             e->deadline.tv_usec = 0;
             redisAsyncHandleTimeout(ac);
+            handled |= 4;
         }
     }
     /* do a delayed cleanup if required */
