@@ -16,8 +16,24 @@ typedef struct redisPollEvents {
     int reading, writing;
     int in_tick;
     int deleted;
-    struct timeval deadline;
+    double deadline;
 } redisPollEvents;
+
+static double redisPollGetNow()
+{
+#ifndef _MSC_VER
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return (double)tv.tv_sec + (double)tv.tv_usec * 1e-6;
+#else
+    FILETIME ft;
+    ULARGE_INTEGER li;
+    GetSystemTimeAsFileTime(&ft);
+    li.HighPart = ft.dwHighDateTime;
+    li.LowPart = ft.dwLowDateTime;
+    return (double)li.QuadPart * 1e-7;
+#endif
+}
 
 static int redisPollTick(redisAsyncContext *ac) {
     int reading;
@@ -74,14 +90,12 @@ static int redisPollTick(redisAsyncContext *ac) {
         }
     }
     /* perform timeouts */
-    if (!e->deleted && e->deadline.tv_sec != 0 && e->deadline.tv_usec == 0)
+    if (!e->deleted && e->deadline!= 0.0)
     {
-        struct timeval now;
-        gettimeofday(&now, NULL);
-        if (now.tv_sec > e->deadline.tv_sec || (now.tv_sec == e->deadline.tv_sec && now.tv_usec >= e->deadline.tv_usec)) {
+        double now = redisPollGetNow();
+        if (now >= e->deadline) {
             /* deadline has passed.  disable timeout and perform callback */
-            e->deadline.tv_sec = 0;
-            e->deadline.tv_usec = 0;
+            e->deadline = 0.0;
             redisAsyncHandleTimeout(ac);
             handled |= 4;
         }
@@ -127,14 +141,8 @@ static void redisPollCleanup(void *data) {
 static void redisPollScheduleTimer(void *data, struct timeval tv)
 {
     redisPollEvents *e = (redisPollEvents*)data;
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    e->deadline.tv_sec = now.tv_sec + tv.tv_sec;
-    e->deadline.tv_usec = now.tv_usec + tv.tv_usec;
-    if (e->deadline.tv_usec >= 1000000) {
-        e->deadline.tv_usec -= 1000000;
-        e->deadline.tv_sec += 1;
-    }
+    double now = redisPollGetNow();
+    e->deadline = now + (double)tv.tv_sec + (double)tv.tv_usec * 1e-6;
 }
 
 
@@ -154,9 +162,8 @@ static int redisPollAttach(redisAsyncContext *ac) {
     e->context = ac;
     e->fd = c->fd;
     e->reading = e->writing = 0;
-    e->deadline.tv_sec = 0;
-    e->deadline.tv_usec = 0;
-
+    e->deadline = 0.0;
+    
     /* Register functions to start/stop listening for events */
     ac->ev.addRead = redisPollAddRead;
     ac->ev.delRead = redisPollDelRead;
