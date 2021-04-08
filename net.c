@@ -281,8 +281,8 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
     if (error == EINPROGRESS)
     {
         /* must check error to see if connect failed.  Get the socket error */
-        int fail, so_error, optlen;
-        optlen = sizeof(so_error);
+        int fail, so_error;
+        socklen_t optlen = sizeof(so_error);
         fail = getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &so_error, &optlen);
         if (fail == 0) {
             if (so_error == 0) {
