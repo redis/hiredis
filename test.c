@@ -1,3 +1,6 @@
+/* turn of windows warnings for _strcmp etc. */
+#define _CRT_NONSTDC_NO_DEPRECATE
+
 #include "fmacros.h"
 #include "sockcompat.h"
 #include <stdio.h>

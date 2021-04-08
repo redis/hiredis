@@ -29,6 +29,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* turn of windows warnings for _strcmp etc. */
+#define _CRT_NONSTDC_NO_DEPRECATE
+
 #include "fmacros.h"
 #include "alloc.h"
 #include <stdlib.h>
