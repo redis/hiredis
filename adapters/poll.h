@@ -19,7 +19,7 @@ typedef struct redisPollEvents {
     double deadline;
 } redisPollEvents;
 
-static double redisPollGetNow()
+static double redisPollGetNow(void)
 {
 #ifndef _MSC_VER
     struct timeval tv;
@@ -35,13 +35,20 @@ static double redisPollGetNow()
 #endif
 }
 
-static int redisPollTick(redisAsyncContext *ac) {
+/* Poll for io, handling any pending callbacks.
+ * The timeout argument can be positive to
+ * wait for a maximum given time for IO, zero to
+ * poll, or negative to wait forever
+ */
+static int redisPollTick(redisAsyncContext *ac, double timeout) {
     int reading;
     int writing;
     int fd;
     fd_set sr, sw, se;
     int ns;
     int handled;
+    struct timeval tv_timeout = { 0 };
+    struct timeval *ptimeout = &tv_timeout;
 
     redisPollEvents *e = (redisPollEvents*)ac->ev.data;
     if (!e)
@@ -69,8 +76,13 @@ static int redisPollTick(redisAsyncContext *ac) {
         FD_ZERO(&se);
         FD_SET(fd, &se);
     }
-    struct timeval timeout = { 0 };
-    ns = select(fd + 1, reading ? &sr : NULL, writing ? &sw : NULL, writing ? &se : NULL, &timeout);
+    if (timeout > 0.0) {
+        tv_timeout.tv_sec = (time_t)timeout;
+        tv_timeout.tv_usec = (time_t)((timeout-(int)timeout)*1e6);
+    } else if (timeout < 0.0)
+        ptimeout = NULL;
+
+    ns = select(fd + 1, reading ? &sr : NULL, writing ? &sw : NULL, writing ? &se : NULL, ptimeout);
     handled = 0;
     e->in_tick = 1;
     if (ns)

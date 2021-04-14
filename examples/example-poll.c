@@ -56,8 +56,7 @@ int main (int argc, char **argv) {
     redisAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
     while (!exit_loop)
     {
-        redisPollTick(c);
-        sleep(0.1);
+        redisPollTick(c, 0.1);
     }
     return 0;
 }
