@@ -107,7 +107,8 @@ if (MSVC)
 endif()
 
 IF ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wmissing-prototypes -Wstrict-prototypes")
+    # set the same warning options as Makefile
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -W -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers")
 ENDIF()
 
 # For NuGet packages
