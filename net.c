@@ -46,9 +46,7 @@
 #include "sds.h"
 #include "sockcompat.h"
 #include "win32.h"
-
-/* Defined in hiredis.c */
-void __redisSetError(redisContext *c, int type, const char *str);
+#include "private.h"
 
 void redisNetClose(redisContext *c) {
     if (c && c->fd != REDIS_INVALID_FD) {

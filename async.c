@@ -44,6 +44,7 @@
 #include "dict.c"
 #include "sds.h"
 #include "win32.h"
+#include "private.h"
 
 #include "async_private.h"
 
@@ -51,10 +52,6 @@
 #undef assert
 #define assert(e) (void)(e)
 #endif
-
-/* Forward declarations of hiredis.c functions */
-int __redisAppendCommand(redisContext *c, const char *cmd, size_t len);
-void __redisSetError(redisContext *c, int type, const char *str);
 
 /* Functions managing dictionary of callbacks for pub/sub. */
 static unsigned int callbackHash(const void *key) {

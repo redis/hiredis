@@ -106,6 +106,10 @@ if (MSVC)
         CONFIGURATIONS Debug RelWithDebInfo)
 endif()
 
+IF ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wmissing-prototypes -Wstrict-prototypes")
+ENDIF()
+
 # For NuGet packages
 INSTALL(FILES hiredis.targets
     DESTINATION build/native)
