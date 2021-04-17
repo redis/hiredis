@@ -251,7 +251,7 @@ static void do_reconnect(redisContext *c, struct config config) {
 
 static void test_format_commands(void) {
     char *cmd;
-    int len;
+    long long len;
 
     test("Format command without interpolation: ");
     len = redisFormatCommand(&cmd,"SET foo bar");
@@ -775,7 +775,7 @@ static void *hi_calloc_insecure(size_t nmemb, size_t size) {
     (void)nmemb;
     (void)size;
     insecure_calloc_calls++;
-    return (void*)0xdeadc0de;
+    return (void*)(uintptr_t)0xdeadc0de;
 }
 
 static void *hi_realloc_fail(void *ptr, size_t size) {
