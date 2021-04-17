@@ -272,7 +272,7 @@ static int redisContextWaitReady(redisContext *c, long msec) {
 }
 
 int redisCheckConnectDone(redisContext *c, int *completed) {
-    int rc = connect(c->fd, (const struct sockaddr *)c->saddr, c->addrlen);
+    int rc = connect(c->fd, (const struct sockaddr *)c->saddr, (socklen_t)c->addrlen);
     if (rc == 0) {
         *completed = 1;
         return REDIS_OK;
@@ -332,7 +332,7 @@ int redisCheckSocketError(redisContext *c) {
 
 int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
     const void *to_ptr = &tv;
-    size_t to_sz = sizeof(tv);
+    socklen_t to_sz = sizeof(tv);
 
     if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,to_ptr,to_sz) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(SO_RCVTIMEO)");
@@ -474,7 +474,7 @@ addrretry:
             }
 
             for (b = bservinfo; b != NULL; b = b->ai_next) {
-                if (bind(s,b->ai_addr,b->ai_addrlen) != -1) {
+                if (bind(s,b->ai_addr,(socklen_t)b->ai_addrlen) != -1) {
                     bound = 1;
                     break;
                 }
@@ -497,7 +497,7 @@ addrretry:
         memcpy(c->saddr, p->ai_addr, p->ai_addrlen);
         c->addrlen = p->ai_addrlen;
 
-        if (connect(s,p->ai_addr,p->ai_addrlen) == -1) {
+        if (connect(s,p->ai_addr,(socklen_t)p->ai_addrlen) == -1) {
             if (errno == EHOSTUNREACH) {
                 redisNetClose(c);
                 continue;
@@ -617,13 +617,13 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
 
     c->flags |= REDIS_CONNECTED;
     return REDIS_OK;
+oom:
+    __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+    return REDIS_ERR;
 #else
     /* We currently do not support Unix sockets for Windows. */
     /* TODO(m): https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/ */
     errno = EPROTONOSUPPORT;
     return REDIS_ERR;
 #endif /* _WIN32 */
-oom:
-    __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
-    return REDIS_ERR;
 }

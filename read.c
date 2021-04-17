@@ -213,7 +213,7 @@ static int string2ll(const char *s, size_t slen, long long *value) {
     if (negative) {
         if (v > ((unsigned long long)(-(LLONG_MIN+1))+1)) /* Overflow. */
             return REDIS_ERR;
-        if (value != NULL) *value = -v;
+        if (value != NULL) *value = -(long long)v;
     } else {
         if (v > LLONG_MAX) /* Overflow. */
             return REDIS_ERR;
@@ -222,9 +222,9 @@ static int string2ll(const char *s, size_t slen, long long *value) {
     return REDIS_OK;
 }
 
-static char *readLine(redisReader *r, int *_len) {
+static char *readLine(redisReader *r, size_t *_len) {
     char *p, *s;
-    int len;
+    size_t len;
 
     p = r->buf+r->pos;
     s = seekNewline(p,(r->len-r->pos));
@@ -269,7 +269,7 @@ static int processLineItem(redisReader *r) {
     redisReadTask *cur = r->task[r->ridx];
     void *obj;
     char *p;
-    int len;
+    size_t len;
 
     if ((p = readLine(r,&len)) != NULL) {
         if (cur->type == REDIS_REPLY_INTEGER) {
@@ -290,7 +290,7 @@ static int processLineItem(redisReader *r) {
             char buf[326], *eptr;
             double d;
 
-            if ((size_t)len >= sizeof(buf)) {
+            if (len >= sizeof(buf)) {
                 __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                         "Double value is too large");
                 return REDIS_ERR;
@@ -349,7 +349,7 @@ static int processLineItem(redisReader *r) {
         } else if (cur->type == REDIS_REPLY_BIGNUM) {
             /* Ensure all characters are decimal digits (with possible leading
              * minus sign). */
-            for (int i = 0; i < len; i++) {
+            for (size_t i = 0; i < len; i++) {
                 /* XXX Consider: Allow leading '+'? Error on leading '0's? */
                 if (i == 0 && p[0] == '-') continue;
                 if (p[i] < '0' || p[i] > '9') {
@@ -364,7 +364,7 @@ static int processLineItem(redisReader *r) {
                 obj = (void*)REDIS_REPLY_BIGNUM;
         } else {
             /* Type will be error or status. */
-            for (int i = 0; i < len; i++) {
+            for (size_t i = 0; i < len; i++) {
                 if (p[i] == '\r' || p[i] == '\n') {
                     __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                             "Bad simple string value");
@@ -396,7 +396,7 @@ static int processBulkItem(redisReader *r) {
     void *obj = NULL;
     char *p, *s;
     long long len;
-    unsigned long bytelen;
+    size_t bytelen;
     int success = 0;
 
     p = r->buf+r->pos;
@@ -439,7 +439,7 @@ static int processBulkItem(redisReader *r) {
                 if (r->fn && r->fn->createString)
                     obj = r->fn->createString(cur,s+2,len);
                 else
-                    obj = (void*)(long)cur->type;
+                    obj = (void*)(intptr_t)cur->type;
                 success = 1;
             }
         }
@@ -494,7 +494,8 @@ static int processAggregateItem(redisReader *r) {
     void *obj;
     char *p;
     long long elements;
-    int root = 0, len;
+    int root = 0;
+    size_t len;
 
     if (r->ridx == r->tasks - 1) {
         if (redisReaderGrow(r) == REDIS_ERR)
@@ -536,7 +537,7 @@ static int processAggregateItem(redisReader *r) {
             if (r->fn && r->fn->createArray)
                 obj = r->fn->createArray(cur,elements);
             else
-                obj = (void*)(long)cur->type;
+                obj = (void*)(intptr_t)cur->type;
 
             if (obj == NULL) {
                 __redisReaderSetErrorOOM(r);
