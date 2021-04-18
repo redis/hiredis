@@ -1,0 +1,24 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master, dev ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: install prerequisites
+      run: sudo apt-get update && sudo apt-get install -y libev-dev libevent-dev libglib2.0-dev libssl-dev
+    - uses: actions/checkout@v2
+    - name: run make
+      run: make all examples
+    - name: Run unittests
+      env:
+        REDIS_DOCKER: redis:alpine
+      run: make check
