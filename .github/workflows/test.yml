@@ -18,10 +18,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: run make
       run: make all examples
-    - name: start redis server
-      run: docker run --name redisserver --rm -p 6379:6379 -d redis:alpine
-    - name: Run hiredis-test
-      run: ./hiredis-test
-    - name: cleanup
-      if: always()
-      run: docker kill redisserver
+    - name: Run unittests
+      env:
+        REDIS_DOCKER: redis:alpine
+      run: make check
