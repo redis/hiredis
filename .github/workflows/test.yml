@@ -12,9 +12,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+    - name: install prerequisites
+      run: sudo apt-get update && sudo apt-get install -y libev-dev libevent-dev libglib2.0-dev libssl-dev
     - uses: actions/checkout@v2
-    - name: make hiredis-test
-      run: make hiredis-test
+    - name: run make
+      run: make all examples
     - name: start redis server
       run: docker run --name redisserver --rm -p 6379:6379 -d redis:alpine
     - name: Run hiredis-test
