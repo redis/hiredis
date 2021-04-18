@@ -43,18 +43,21 @@ if [ "$TEST_SSL" = "1" ]; then
 fi
 
 cleanup() {
-  set +e
-  kill $(cat ${PID_FILE})
+  if [ -n "${REDIS_DOCKER}" ] ; then
+    docker kill redis-test-server
+  else
+    set +e
+    kill $(cat ${PID_FILE})
+  fi
   rm -rf ${tmpdir}
 }
 trap cleanup INT TERM EXIT
 
 cat > ${tmpdir}/redis.conf <<EOF
-daemonize yes
 pidfile ${PID_FILE}
 port ${REDIS_PORT}
-bind 127.0.0.1
 unixsocket ${SOCK_FILE}
+unixsocketperm 777
 EOF
 
 if [ "$TEST_SSL" = "1" ]; then
@@ -66,10 +69,29 @@ tls-key-file ${SSL_KEY}
 EOF
 fi
 
-cat ${tmpdir}/redis.conf
-${REDIS_SERVER} ${tmpdir}/redis.conf
+if [ ! -n "${REDIS_DOCKER}" ]; then
+cat >> ${tmpdir}/redis.conf <<EOF
+bind 127.0.0.1
+daemonize yes
+EOF
+fi
 
+echo ${tmpdir}
+cat ${tmpdir}/redis.conf
+if [ -n "${REDIS_DOCKER}" ] ; then
+    chmod a+wx ${tmpdir}
+    chmod a+r ${tmpdir}/*
+    docker run -d --rm --name redis-test-server \
+        -p ${REDIS_PORT}:${REDIS_PORT} \
+        -p ${REDIS_SSL_PORT}:${REDIS_SSL_PORT} \
+        -v ${tmpdir}:${tmpdir} \
+        ${REDIS_DOCKER} \
+        redis-server ${tmpdir}/redis.conf
+else
+    ${REDIS_SERVER} ${tmpdir}/redis.conf
+fi
 # Wait until we detect the unix socket
+echo waiting for server
 while [ ! -S "${SOCK_FILE}" ]; do sleep 1; done
 
 # Treat skips as failures if directed
