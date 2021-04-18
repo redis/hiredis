@@ -1,0 +1,24 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master, dev ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: make hiredis-test
+      run: make hiredis-test
+    - name: start redis server
+      run: docker run --name redisserver --rm -p 6379:6379 -d redis:alpine
+    - name: Run hiredis-test
+      run: ./hiredis-test
+    - name: cleanup
+      if: always()
+      run: docker kill redisserver
