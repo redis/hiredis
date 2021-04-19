@@ -13,9 +13,9 @@
 typedef struct redisPollEvents {
     redisAsyncContext *context;
     int fd;
-    int reading, writing;
-    int in_tick;
-    int deleted;
+    char reading, writing;
+    char in_tick;
+    char deleted;
     double deadline;
 } redisPollEvents;
 
@@ -114,7 +114,7 @@ static int redisPollTick(redisAsyncContext *ac, double timeout) {
     }
     /* do a delayed cleanup if required */
     if (e->deleted)
-            hi_free(e);
+        hi_free(e);
     else
         e->in_tick = 0;
     return handled;
@@ -170,10 +170,12 @@ static int redisPollAttach(redisAsyncContext *ac) {
     e = (redisPollEvents*)hi_malloc(sizeof(*e));
     if (e == NULL)
         return REDIS_ERR;
+    memset(e, 0, sizeof(*e));
 
     e->context = ac;
     e->fd = c->fd;
     e->reading = e->writing = 0;
+    e->in_tick = e->deleted = 0;
     e->deadline = 0.0;
     
     /* Register functions to start/stop listening for events */
