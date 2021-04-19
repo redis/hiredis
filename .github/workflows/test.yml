@@ -73,7 +73,7 @@ jobs:
       run: make check
 
   build-windows:
-    name: Build on windows 64 bit Intel
+    name: Build and test on windows 64 bit Intel
     runs-on: windows-latest
     steps:
       - uses: microsoft/setup-msbuild@v1.0.2
@@ -86,6 +86,11 @@ jobs:
         run: MSBuild hiredis_static.vcxproj /p:Configuration=Debug
       - name: build redis-test
         run: MSBuild hiredis-test.vcxproj /p:Configuration=Debug
-      # No easy way to run a local redis server here yet, so no tests.
+      # use memurai, redis compatible server, since it is easy to install.  Can't
+      # install official redis containers on the windows runner
+      - name: install Memurai redis server
+        run: choco install -y memurai-developer.install
+      - name: run tests
+        run: Debug\hiredis-test.exe
       
       
