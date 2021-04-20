@@ -1986,8 +1986,8 @@ static redisAsyncContext *do_aconnect(struct config config, int testno)
         /* Create a dummy connection just to get an fd to inherit */
         redisContext *dummy_ctx = redisConnectUnix(config.unix_sock.path);
         if (dummy_ctx) {
-            int fd = disconnect(dummy_ctx, 1);
-            printf("Connecting to inherited fd %d\n", fd);
+            redisFD fd = disconnect(dummy_ctx, 1);
+            printf("Connecting to inherited fd %d\n", (int)fd);
             options.endpoint.fd = fd;
         }
     }
