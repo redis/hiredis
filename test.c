@@ -15,6 +15,7 @@
 
 #include "hiredis.h"
 #include "async.h"
+#include "adapters/poll.h"
 #ifdef HIREDIS_TEST_SSL
 #include "hiredis_ssl.h"
 #endif
@@ -1880,6 +1881,51 @@ static void test_monitor(struct config config) {
     assert(state.checkpoint == 3);
 }
 #endif /* HIREDIS_TEST_ASYNC */
+
+/* tests for async api using polling adapter */
+struct _astest {
+    int testno;
+    int connected;
+};
+static struct _astest astest;
+static void connectCallback(const redisAsyncContext *c, int status) {
+    (void)c;
+    if (status == REDIS_OK) 
+        astest.connected = 1;
+    else
+        astest.connected = -1;
+}
+static void disconnectCallback(const redisAsyncContext *c, int status) {
+    if (status != REDIS_OK) {
+        printf("Error: %s\n", c->errstr);
+    }
+
+    printf("Connected...\n");
+}
+
+static redisAsyncContext *do_aconnect(struct config config, int testno)
+{
+    astest.testno = testno;
+    astest.connected = 0;
+    redisAsyncContext *c = redisAsyncConnect(config.tcp.host, config.tcp.port);
+    test_cond(c != NULL);
+    redisPollAttach(c);
+    redisAsyncSetConnectCallback(c, connectCallback);
+    redisAsyncSetDisconnectCallback(c, disconnectCallback);
+    return c;
+}
+
+static void test_async(struct config config) {
+    redisAsyncContext *c;
+   
+    test("Async connect");
+    c = do_aconnect(config, 0);
+    assert(c);
+    while(astest.connected == 0)
+        redisPollTick(c, 0.1);
+    test_cond(astest.connected == 1);
+    redisAsyncFree(c);
+}
 
 int main(int argc, char **argv) {
     struct config cfg = {
