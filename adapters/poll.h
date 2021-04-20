@@ -12,7 +12,7 @@
 
 typedef struct redisPollEvents {
     redisAsyncContext *context;
-    int fd;
+    redisFD fd;
     char reading, writing;
     char in_tick;
     char deleted;
@@ -43,7 +43,7 @@ static double redisPollGetNow(void)
 static int redisPollTick(redisAsyncContext *ac, double timeout) {
     int reading;
     int writing;
-    int fd;
+    redisFD fd;
     fd_set sr, sw, se;
     int ns;
     int handled;
@@ -77,12 +77,18 @@ static int redisPollTick(redisAsyncContext *ac, double timeout) {
         FD_SET(fd, &se);
     }
     if (timeout > 0.0) {
+#ifdef _MSC_VER
+        tv_timeout.tv_sec = (long)timeout;
+        tv_timeout.tv_usec = (long)((timeout-(int)timeout)*1e6);
+#else
         tv_timeout.tv_sec = (time_t)timeout;
         tv_timeout.tv_usec = (time_t)((timeout-(int)timeout)*1e6);
+#endif
     } else if (timeout < 0.0)
         ptimeout = NULL;
 
-    ns = select(fd + 1, reading ? &sr : NULL, writing ? &sw : NULL, writing ? &se : NULL, ptimeout);
+    /* first argument is ignored on windows, therefore it is safe to cast to int */
+    ns = select((int)fd + 1, reading ? &sr : NULL, writing ? &sw : NULL, writing ? &se : NULL, ptimeout);
     handled = 0;
     e->in_tick = 1;
     if (ns)
