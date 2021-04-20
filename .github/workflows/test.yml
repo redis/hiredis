@@ -91,6 +91,7 @@ jobs:
       - name: install Memurai redis server
         run: choco install -y memurai-developer.install
       - name: run tests
+        timeout-minutes: 2
         run: Debug\hiredis-test.exe
       
       

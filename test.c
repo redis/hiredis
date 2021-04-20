@@ -1885,30 +1885,64 @@ static void test_monitor(struct config config) {
 /* tests for async api using polling adapter */
 struct _astest {
     int testno;
+    int connects;
+    int connect_status;
+    int disconnects;
+    int disconnect_status;
     int connected;
 };
 static struct _astest astest;
 static void connectCallback(const redisAsyncContext *c, int status) {
-    (void)c;
+    assert(c->data == (void*)&astest);
+    assert(astest.connects == 0);
+    astest.connects++;
+    astest.connect_status = status;
     if (status == REDIS_OK) 
         astest.connected = 1;
     else
         astest.connected = -1;
 }
 static void disconnectCallback(const redisAsyncContext *c, int status) {
-    if (status != REDIS_OK) {
-        printf("Error: %s\n", c->errstr);
-    }
-
-    printf("Connected...\n");
+    assert(c->data == (void*)&astest);
+    assert(astest.disconnects == 0);
+    astest.disconnects++;
+    astest.disconnect_status = status;
+    astest.connected = 0;
 }
 
 static redisAsyncContext *do_aconnect(struct config config, int testno)
 {
+    redisOptions options = {0};
+    
     astest.testno = testno;
     astest.connected = 0;
-    redisAsyncContext *c = redisAsyncConnect(config.tcp.host, config.tcp.port);
-    test_cond(c != NULL);
+    astest.connects = astest.disconnects = 0;
+    astest.connect_status = astest.disconnect_status = -2;
+
+    if (config.type == CONN_TCP) {
+        options.type = REDIS_CONN_TCP;
+        options.connect_timeout = &config.tcp.timeout;
+        REDIS_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
+    } else if (config.type == CONN_SSL) {
+        options.type = REDIS_CONN_TCP;
+        options.connect_timeout = &config.tcp.timeout;
+        REDIS_OPTIONS_SET_TCP(&options, config.ssl.host, config.ssl.port);
+    } else if (config.type == CONN_UNIX) {
+        options.type = REDIS_CONN_UNIX;
+        options.endpoint.unix_socket = config.unix_sock.path;
+    } else if (config.type == CONN_FD) {
+        options.type = REDIS_CONN_USERFD;
+        /* Create a dummy connection just to get an fd to inherit */
+        redisContext *dummy_ctx = redisConnectUnix(config.unix_sock.path);
+        if (dummy_ctx) {
+            int fd = disconnect(dummy_ctx, 1);
+            printf("Connecting to inherited fd %d\n", fd);
+            options.endpoint.fd = fd;
+        }
+    }
+    redisAsyncContext *c = redisAsyncConnectWithOptions(&options);
+    assert(c);
+    c->data = &astest;
     redisPollAttach(c);
     redisAsyncSetConnectCallback(c, connectCallback);
     redisAsyncSetDisconnectCallback(c, disconnectCallback);
@@ -1917,14 +1951,58 @@ static redisAsyncContext *do_aconnect(struct config config, int testno)
 
 static void test_async(struct config config) {
     redisAsyncContext *c;
+    struct config defaultconfig = config;
    
-    test("Async connect");
+    test("Async connect: ");
     c = do_aconnect(config, 0);
     assert(c);
     while(astest.connected == 0)
         redisPollTick(c, 0.1);
+    assert(astest.connects == 1);
+    assert(astest.connect_status == REDIS_OK);
     test_cond(astest.connected == 1);
+    assert(astest.disconnects == 0);
+
+    test("Async free after connect: ");
     redisAsyncFree(c);
+    assert(astest.disconnects == 1);
+    test_cond(astest.disconnect_status == REDIS_OK);
+
+    test("Async connect timeout: ");
+    if (config.type == CONN_TCP)
+    {
+        config.tcp.host = "192.168.254.254";  /* blackhole ip */
+        config.tcp.timeout.tv_usec = 100000;
+        c = do_aconnect(config, 0);
+        assert(c);
+        assert(c->err == 0);
+        while(astest.connected == 0)
+            redisPollTick(c, 0.1);
+        assert(astest.connected == -1);
+        redisAsyncFree(c);
+        test_cond(astest.connect_status == REDIS_ERR);
+    } else
+        test_skipped();
+    config = defaultconfig;
+
+    /* The following test hangs on windows, unless fix for async
+     * connect on windows is applied
+     */
+    test("Async connect failure: ");
+    if (config.type == CONN_TCP)
+    {
+        config.tcp.port = 12345;  /* non-listening port */
+        c = do_aconnect(config, 0);
+        assert(c);
+        assert(c->err == 0);
+        while(astest.connected == 0)
+            redisPollTick(c, 0.1);
+        assert(astest.connected == -1);
+        redisAsyncFree(c);
+        test_cond(astest.connect_status == REDIS_ERR);
+    } else
+        test_skipped();
+    config = defaultconfig;
 }
 
 int main(int argc, char **argv) {
