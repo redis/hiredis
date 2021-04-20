@@ -72,7 +72,7 @@ redisSSLContext *_ssl_ctx = NULL;
 
 /* The following lines make up our testing "framework" :) */
 static int tests = 0, fails = 0, skips = 0;
-#define test(_s) { printf("#%02d ", ++tests); printf(_s); }
+#define test(_s) { printf("#%02d ", ++tests); printf(_s); fflush(stdout); }
 #define test_cond(_c) if(_c) printf("\033[0;32mPASSED\033[0;0m\n"); else {printf("\033[0;31mFAILED\033[0;0m\n"); fails++;}
 #define test_skipped() { printf("\033[01;33mSKIPPED\033[0;0m\n"); skips++; }
 
