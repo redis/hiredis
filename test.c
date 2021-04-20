@@ -1884,6 +1884,7 @@ static void test_monitor(struct config config) {
 
 /* tests for async api using polling adapter */
 struct _astest {
+    redisAsyncContext *ac;
     int testno;
     int connects;
     int connect_status;
@@ -1892,15 +1893,28 @@ struct _astest {
     int connected;
 };
 static struct _astest astest;
+static void asCleanup(void* data)
+{
+    struct _astest *t = (struct _astest *)data;
+    t->ac = NULL;
+}
+
 static void connectCallback(const redisAsyncContext *c, int status) {
-    assert(c->data == (void*)&astest);
-    assert(astest.connects == 0);
-    astest.connects++;
-    astest.connect_status = status;
-    if (status == REDIS_OK) 
-        astest.connected = 1;
-    else
-        astest.connected = -1;
+    struct _astest *t = (struct _astest *)c->data;
+    assert(t == &astest);
+    assert(t->connects == 0);
+    t->connects++;
+    t->connect_status = status;
+    t->connected = status == REDIS_OK ? 1 : -1;
+        
+    if (t->testno == 3) {
+        /* disconnect directly. */
+       redisAsyncDisconnect(t->ac);
+    }
+    else if (t->testno == 4) {
+        /* disconnect directly. */
+        redisAsyncFree(t->ac);
+    }
 }
 static void disconnectCallback(const redisAsyncContext *c, int status) {
     assert(c->data == (void*)&astest);
@@ -1913,10 +1927,9 @@ static void disconnectCallback(const redisAsyncContext *c, int status) {
 static redisAsyncContext *do_aconnect(struct config config, int testno)
 {
     redisOptions options = {0};
+    memset(&astest, 0, sizeof(astest));
     
     astest.testno = testno;
-    astest.connected = 0;
-    astest.connects = astest.disconnects = 0;
     astest.connect_status = astest.disconnect_status = -2;
 
     if (config.type == CONN_TCP) {
@@ -1942,7 +1955,9 @@ static redisAsyncContext *do_aconnect(struct config config, int testno)
     }
     redisAsyncContext *c = redisAsyncConnectWithOptions(&options);
     assert(c);
+    astest.ac = c;
     c->data = &astest;
+    c->dataCleanup = asCleanup;
     redisPollAttach(c);
     redisAsyncSetConnectCallback(c, connectCallback);
     redisAsyncSetDisconnectCallback(c, disconnectCallback);
@@ -1960,12 +1975,14 @@ static void test_async(struct config config) {
         redisPollTick(c, 0.1);
     assert(astest.connects == 1);
     assert(astest.connect_status == REDIS_OK);
-    test_cond(astest.connected == 1);
     assert(astest.disconnects == 0);
+    test_cond(astest.connected == 1);
 
     test("Async free after connect: ");
+    assert(astest.ac != NULL);
     redisAsyncFree(c);
     assert(astest.disconnects == 1);
+    assert(astest.ac == NULL);
     test_cond(astest.disconnect_status == REDIS_OK);
 
     test("Async connect timeout: ");
@@ -1973,7 +1990,7 @@ static void test_async(struct config config) {
     {
         config.tcp.host = "192.168.254.254";  /* blackhole ip */
         config.tcp.timeout.tv_usec = 100000;
-        c = do_aconnect(config, 0);
+        c = do_aconnect(config, 1);
         assert(c);
         assert(c->err == 0);
         while(astest.connected == 0)
@@ -1992,7 +2009,7 @@ static void test_async(struct config config) {
     if (config.type == CONN_TCP)
     {
         config.tcp.port = 12345;  /* non-listening port */
-        c = do_aconnect(config, 0);
+        c = do_aconnect(config, 2);
         assert(c);
         assert(c->err == 0);
         while(astest.connected == 0)
@@ -2003,6 +2020,37 @@ static void test_async(struct config config) {
     } else
         test_skipped();
     config = defaultconfig;
+
+    /* Test that we can disconnect directly from the
+     * connect callback.  This needs needs a separate fix
+     */
+    test("Async disconnect from connect callback: ");
+    c = do_aconnect(config, 3);
+    assert(c);
+    while(astest.ac)
+        redisPollTick(c, 0.1);
+    /* did connect */
+    assert(astest.connects == 1);
+    assert(astest.connect_status == REDIS_OK);
+    /* but now should be disconnected */
+    assert(astest.disconnects == 1);
+    assert(!astest.ac);
+    test_cond(astest.connected == 0);
+
+    test("Async free from connect callback: ");
+    c = do_aconnect(config, 4);
+    assert(c);
+    while(astest.ac)
+        redisPollTick(c, 0.1);
+    /* did connect */
+    assert(astest.connects == 1);
+    assert(astest.connect_status == REDIS_OK);
+    /* but now should be disconnected */
+    assert(astest.disconnects == 1);
+    assert(!astest.ac);
+    test_cond(astest.connected == 0);
+    
+
 }
 
 int main(int argc, char **argv) {
