@@ -187,6 +187,8 @@ const char *redisSSLContextGetError(redisSSLContextError error)
             return "Failed to open system certifcate store";
         case REDIS_SSL_CTX_OS_CERT_ADD_FAILED:
             return "Failed to add CA certificates obtained from system to the SSL context";
+        case REDIS_SSL_CTX_CIPHER_SUITE_SET_FAILED:
+            return "Failed to set the custom cipher suite on the SSL context";
         default:
             return "Unknown error code";
     }
@@ -298,6 +300,25 @@ error:
 #endif
     redisFreeSSLContext(ctx);
     return NULL;
+}
+
+
+int redisSetCiphersSSLContext(const char* cipher_suite, redisSSLContext* redis_ssl_ctx, redisSSLContextError* error)
+{
+  if(!cipher_suite || !redis_ssl_ctx)
+  {
+    return REDIS_ERR;
+  }
+
+  static const int success = 1;
+  int result = SSL_CTX_set_cipher_list(redis_ssl_ctx->ssl_ctx, cipher_suite);
+  if(result != success)
+  {
+    if(error) *error = REDIS_SSL_CTX_CIPHER_SUITE_SET_FAILED;
+    return REDIS_ERR;
+  }
+
+  return REDIS_OK;
 }
 
 /**

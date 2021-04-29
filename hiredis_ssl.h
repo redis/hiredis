@@ -58,7 +58,8 @@ typedef enum {
     REDIS_SSL_CTX_CLIENT_CERT_LOAD_FAILED,      /* Failed to load client certificate */
     REDIS_SSL_CTX_PRIVATE_KEY_LOAD_FAILED,      /* Failed to load private key */
     REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED,     /* Failed to open system certifcate store */
-    REDIS_SSL_CTX_OS_CERT_ADD_FAILED            /* Failed to add CA certificates obtained from system to the SSL context */
+    REDIS_SSL_CTX_OS_CERT_ADD_FAILED,           /* Failed to add CA certificates obtained from system to the SSL context */
+    REDIS_SSL_CTX_CIPHER_SUITE_SET_FAILED       /* Failed to set custom cipher suite */
 } redisSSLContextError;
 
 /**
@@ -105,6 +106,20 @@ redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *
  * Free a previously created OpenSSL context.
  */
 void redisFreeSSLContext(redisSSLContext *redis_ssl_ctx);
+
+
+/**
+ * Helper function to set custom cipher suite on SSL context.
+ *
+ * cipher_suite is a string in the form of ECDHE+AESGCM:ECDHE+CHACHA20:+AES128
+ *
+ * If error is non-null, it will be populated in case the ciphers setting fails.
+ *
+ * Returne REDIS_ERR in case of an error
+ *
+ */
+int redisSetCiphersSSLContext(const char* cipher_suite, redisSSLContext* redis_ssl_ctx, redisSSLContextError* error);
+
 
 /**
  * Initiate SSL on an existing redisContext.
