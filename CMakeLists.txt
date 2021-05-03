@@ -6,7 +6,7 @@ OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
 OPTION(ENABLE_EXAMPLES "Enable building hiredis examples" OFF)
-OPTION(HIREDIS_PIC "Build Position-Independant-Code (PIC) static libs (when BUILD_SHARED_LIBS OFF)" ON)
+OPTION(HIREDIS_PIC "Build Position-Independent-Code (PIC) static libs (when BUILD_SHARED_LIBS OFF)" ON)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
