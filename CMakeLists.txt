@@ -49,6 +49,7 @@ IF(WIN32)
 ENDIF()
 
 ADD_LIBRARY(hiredis ${hiredis_sources})
+ADD_LIBRARY(hiredis::hiredis ALIAS hiredis)
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
@@ -142,6 +143,7 @@ IF(ENABLE_SSL)
     SET(hiredis_ssl_sources
         ssl.c)
     ADD_LIBRARY(hiredis_ssl ${hiredis_ssl_sources})
+    ADD_LIBRARY(hiredis::hiredis_ssl ALIAS hiredis_ssl)
 
     IF (APPLE)
         SET_PROPERTY(TARGET hiredis_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
