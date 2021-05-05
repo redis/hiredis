@@ -4,10 +4,10 @@ REDIS_SERVER=${REDIS_SERVER:-redis-server}
 REDIS_PORT=${REDIS_PORT:-56379}
 REDIS_SSL_PORT=${REDIS_SSL_PORT:-56443}
 TEST_SSL=${TEST_SSL:-0}
-SKIPS_AS_FAILS=${SKIPS_AS_FAILS-:0}
+SKIPS_AS_FAILS=${SKIPS_AS_FAILS:-0}
 ENABLE_DEBUG_CMD=
 SSL_TEST_ARGS=
-SKIPS_ARG=
+SKIPS_ARG=${SKIPS_ARG:-}
 REDIS_DOCKER=${REDIS_DOCKER:-}
 
 # We need to enable the DEBUG command for redis-server >= 7.0.0
@@ -107,6 +107,6 @@ echo waiting for server
 while [ ! -S "${SOCK_FILE}" ]; do sleep 1; done
 
 # Treat skips as failures if directed
-[ "$SKIPS_AS_FAILS" = 1 ] && SKIPS_ARG="--skips-as-fails"
+[ "$SKIPS_AS_FAILS" = 1 ] && SKIPS_ARG="${SKIPS_ARG} --skips-as-fails"
 
 ${TEST_PREFIX:-} ./hiredis-test -h 127.0.0.1 -p ${REDIS_PORT} -s ${SOCK_FILE} ${SSL_TEST_ARGS} ${SKIPS_ARG}

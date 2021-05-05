@@ -11,19 +11,25 @@ jobs:
     name: Build all, plus default examples, run tests against redis
 
     runs-on: ubuntu-latest
+    env:
+      # the docker image used by the test.sh
+      REDIS_DOCKER: redis:alpine
 
     steps:
 
     - name: install prerequisites
-      run: sudo apt-get update && sudo apt-get install -y libev-dev libevent-dev libglib2.0-dev libssl-dev
+      run: sudo apt-get update && sudo apt-get install -y libev-dev libevent-dev libglib2.0-dev libssl-dev valgrind
     - uses: actions/checkout@v2
     - name: run make
       run: make all examples
     - name: Run unittests
-      env:
-        REDIS_DOCKER: redis:alpine
       run: make check
-
+    - name: Run tests with valgrind
+      env:
+        TEST_PREFIX: valgrind --error-exitcode=100
+        SKIPS_ARG: --skip-throughput
+      run: make check
+  
   build-32-bit:
     name: Build and test minimal 32 bit linux
     runs-on: ubuntu-latest
