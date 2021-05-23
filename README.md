@@ -261,9 +261,9 @@ a single call to `read(2)`):
 redisReply *reply;
 redisAppendCommand(context,"SET foo bar");
 redisAppendCommand(context,"GET foo");
-redisGetReply(context,(void *)&reply); // reply for SET
+redisGetReply(context,(void**)&reply); // reply for SET
 freeReplyObject(reply);
-redisGetReply(context,(void *)&reply); // reply for GET
+redisGetReply(context,(void**)&reply); // reply for GET
 freeReplyObject(reply);
 ```
 This API can also be used to implement a blocking subscriber:
