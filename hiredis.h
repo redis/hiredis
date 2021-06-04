@@ -220,18 +220,21 @@ typedef struct {
 /**
  * Helper macros to initialize options to their specified fields.
  */
-#define REDIS_OPTIONS_SET_TCP(opts, ip_, port_) \
-    (opts)->type = REDIS_CONN_TCP; \
-    (opts)->endpoint.tcp.ip = ip_; \
-    (opts)->endpoint.tcp.port = port_;
+#define REDIS_OPTIONS_SET_TCP(opts, ip_, port_) do { \
+        (opts)->type = REDIS_CONN_TCP;               \
+        (opts)->endpoint.tcp.ip = ip_;               \
+        (opts)->endpoint.tcp.port = port_;           \
+    } while(0)
 
-#define REDIS_OPTIONS_SET_UNIX(opts, path) \
-    (opts)->type = REDIS_CONN_UNIX;        \
-    (opts)->endpoint.unix_socket = path;
+#define REDIS_OPTIONS_SET_UNIX(opts, path) do { \
+        (opts)->type = REDIS_CONN_UNIX;         \
+        (opts)->endpoint.unix_socket = path;    \
+    } while(0)
 
-#define REDIS_OPTIONS_SET_PRIVDATA(opts, data, dtor) \
-    (opts)->privdata = data;                         \
-    (opts)->free_privdata = dtor;                    \
+#define REDIS_OPTIONS_SET_PRIVDATA(opts, data, dtor) do {  \
+        (opts)->privdata = data;                           \
+        (opts)->free_privdata = dtor;                      \
+    } while(0)
 
 typedef struct redisContextFuncs {
     void (*free_privctx)(void *);
