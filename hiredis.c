@@ -974,7 +974,12 @@ int redisBufferWrite(redisContext *c, int *done) {
     if (sdslen(c->obuf) > 0) {
         ssize_t nwritten = c->funcs->write(c);
         if (nwritten < 0) {
-            return REDIS_ERR;
+            if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+                /* Try again later */
+            } else {
+                __redisSetError(c, REDIS_ERR_IO, NULL);
+                return REDIS_ERR;
+            }
         } else if (nwritten > 0) {
             if (nwritten == (ssize_t)sdslen(c->obuf)) {
                 sdsfree(c->obuf);
