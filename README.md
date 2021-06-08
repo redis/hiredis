@@ -522,7 +522,7 @@ redisSSLContext *ssl_context;
 /* An error variable to indicate what went wrong, if the context fails to
  * initialize.
  */
-redisSSLContextError ssl_error;
+redisSSLContextError ssl_error = REDIS_SSL_CTX_NONE;
 
 /* Initialize global OpenSSL state.
  *
@@ -540,12 +540,10 @@ ssl_context = redisCreateSSLContext(
     "redis.mydomain.com",   /* Server name to request (SNI), optional */
     &ssl_error);
 
-if(ssl_context == NULL || ssl_error != 0) {
+if(ssl_context == NULL || ssl_error != REDIS_SSL_CTX_NONE) {
     /* Handle error and abort... */
-    /* e.g. 
-    printf("SSL error: %s\n", 
-        (ssl_error != 0) ? 
-            redisSSLContextGetError(ssl_error) : "Unknown error");
+    /* e.g.
+    printf("SSL error: %s\n", redisSSLContextGetError(ssl_error));
     // Abort
     */
 }
