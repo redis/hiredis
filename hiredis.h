@@ -86,10 +86,7 @@ typedef long long ssize_t;
  */
 #define REDIS_NO_AUTO_FREE 0x200
 
-/**
- * Flag that indicates the user does not want the context to
- * be automatically freed replies
- */
+/* Flag that indicates the user does not want replies to be automatically freed */
 #define REDIS_NO_AUTO_FREE_REPLIES 0x400
 
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
