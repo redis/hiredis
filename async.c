@@ -604,7 +604,8 @@ static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
 
     if (redisCheckConnectDone(c, &completed) == REDIS_ERR) {
         /* Error! */
-        redisCheckSocketError(c);
+        if (redisCheckSocketError(c) == REDIS_ERR)
+            __redisAsyncCopyError(ac);
         __redisAsyncHandleConnectFailure(ac);
         return REDIS_ERR;
     } else if (completed == 1) {
@@ -696,7 +697,7 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
             return;
         }
 
-        if (!ac->c.command_timeout || 
+        if (!ac->c.command_timeout ||
             (!ac->c.command_timeout->tv_sec && !ac->c.command_timeout->tv_usec)) {
             /* A belated connect timeout arriving, ignore */
             return;
