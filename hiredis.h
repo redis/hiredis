@@ -86,6 +86,9 @@ typedef long long ssize_t;
  */
 #define REDIS_NO_AUTO_FREE 0x200
 
+/* Flag that is set when an async finalizer is executed. */
+#define REDIS_IN_FINALIZER 0x400
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
