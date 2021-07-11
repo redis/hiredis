@@ -86,6 +86,9 @@ typedef long long ssize_t;
  */
 #define REDIS_NO_AUTO_FREE 0x200
 
+/* Flag that indicates the user does not want replies to be automatically freed */
+#define REDIS_NO_AUTO_FREE_REPLIES 0x400
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
@@ -152,6 +155,11 @@ struct redisSsl;
 
 /* Don't automatically intercept and free RESP3 PUSH replies. */
 #define REDIS_OPT_NO_PUSH_AUTOFREE 0x08
+
+/**
+ * Don't automatically free replies
+ */
+#define REDIS_OPT_NOAUTOFREEREPLIES 0x10
 
 /* In Unix systems a file descriptor is a regular signed int, with -1
  * representing an invalid descriptor. In Windows it is a SOCKET

@@ -804,6 +804,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
     if (options->options & REDIS_OPT_NOAUTOFREE) {
         c->flags |= REDIS_NO_AUTO_FREE;
     }
+    if (options->options & REDIS_OPT_NOAUTOFREEREPLIES) {
+        c->flags |= REDIS_NO_AUTO_FREE_REPLIES;
+    }
 
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */

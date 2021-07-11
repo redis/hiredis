@@ -569,7 +569,9 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 
         if (cb.fn != NULL) {
             __redisRunCallback(ac,&cb,reply);
-            c->reader->fn->freeObject(reply);
+            if (!(c->flags & REDIS_NO_AUTO_FREE_REPLIES)){
+                c->reader->fn->freeObject(reply);
+            }
 
             /* Proceed with free'ing when redisAsyncFree() was called. */
             if (c->flags & REDIS_FREEING) {
