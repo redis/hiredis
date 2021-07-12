@@ -123,3 +123,41 @@ jobs:
         - cmd.exe //C 'C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat' amd64 '&&'
           cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_EXAMPLES=ON '&&' ninja -v
         - ./hiredis-test.exe
+    - os: linux
+      arch: s390x
+      env:
+        - BITS="64"
+      compiler: gcc
+      addons:
+        apt:
+          update: true
+          packages:
+            - libc6-dbg
+            - libc6-dev
+            - gcc-multilib
+            - g++-multilib
+            - libssl-dev
+            - valgrind
+            - gcc-multilib
+            - g++-multilib
+            - libssl-dev
+            - valgrind
+    - os: linux
+      arch: s390x
+      env:
+        - BITS="64"
+      compiler: clang
+      addons:
+        apt:
+          update: true
+          packages:
+            - libc6-dbg
+            - libc6-dev
+            - gcc-multilib
+            - g++-multilib
+            - libssl-dev
+            - valgrind
+            - gcc-multilib
+            - g++-multilib
+            - libssl-dev
+            - valgrind
