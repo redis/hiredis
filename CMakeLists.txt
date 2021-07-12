@@ -4,7 +4,7 @@ PROJECT(hiredis)
 
 OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
-OPTION(ENABLE_SSL_TESTS, "Should we test SSL connections" OFF)
+OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
