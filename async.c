@@ -29,6 +29,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* turn of windows warnings for _strcmp etc. */
+#define _CRT_NONSTDC_NO_DEPRECATE
+
 #include "fmacros.h"
 #include "alloc.h"
 #include <stdlib.h>
@@ -75,7 +78,7 @@ static void *callbackValDup(void *privdata, const void *src) {
 }
 
 static int callbackKeyCompare(void *privdata, const void *key1, const void *key2) {
-    int l1, l2;
+    size_t l1, l2;
     ((void) privdata);
 
     l1 = sdslen((const sds)key1);
@@ -302,6 +305,34 @@ static void __redisRunPushCallback(redisAsyncContext *ac, redisReply *reply) {
     }
 }
 
+static void __redisRunConnectCallback(redisAsyncContext *ac, int status)
+{
+    if (ac->onConnect) {
+        if (!(ac->c.flags & REDIS_IN_CALLBACK)) {
+            ac->c.flags |= REDIS_IN_CALLBACK;
+            ac->onConnect(ac, status);
+            ac->c.flags &= ~REDIS_IN_CALLBACK;
+        } else {
+            /* already in callback */
+            ac->onConnect(ac, status);
+        }
+    }
+}
+
+static void __redisRunDisconnectCallback(redisAsyncContext *ac, int status)
+{
+    if (ac->onDisconnect) {
+        if (!(ac->c.flags & REDIS_IN_CALLBACK)) {
+            ac->c.flags |= REDIS_IN_CALLBACK;
+            ac->onDisconnect(ac, status);
+            ac->c.flags &= ~REDIS_IN_CALLBACK;
+        } else {
+            /* already in callback */
+            ac->onDisconnect(ac, status);
+        }
+    }
+}
+
 /* Helper function to free the context. */
 static void __redisAsyncFree(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
@@ -339,12 +370,11 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
 
     /* Execute disconnect callback. When redisAsyncFree() initiated destroying
      * this context, the status will always be REDIS_OK. */
-    if (ac->onDisconnect && (c->flags & REDIS_CONNECTED)) {
-        if (c->flags & REDIS_FREEING) {
-            ac->onDisconnect(ac,REDIS_OK);
-        } else {
-            ac->onDisconnect(ac,(ac->err == 0) ? REDIS_OK : REDIS_ERR);
-        }
+    if (c->flags & REDIS_CONNECTED) {
+        int status = ac->err == 0 ? REDIS_OK : REDIS_ERR;
+        if (c->flags & REDIS_FREEING)
+            status = REDIS_OK;
+        __redisRunDisconnectCallback(ac, status);
     }
 
     if (ac->dataCleanup) {
@@ -593,7 +623,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 }
 
 static void __redisAsyncHandleConnectFailure(redisAsyncContext *ac) {
-    if (ac->onConnect) ac->onConnect(ac, REDIS_ERR);
+    __redisRunConnectCallback(ac, REDIS_ERR);
     __redisAsyncDisconnect(ac);
 }
 
@@ -618,8 +648,19 @@ static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
             return REDIS_ERR;
         }
 
-        if (ac->onConnect) ac->onConnect(ac, REDIS_OK);
+        /* flag us as fully connect, but allow the callback
+         * to disconnect.  For that reason, permit the function
+         * to delete the context here after callback return.
+         */
         c->flags |= REDIS_CONNECTED;
+        __redisRunConnectCallback(ac, REDIS_OK);
+        if ((ac->c.flags & REDIS_DISCONNECTING)) {
+            redisAsyncDisconnect(ac);
+            return REDIS_ERR;
+        } else if ((ac->c.flags & REDIS_FREEING)) {
+            redisAsyncFree(ac);
+            return REDIS_ERR;
+        }
         return REDIS_OK;
     } else {
         return REDIS_OK;
@@ -643,6 +684,8 @@ void redisAsyncRead(redisAsyncContext *ac) {
  */
 void redisAsyncHandleRead(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
+    /* must not be called from a callback */
+    assert(!(c->flags & REDIS_IN_CALLBACK));
 
     if (!(c->flags & REDIS_CONNECTED)) {
         /* Abort connect was not successful. */
@@ -676,6 +719,8 @@ void redisAsyncWrite(redisAsyncContext *ac) {
 
 void redisAsyncHandleWrite(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
+    /* must not be called from a callback */
+    assert(!(c->flags & REDIS_IN_CALLBACK));
 
     if (!(c->flags & REDIS_CONNECTED)) {
         /* Abort connect was not successful. */
@@ -692,6 +737,8 @@ void redisAsyncHandleWrite(redisAsyncContext *ac) {
 void redisAsyncHandleTimeout(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     redisCallback cb;
+    /* must not be called from a callback */
+    assert(!(c->flags & REDIS_IN_CALLBACK));
 
     if ((c->flags & REDIS_CONNECTED)) {
         if ( ac->replies.head == NULL) {
@@ -711,8 +758,8 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
         __redisAsyncCopyError(ac);
     }
 
-    if (!(c->flags & REDIS_CONNECTED) && ac->onConnect) {
-        ac->onConnect(ac, REDIS_ERR);
+    if (!(c->flags & REDIS_CONNECTED)) {
+        __redisRunConnectCallback(ac, REDIS_ERR);
     }
 
     while (__redisShiftCallback(&ac->replies, &cb) == REDIS_OK) {

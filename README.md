@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
+[![C/C++ CI](https://github.com/kristjanvalur/hiredis/actions/workflows/test.yml/badge.svg)](https://github.com/kristjanvalur/hiredis/actions/workflows/test.yml)
 
 **This Readme reflects the latest changed in the master branch. See [v1.0.0](https://github.com/redis/hiredis/tree/v1.0.0) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
 

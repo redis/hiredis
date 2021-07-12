@@ -312,12 +312,12 @@ static size_t bulklen(size_t len) {
 int redisvFormatCommand(char **target, const char *format, va_list ap) {
     const char *c = format;
     char *cmd = NULL; /* final command */
-    int pos; /* position in final command */
+    size_t pos; /* position in final command */
     sds curarg, newarg; /* current argument */
     int touched = 0; /* was the current argument touched? */
     char **curargv = NULL, **newargv = NULL;
     int argc = 0;
-    int totlen = 0;
+    size_t totlen = 0;
     int error_type = 0; /* 0 = no error; -1 = memory error; -2 = format error */
     int j;
 
@@ -516,7 +516,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
 
     hi_free(curargv);
     *target = cmd;
-    return totlen;
+    return (int)totlen;
 
 format_err:
     error_type = -2;
@@ -576,7 +576,7 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
                               const size_t *argvlen)
 {
     sds cmd, aux;
-    unsigned long long totlen;
+    size_t totlen;
     int j;
     size_t len;
 
@@ -617,7 +617,7 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
     assert(sdslen(cmd)==totlen);
 
     *target = cmd;
-    return totlen;
+    return (int) totlen; /* should use ssize_t */
 }
 
 void redisFreeSdsCommand(sds cmd) {
@@ -631,9 +631,10 @@ void redisFreeSdsCommand(sds cmd) {
  */
 int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
     char *cmd = NULL; /* final command */
-    int pos; /* position in final command */
+    size_t pos; /* position in final command */
     size_t len;
-    int totlen, j;
+    size_t totlen;
+    int j;
 
     /* Abort on a NULL target */
     if (target == NULL)
@@ -664,7 +665,7 @@ int redisFormatCommandArgv(char **target, int argc, const char **argv, const siz
     cmd[pos] = '\0';
 
     *target = cmd;
-    return totlen;
+    return (int)totlen;  /* should really use ssize_t */
 }
 
 void redisFreeCommand(char *cmd) {
@@ -942,7 +943,7 @@ redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn) {
  * see if there is a reply available. */
 int redisBufferRead(redisContext *c) {
     char buf[1024*16];
-    int nread;
+    ssize_t nread;
 
     /* Return early when the context has seen an error. */
     if (c->err)

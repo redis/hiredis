@@ -1,3 +1,6 @@
+/* turn of windows warnings for _strcmp etc. */
+#define _CRT_NONSTDC_NO_DEPRECATE
+
 #include "fmacros.h"
 #include "sockcompat.h"
 #include <stdio.h>
@@ -15,6 +18,7 @@
 
 #include "hiredis.h"
 #include "async.h"
+#include "adapters/poll.h"
 #ifdef HIREDIS_TEST_SSL
 #include "hiredis_ssl.h"
 #endif
@@ -65,7 +69,7 @@ redisSSLContext *_ssl_ctx = NULL;
 
 /* The following lines make up our testing "framework" :) */
 static int tests = 0, fails = 0, skips = 0;
-#define test(_s) { printf("#%02d ", ++tests); printf(_s); }
+#define test(_s) { printf("#%02d ", ++tests); printf(_s); fflush(stdout); }
 #define test_cond(_c) if(_c) printf("\033[0;32mPASSED\033[0;0m\n"); else {printf("\033[0;31mFAILED\033[0;0m\n"); fails++;}
 #define test_skipped() { printf("\033[01;33mSKIPPED\033[0;0m\n"); skips++; }
 
@@ -167,7 +171,7 @@ static void send_client_tracking(redisContext *c, const char *str) {
     freeReplyObject(reply);
 }
 
-static int disconnect(redisContext *c, int keep_fd) {
+static redisFD disconnect(redisContext *c, int keep_fd) {
     redisReply *reply;
 
     /* Make sure we're on DB 9. */
@@ -182,7 +186,7 @@ static int disconnect(redisContext *c, int keep_fd) {
     if (keep_fd)
         return redisFreeKeepFd(c);
     redisFree(c);
-    return -1;
+    return REDIS_INVALID_FD;
 }
 
 static void do_ssl_handshake(redisContext *c) {
@@ -211,8 +215,8 @@ static redisContext *do_connect(struct config config) {
         /* Create a dummy connection just to get an fd to inherit */
         redisContext *dummy_ctx = redisConnectUnix(config.unix_sock.path);
         if (dummy_ctx) {
-            int fd = disconnect(dummy_ctx, 1);
-            printf("Connecting to inherited fd %d\n", fd);
+            redisFD fd = disconnect(dummy_ctx, 1);
+            printf("Connecting to inherited fd %d\n", (int)fd);
             c = redisConnectFd(fd);
         }
     } else {
@@ -1411,6 +1415,248 @@ static void test_throughput(struct config config) {
 //     redisFree(c);
 // }
 
+
+/* tests for async api */
+struct _astest {
+    redisAsyncContext *ac;
+    int testno;
+    int counter;
+    int connects;
+    int connect_status;
+    int disconnects;
+    int disconnect_status;
+    int connected;
+};
+static struct _astest astest;
+static void asCleanup(void* data)
+{
+    struct _astest *t = (struct _astest *)data;
+    t->ac = NULL;
+}
+
+static void asleep(int ms)
+{
+#if _MSC_VER
+    Sleep(ms);
+#else
+    usleep(ms*1000);
+#endif
+}
+
+static void connectCallback(const redisAsyncContext *c, int status) {
+    struct _astest *t = (struct _astest *)c->data;
+    assert(t == &astest);
+    assert(t->connects == 0);
+    t->connects++;
+    t->connect_status = status;
+    t->connected = status == REDIS_OK ? 1 : -1;
+        
+    if (t->testno == 3) {
+        /* disconnect directly. */
+       redisAsyncDisconnect(t->ac);
+    }
+    else if (t->testno == 4) {
+        /* disconnect directly. */
+        redisAsyncFree(t->ac);
+    }
+}
+static void disconnectCallback(const redisAsyncContext *c, int status) {
+    assert(c->data == (void*)&astest);
+    assert(astest.disconnects == 0);
+    astest.disconnects++;
+    astest.disconnect_status = status;
+    astest.connected = 0;
+}
+
+static void commandCallback(struct redisAsyncContext *ac, void* _reply, void* _privdata)
+{
+    redisReply *reply = (redisReply*)_reply;
+    struct _astest *t = (struct _astest *)ac->data;
+    assert(t == &astest);
+    (void)_privdata;
+    if (t->testno == 5)
+    {
+        test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+        redisAsyncFree(ac);
+    }
+    if (t->testno == 6)
+    {
+        /* two ping pongs */
+        assert(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+        if (++t->counter == 1) {
+            int status = redisAsyncCommand(ac, commandCallback, NULL, "PING");
+            assert(status == REDIS_OK);
+        } else {
+            test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+            redisAsyncFree(ac);
+        }
+    }
+}
+
+static redisAsyncContext *do_aconnect(struct config config, int testno)
+{
+    redisOptions options = {0};
+    memset(&astest, 0, sizeof(astest));
+    
+    astest.testno = testno;
+    astest.connect_status = astest.disconnect_status = -2;
+
+    if (config.type == CONN_TCP) {
+        options.type = REDIS_CONN_TCP;
+        options.connect_timeout = &config.tcp.timeout;
+        REDIS_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
+    } else if (config.type == CONN_SSL) {
+        options.type = REDIS_CONN_TCP;
+        options.connect_timeout = &config.tcp.timeout;
+        REDIS_OPTIONS_SET_TCP(&options, config.ssl.host, config.ssl.port);
+    } else if (config.type == CONN_UNIX) {
+        options.type = REDIS_CONN_UNIX;
+        options.endpoint.unix_socket = config.unix_sock.path;
+    } else if (config.type == CONN_FD) {
+        options.type = REDIS_CONN_USERFD;
+        /* Create a dummy connection just to get an fd to inherit */
+        redisContext *dummy_ctx = redisConnectUnix(config.unix_sock.path);
+        if (dummy_ctx) {
+            redisFD fd = disconnect(dummy_ctx, 1);
+            printf("Connecting to inherited fd %d\n", (int)fd);
+            options.endpoint.fd = fd;
+        }
+    }
+    redisAsyncContext *c = redisAsyncConnectWithOptions(&options);
+    assert(c);
+    astest.ac = c;
+    c->data = &astest;
+    c->dataCleanup = asCleanup;
+    redisPollAttach(c);
+    redisAsyncSetConnectCallback(c, connectCallback);
+    redisAsyncSetDisconnectCallback(c, disconnectCallback);
+    return c;
+}
+
+static void test_async(struct config config) {
+    int status;
+    redisAsyncContext *c;
+    struct config defaultconfig = config;
+   
+    test("Async connect: ");
+    c = do_aconnect(config, 0);
+    assert(c);
+    while(astest.connected == 0)
+        redisPollTick(c, 0.1);
+    assert(astest.connects == 1);
+    assert(astest.connect_status == REDIS_OK);
+    assert(astest.disconnects == 0);
+    test_cond(astest.connected == 1);
+
+    test("Async free after connect: ");
+    assert(astest.ac != NULL);
+    redisAsyncFree(c);
+    assert(astest.disconnects == 1);
+    assert(astest.ac == NULL);
+    test_cond(astest.disconnect_status == REDIS_OK);
+
+    test("Async connect timeout: ");
+    if (config.type == CONN_TCP)
+    {
+        config.tcp.host = "192.168.254.254";  /* blackhole ip */
+        config.tcp.timeout.tv_usec = 100000;
+        c = do_aconnect(config, 1);
+        assert(c);
+        assert(c->err == 0);
+        while(astest.connected == 0)
+            redisPollTick(c, 0.1);
+        assert(astest.connected == -1);
+        /*
+         * freeing should not be done, clearing should have happened.
+         *redisAsyncFree(c);
+         */
+        assert(astest.ac == NULL);
+        test_cond(astest.connect_status == REDIS_ERR);
+    } else
+        test_skipped();
+    config = defaultconfig;
+
+    /* The following test hangs on windows, unless fix for async
+     * connect on windows is applied
+     * https://github.com/redis/hiredis/issues/947
+     */
+    test("Async connect failure: ");
+    if (config.type == CONN_TCP)
+    {
+        config.tcp.port = 12345;  /* non-listening port */
+        c = do_aconnect(config, 2);
+        assert(c);
+        assert(c->err == 0);
+        while(astest.connected == 0)
+            redisPollTick(c, 0.1);
+        assert(astest.connected == -1);
+        assert(astest.ac == NULL);
+        test_cond(astest.connect_status == REDIS_ERR);
+    } else
+        test_skipped();
+    config = defaultconfig;
+
+    /* Test that we can disconnect directly from the
+     * connect callback.  This needs needs a separate fix
+     * see: https://github.com/redis/hiredis/issues/946
+     */
+    test("Async disconnect from connect callback: ");
+    c = do_aconnect(config, 3);
+    assert(c);
+    while(astest.ac)
+        redisPollTick(c, 0.1);
+    /* did connect */
+    assert(astest.connects == 1);
+    assert(astest.connect_status == REDIS_OK);
+    /* but now should be disconnected */
+    assert(astest.disconnects == 1);
+    assert(!astest.ac);
+    test_cond(astest.connected == 0);
+
+    test("Async free from connect callback: ");
+    c = do_aconnect(config, 4);
+    assert(c);
+    while(astest.ac)
+        redisPollTick(c, 0.1);
+    /* did connect */
+    assert(astest.connects == 1);
+    assert(astest.connect_status == REDIS_OK);
+    /* but now should be disconnected */
+    assert(astest.disconnects == 1);
+    assert(!astest.ac);
+    test_cond(astest.connected == 0);
+    
+    /* Test a ping/pong after connection */
+    test("Async PING/PONG: ");
+    c = do_aconnect(config, 5);
+    while(astest.connected == 0)
+        redisPollTick(c, 0.1);
+    status = redisAsyncCommand(c, commandCallback, NULL, "PING");
+    assert(status == REDIS_OK);
+    while(astest.ac)
+        redisPollTick(c, 0.1);
+    
+    /* Test a ping/pong after connection that didn't time out.
+     * see https://github.com/redis/hiredis/issues/945
+     */
+    test("Async PING/PONG after connect timeout: ");
+    if (config.type == CONN_TCP)
+    {
+        config.tcp.timeout.tv_usec = 10000; /* 10ms  */
+        c = do_aconnect(config, 6);
+        while(astest.connected == 0)
+            redisPollTick(c, 0.1);
+        /* sleep 0.1 s, allowing old timeout to arrive */
+        asleep(10);
+        status = redisAsyncCommand(c, commandCallback, NULL, "PING");
+        assert(status == REDIS_OK);
+        while(astest.ac)
+            redisPollTick(c, 0.1);
+    }
+    config = defaultconfig;
+
+}
+
 int main(int argc, char **argv) {
     struct config cfg = {
         .tcp = {
@@ -1494,6 +1740,7 @@ int main(int argc, char **argv) {
     test_invalid_timeout_errors(cfg);
     test_append_formatted_commands(cfg);
     if (throughput) test_throughput(cfg);
+    test_async(cfg);
 
     printf("\nTesting against Unix socket connection (%s): ", cfg.unix_sock.path);
     if (test_unix_socket) {
