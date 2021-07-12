@@ -273,6 +273,11 @@ redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *
             if (error) *error = REDIS_SSL_CTX_CA_CERT_LOAD_FAILED;
             goto error;
         }
+    } else {
+        if (!SSL_CTX_set_default_verify_paths(ctx->ssl_ctx)) {
+            if (error) *error = REDIS_SSL_CTX_CLIENT_DEFAULT_CERT_FAILED;
+            goto error;
+        }
     }
 
     if (cert_filename) {
