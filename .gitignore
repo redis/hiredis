@@ -7,3 +7,5 @@
 /*.pc
 *.dSYM
 tags
+build
+
