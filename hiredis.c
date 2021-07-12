@@ -231,6 +231,11 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
         freeReplyObject(r);
         return NULL;
     }
+    else if (len+1 == 0) {
+        hi_free(r->str);
+        freeReplyObject(r);
+        return NULL;
+    }
 
     /* The double reply also has the original protocol string representing a
      * double as a null terminated string. This way the caller does not need
