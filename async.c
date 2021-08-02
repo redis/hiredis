@@ -820,7 +820,8 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, redis
             if (de != NULL) {
                 existcb = dictGetEntryVal(de);
                 cb.pending_subs = existcb->pending_subs + 1;
-                __redisRunFinalizer(ac,existcb);
+                if (existcb->privdata != cb.privdata)
+                    __redisRunFinalizer(ac,existcb);
             }
 
             ret = dictReplace(cbdict,sname,&cb);
