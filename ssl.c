@@ -44,7 +44,6 @@
 #endif
 
 #include <openssl/ssl.h>
-#include <openssl/err.h>
 
 #include "win32.h"
 #include "async_private.h"
