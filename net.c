@@ -50,6 +50,8 @@
 /* Defined in hiredis.c */
 void __redisSetError(redisContext *c, int type, const char *str);
 
+int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
+
 void redisNetClose(redisContext *c) {
     if (c && c->fd != REDIS_INVALID_FD) {
         close(c->fd);
@@ -333,6 +335,10 @@ int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
     const void *to_ptr = &tv;
     size_t to_sz = sizeof(tv);
 
+    if (redisContextUpdateCommandTimeout(c, &tv) != REDIS_OK) {
+        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+        return REDIS_ERR;
+    }
     if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,to_ptr,to_sz) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(SO_RCVTIMEO)");
         return REDIS_ERR;

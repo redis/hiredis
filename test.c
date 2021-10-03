@@ -1156,7 +1156,13 @@ static void test_blocking_connection_timeouts(struct config config) {
     test("Does not return a reply when the command times out: ");
     if (detect_debug_sleep(c)) {
         redisAppendFormattedCommand(c, sleep_cmd, strlen(sleep_cmd));
+
+        // flush connection buffer without waiting for the reply
         s = c->funcs->write(c);
+        assert(s == (ssize_t)sdslen(c->obuf));
+        sdsfree(c->obuf);
+        c->obuf = sdsempty();
+
         tv.tv_sec = 0;
         tv.tv_usec = 10000;
         redisSetTimeout(c, tv);
@@ -1169,6 +1175,9 @@ static void test_blocking_connection_timeouts(struct config config) {
                   strcmp(c->errstr, "recv timeout") == 0);
 #endif
         freeReplyObject(reply);
+
+        // wait for the DEBUG SLEEP to complete so that Redis server is unblocked for the following tests
+        sleep(3);
     } else {
         test_skipped();
     }
