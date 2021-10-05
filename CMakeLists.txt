@@ -123,7 +123,11 @@ export(EXPORT hiredis-targets
     FILE "${CMAKE_CURRENT_BINARY_DIR}/hiredis-targets.cmake"
     NAMESPACE hiredis::)
 
-SET(CMAKE_CONF_INSTALL_DIR share/hiredis)
+if(WIN32)
+    SET(CMAKE_CONF_INSTALL_DIR share/hiredis)
+else()
+    SET(CMAKE_CONF_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/hiredis)
+endif()
 SET(INCLUDE_INSTALL_DIR include)
 include(CMakePackageConfigHelpers)
 configure_package_config_file(hiredis-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
@@ -201,7 +205,11 @@ IF(ENABLE_SSL)
            FILE "${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl-targets.cmake"
            NAMESPACE hiredis::)
 
-    SET(CMAKE_CONF_INSTALL_DIR share/hiredis_ssl)
+    if(WIN32)
+        SET(CMAKE_CONF_INSTALL_DIR share/hiredis_ssl)
+    else()
+        SET(CMAKE_CONF_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/hiredis_ssl)
+    endif()
     configure_package_config_file(hiredis_ssl-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl-config.cmake
                                   INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
                                   PATH_VARS INCLUDE_INSTALL_DIR)
