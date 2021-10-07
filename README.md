@@ -22,9 +22,11 @@ Redis version >= 1.2.0.
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
 
-## Upgrading to `1.0.1`
+## Upgrading to `1.0.2`
 
-Version 1.0.1 is simply 1.0.0 with a fix for [CVE-2021-32765](https://github.com/redis/hiredis/security/advisories/GHSA-hfm9-39pp-55p2).  They are otherwise identical.
+<span style="color:red">NOTE:  v1.0.1 erroneously bumped SONAME, which is why it is skipped here.</span>
+
+Version 1.0.2 is simply 1.0.0 with a fix for [CVE-2021-32765](https://github.com/redis/hiredis/security/advisories/GHSA-hfm9-39pp-55p2).  They are otherwise identical.
 
 ## Upgrading to `1.0.0`
 

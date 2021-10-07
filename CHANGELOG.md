@@ -1,4 +1,13 @@
+## [1.0.2](https://github.com/redis/hiredis/tree/v1.0.2) - (2021-10-07)
+
+Announcing Hiredis v1.0.2, which fixes CVE-2021-32765 but returns the SONAME to the correct value of `1.0.0`.
+
+- [Revert SONAME bump](https://github.com/redis/hiredis/commit/d4e6f109a064690cde64765c654e679fea1d3548)
+  ([Michael Grunder](https://github.com/michael-grunder))
+
 ## [1.0.1](https://github.com/redis/hiredis/tree/v1.0.1) - (2021-10-04)
+
+<span style="color:red">This release erroneously bumped the SONAME, please use [1.0.2](https://github.com/redis/hiredis/tree/v1.0.2)</span>
 
 Announcing Hiredis v1.0.1, a security release fixing CVE-2021-32765
 
