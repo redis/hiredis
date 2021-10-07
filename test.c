@@ -59,6 +59,8 @@ struct pushCounters {
     int str;
 };
 
+static int insecure_calloc_calls;
+
 #ifdef HIREDIS_TEST_SSL
 redisSSLContext *_ssl_ctx = NULL;
 #endif
@@ -765,6 +767,11 @@ static void *hi_calloc_fail(size_t nmemb, size_t size) {
     return NULL;
 }
 
+static void *hi_calloc_insecure(size_t nmemb, size_t size) {
+    insecure_calloc_calls++;
+    return (void*)0xdeadc0de;
+}
+
 static void *hi_realloc_fail(void *ptr, size_t size) {
     (void)ptr;
     (void)size;
@@ -772,6 +779,8 @@ static void *hi_realloc_fail(void *ptr, size_t size) {
 }
 
 static void test_allocator_injection(void) {
+    void *ptr;
+
     hiredisAllocFuncs ha = {
         .mallocFn = hi_malloc_fail,
         .callocFn = hi_calloc_fail,
@@ -790,6 +799,13 @@ static void test_allocator_injection(void) {
     test("redisReader uses injected allocators: ");
     redisReader *reader = redisReaderCreate();
     test_cond(reader == NULL);
+
+    /* Make sure hiredis itself protects against a non-overflow checking calloc */
+    test("hiredis calloc wrapper protects against overflow: ");
+    ha.callocFn = hi_calloc_insecure;
+    hiredisSetAllocators(&ha);
+    ptr = hi_calloc((SIZE_MAX / sizeof(void*)) + 3, sizeof(void*));
+    test_cond(ptr == NULL && insecure_calloc_calls == 0);
 
     // Return allocators to default
     hiredisResetAllocators();
