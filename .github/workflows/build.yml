@@ -63,3 +63,27 @@ jobs:
 
       - name: Run tests
         run: $GITHUB_WORKSPACE/test.sh
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ env.GITHUB_REPOSITORY }}
+          ref: ${{ env.GITHUB_HEAD_REF }}
+
+      - name: Install dependencies
+        run: |
+          choco install -y ninja memurai-developer
+
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build hiredis
+        run: |
+          mkdir build && cd build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_EXAMPLES=ON
+          ninja -v
+
+      - name: Run tests
+        run: |
+          ./build/hiredis-test.exe
