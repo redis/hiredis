@@ -768,6 +768,8 @@ static void *hi_calloc_fail(size_t nmemb, size_t size) {
 }
 
 static void *hi_calloc_insecure(size_t nmemb, size_t size) {
+    (void)nmemb;
+    (void)size;
     insecure_calloc_calls++;
     return (void*)0xdeadc0de;
 }
