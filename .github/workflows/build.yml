@@ -11,17 +11,32 @@ jobs:
           repository: ${{ env.GITHUB_REPOSITORY }}
           ref: ${{ env.GITHUB_HEAD_REF }}
 
-      - name: Install redis-server
+      - name: Install dependencies
         run: |
           sudo add-apt-repository -y ppa:chris-lea/redis-server
           sudo apt-get update
-          sudo apt-get install -y redis-server
+          sudo apt-get install -y redis-server valgrind
+      
+      - name: Build using cmake
+        env: 
+          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON
+          CFLAGS: -Werror
+          CXXFLAGS: -Werror
+        run: mkdir build-ubuntu && cd build-ubuntu && cmake ..
 
-      - name: Build hiredis
+      - name: Build using makefile
         run: USE_SSL=1 make
 
       - name: Run tests
+        env:
+          SKIPS_AS_FAILS: 1
         run: $GITHUB_WORKSPACE/test.sh
+
+      #      - name: Run tests under valgrind
+      #        env:
+      #          SKIPS_AS_FAILS: 1
+      #          TEST_PREFIX: valgrind --track-origins=yes --leak-check=full
+      #        run: $GITHUB_WORKSPACE/test.sh
 
   centos7:
     runs-on: ubuntu-latest
@@ -37,12 +52,27 @@ jobs:
         run: |
           yum -y install http://rpms.remirepo.net/enterprise/remi-release-7.rpm
           yum -y --enablerepo=remi install redis
-          yum -y install gcc make openssl-devel
+          yum -y install gcc gcc-c++ make openssl-devel cmake3 valgrind
 
-      - name: Build hiredis
+      - name: Build using cmake
+        env: 
+          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON
+          CFLAGS: -Werror
+          CXXFLAGS: -Werror
+        run: mkdir build-centos7 && cd build-centos7 && cmake3 ..
+
+      - name: Build using Makefile
         run: USE_SSL=1 make
 
       - name: Run tests
+        env:
+          SKIPS_AS_FAILS: 1
+        run: $GITHUB_WORKSPACE/test.sh
+
+      - name: Run tests under valgrind
+        env:
+          SKIPS_AS_FAILS: 1
+          TEST_PREFIX: valgrind --track-origins=yes --leak-check=full
         run: $GITHUB_WORKSPACE/test.sh
 
   centos8:
@@ -60,12 +90,27 @@ jobs:
           dnf -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
           dnf -y module install redis:remi-6.0
           dnf -y group install "Development Tools"
-          dnf -y install openssl-devel
+          dnf -y install openssl-devel cmake valgrind 
 
-      - name: Build hiredis
+      - name: Build using cmake
+        env: 
+          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON
+          CFLAGS: -Werror
+          CXXFLAGS: -Werror
+        run: mkdir build-centos8 && cd build-centos8 && cmake ..
+
+      - name: Build using Makefile
         run: USE_SSL=1 make
 
       - name: Run tests
+        env:
+          SKIPS_AS_FAILS: 1
+        run: $GITHUB_WORKSPACE/test.sh
+
+      - name: Run tests under valgrind
+        env:
+          SKIPS_AS_FAILS: 1
+          TEST_PREFIX: valgrind --track-origins=yes --leak-check=full
         run: $GITHUB_WORKSPACE/test.sh
 
   macos:
