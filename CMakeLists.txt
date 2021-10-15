@@ -47,6 +47,8 @@ ENDIF()
 
 ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
 ADD_LIBRARY(hiredis_static STATIC ${hiredis_sources})
+ADD_LIBRARY(hiredis::hiredis ALIAS hiredis)
+ADD_LIBRARY(hiredis::hiredis_static ALIAS hiredis_static)
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
