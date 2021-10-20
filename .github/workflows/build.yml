@@ -30,6 +30,7 @@ jobs:
       - name: Run tests
         env:
           SKIPS_AS_FAILS: 1
+          TEST_SSL: 1
         run: $GITHUB_WORKSPACE/test.sh
 
       #      - name: Run tests under valgrind
@@ -52,7 +53,7 @@ jobs:
         run: |
           yum -y install http://rpms.remirepo.net/enterprise/remi-release-7.rpm
           yum -y --enablerepo=remi install redis
-          yum -y install gcc gcc-c++ make openssl-devel cmake3 valgrind
+          yum -y install gcc gcc-c++ make openssl openssl-devel cmake3 valgrind
 
       - name: Build using cmake
         env: 
@@ -67,11 +68,13 @@ jobs:
       - name: Run tests
         env:
           SKIPS_AS_FAILS: 1
+          TEST_SSL: 1
         run: $GITHUB_WORKSPACE/test.sh
 
       - name: Run tests under valgrind
         env:
           SKIPS_AS_FAILS: 1
+          TEST_SSL: 1
           TEST_PREFIX: valgrind --track-origins=yes --leak-check=full
         run: $GITHUB_WORKSPACE/test.sh
 
@@ -105,11 +108,13 @@ jobs:
       - name: Run tests
         env:
           SKIPS_AS_FAILS: 1
+          TEST_SSL: 1
         run: $GITHUB_WORKSPACE/test.sh
 
       - name: Run tests under valgrind
         env:
           SKIPS_AS_FAILS: 1
+          TEST_SSL: 1
           TEST_PREFIX: valgrind --track-origins=yes --leak-check=full
         run: $GITHUB_WORKSPACE/test.sh
 
@@ -130,6 +135,8 @@ jobs:
         run: USE_SSL=1 make
 
       - name: Run tests
+        env:
+          TEST_SSL: 1
         run: $GITHUB_WORKSPACE/test.sh
 
   windows:
