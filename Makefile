@@ -73,7 +73,7 @@ USE_SSL?=0
 
 # This is required for test.c only
 ifeq ($(USE_SSL),1)
-  CFLAGS+=-DHIREDIS_TEST_SSL
+  export CFLAGS+=-DHIREDIS_TEST_SSL
 endif
 
 ifeq ($(uname_S),Linux)
@@ -299,7 +299,7 @@ gprof:
 	$(MAKE) CFLAGS="-pg" LDFLAGS="-pg"
 
 gcov:
-	$(MAKE) CFLAGS="-fprofile-arcs -ftest-coverage" LDFLAGS="-fprofile-arcs"
+	$(MAKE) CFLAGS+="-fprofile-arcs -ftest-coverage" LDFLAGS="-fprofile-arcs"
 
 coverage: gcov
 	make check
