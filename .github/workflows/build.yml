@@ -15,17 +15,17 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:chris-lea/redis-server
           sudo apt-get update
-          sudo apt-get install -y redis-server valgrind
+          sudo apt-get install -y redis-server valgrind libevent-dev
       
       - name: Build using cmake
         env: 
-          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON
+          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
         run: mkdir build-ubuntu && cd build-ubuntu && cmake ..
 
       - name: Build using makefile
-        run: USE_SSL=1 make
+        run: USE_SSL=1 TEST_ASYNC=1 make
 
       - name: Run tests
         env:
@@ -53,17 +53,17 @@ jobs:
         run: |
           yum -y install http://rpms.remirepo.net/enterprise/remi-release-7.rpm
           yum -y --enablerepo=remi install redis
-          yum -y install gcc gcc-c++ make openssl openssl-devel cmake3 valgrind
+          yum -y install gcc gcc-c++ make openssl openssl-devel cmake3 valgrind libevent-devel
 
       - name: Build using cmake
         env: 
-          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON
+          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
         run: mkdir build-centos7 && cd build-centos7 && cmake3 ..
 
       - name: Build using Makefile
-        run: USE_SSL=1 make
+        run: USE_SSL=1 TEST_ASYNC=1 make
 
       - name: Run tests
         env:
@@ -93,17 +93,17 @@ jobs:
           dnf -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
           dnf -y module install redis:remi-6.0
           dnf -y group install "Development Tools"
-          dnf -y install openssl-devel cmake valgrind 
+          dnf -y install openssl-devel cmake valgrind libevent-devel
 
       - name: Build using cmake
         env: 
-          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON
+          EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
         run: mkdir build-centos8 && cd build-centos8 && cmake ..
 
       - name: Build using Makefile
-        run: USE_SSL=1 make
+        run: USE_SSL=1 TEST_ASYNC=1 make
 
       - name: Run tests
         env:
