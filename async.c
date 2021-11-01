@@ -144,8 +144,8 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
 
     ac->replies.head = NULL;
     ac->replies.tail = NULL;
-    ac->sub.invalid.head = NULL;
-    ac->sub.invalid.tail = NULL;
+    ac->sub.replies.head = NULL;
+    ac->sub.replies.tail = NULL;
     ac->sub.channels = channels;
     ac->sub.patterns = patterns;
 
@@ -312,9 +312,7 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     /* Execute pending callbacks with NULL reply. */
     while (__redisShiftCallback(&ac->replies,&cb) == REDIS_OK)
         __redisRunCallback(ac,&cb,NULL);
-
-    /* Execute callbacks for invalid commands */
-    while (__redisShiftCallback(&ac->sub.invalid,&cb) == REDIS_OK)
+    while (__redisShiftCallback(&ac->sub.replies,&cb) == REDIS_OK)
         __redisRunCallback(ac,&cb,NULL);
 
     /* Run subscription callbacks with NULL reply */
@@ -468,8 +466,8 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
         }
         sdsfree(sname);
     } else {
-        /* Shift callback for invalid commands. */
-        __redisShiftCallback(&ac->sub.invalid,dstcb);
+        /* Get callback for pending command during subscribe. */
+        __redisShiftCallback(&ac->sub.replies,dstcb);
     }
     return REDIS_OK;
 oom:
@@ -815,9 +813,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
             goto oom;
     } else {
         if (c->flags & REDIS_SUBSCRIBED) {
-            /* This will likely result in an error reply, but it needs to be
-             * received and passed to the callback. */
-            if (__redisPushCallback(&ac->sub.invalid,&cb) != REDIS_OK)
+            if (__redisPushCallback(&ac->sub.replies,&cb) != REDIS_OK)
                 goto oom;
         } else {
             if (__redisPushCallback(&ac->replies,&cb) != REDIS_OK)
