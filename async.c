@@ -144,8 +144,6 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
 
     ac->replies.head = NULL;
     ac->replies.tail = NULL;
-    ac->sub.replies.head = NULL;
-    ac->sub.replies.tail = NULL;
     ac->sub.channels = channels;
     ac->sub.patterns = patterns;
 
@@ -312,8 +310,6 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     /* Execute pending callbacks with NULL reply. */
     while (__redisShiftCallback(&ac->replies,&cb) == REDIS_OK)
         __redisRunCallback(ac,&cb,NULL);
-    while (__redisShiftCallback(&ac->sub.replies,&cb) == REDIS_OK)
-        __redisRunCallback(ac,&cb,NULL);
 
     /* Run subscription callbacks with NULL reply */
     if (ac->sub.channels) {
@@ -465,11 +461,10 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
             }
         }
         sdsfree(sname);
-    } else {
-        /* Shift callback for pending command in subscribed context. */
-        __redisShiftCallback(&ac->sub.replies,dstcb);
+        return REDIS_OK;
     }
-    return REDIS_OK;
+    return REDIS_ERR;
+
 oom:
     __redisSetError(&(ac->c), REDIS_ERR_OOM, "Out of memory");
     return REDIS_ERR;
@@ -538,35 +533,34 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
             continue;
         }
 
-        /* Even if the context is subscribed, pending regular
-         * callbacks will get a reply before pub/sub messages arrive. */
-        if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
-            /*
-             * A spontaneous reply in a not-subscribed context can be the error
-             * reply that is sent when a new connection exceeds the maximum
-             * number of allowed connections on the server side.
-             *
-             * This is seen as an error instead of a regular reply because the
-             * server closes the connection after sending it.
-             *
-             * To prevent the error from being overwritten by an EOF error the
-             * connection is closed here. See issue #43.
-             *
-             * Another possibility is that the server is loading its dataset.
-             * In this case we also want to close the connection, and have the
-             * user wait until the server is ready to take our request.
-             */
-            if (((redisReply*)reply)->type == REDIS_REPLY_ERROR) {
-                c->err = REDIS_ERR_OTHER;
-                snprintf(c->errstr,sizeof(c->errstr),"%s",((redisReply*)reply)->str);
-                c->reader->fn->freeObject(reply);
-                __redisAsyncDisconnect(ac);
-                return;
+        /* Get the callback for this reply, either a subscribe or a reply callback */
+        if(!(c->flags & REDIS_SUBSCRIBED) ||
+           __redisGetSubscribeCallback(ac,reply,&cb) != REDIS_OK) {
+
+            if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
+                /*
+                 * A spontaneous reply in a not-subscribed context can be the error
+                 * reply that is sent when a new connection exceeds the maximum
+                 * number of allowed connections on the server side.
+                 *
+                 * This is seen as an error instead of a regular reply because the
+                 * server closes the connection after sending it.
+                 *
+                 * To prevent the error from being overwritten by an EOF error the
+                 * connection is closed here. See issue #43.
+                 *
+                 * Another possibility is that the server is loading its dataset.
+                 * In this case we also want to close the connection, and have the
+                 * user wait until the server is ready to take our request.
+                 */
+                if (((redisReply*)reply)->type == REDIS_REPLY_ERROR) {
+                    c->err = REDIS_ERR_OTHER;
+                    snprintf(c->errstr,sizeof(c->errstr),"%s",((redisReply*)reply)->str);
+                    c->reader->fn->freeObject(reply);
+                    __redisAsyncDisconnect(ac);
+                    return;
+                }
             }
-            /* No more regular callbacks and no errors, the context *must* be subscribed or monitoring. */
-            assert((c->flags & REDIS_SUBSCRIBED || c->flags & REDIS_MONITORING));
-            if(c->flags & REDIS_SUBSCRIBED)
-                __redisGetSubscribeCallback(ac,reply,&cb);
         }
 
         if (cb.fn != NULL) {
@@ -809,19 +803,12 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
         /* (P)UNSUBSCRIBE does not have its own response: every channel or
          * pattern that is unsubscribed will receive a message. This means we
          * should not append a callback function for this command. */
-    } else if (strncasecmp(cstr,"monitor\r\n",9) == 0) {
-        /* Set monitor flag and push callback */
-        c->flags |= REDIS_MONITORING;
+    } else {
+        if (strncasecmp(cstr,"monitor\r\n",9) == 0)
+            c->flags |= REDIS_MONITORING;
+
         if (__redisPushCallback(&ac->replies,&cb) != REDIS_OK)
             goto oom;
-    } else {
-        if (c->flags & REDIS_SUBSCRIBED) {
-            if (__redisPushCallback(&ac->sub.replies,&cb) != REDIS_OK)
-                goto oom;
-        } else {
-            if (__redisPushCallback(&ac->replies,&cb) != REDIS_OK)
-                goto oom;
-        }
     }
 
     __redisAppendCommand(c,cmd,len);
