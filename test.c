@@ -20,7 +20,7 @@
 #endif
 #ifdef HIREDIS_TEST_ASYNC
 #include "adapters/libevent.h"
-#include <event.h>
+#include <event2/event.h>
 #endif
 #include "net.h"
 #include "win32.h"
@@ -1521,10 +1521,12 @@ static void test_pubsub_handling(struct config config) {
     test("Subscribe, handle published message and unsubscribe: ");
     /* Setup event dispatcher with a testcase timeout */
     base = event_base_new();
-    struct event timeout;
-    evtimer_assign(&timeout,base,timeout_cb,NULL);
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout,base,timeout_cb,NULL);
     struct timeval timeout_tv = {.tv_sec = 10};
-    evtimer_add(&timeout, &timeout_tv);
+    evtimer_add(timeout, &timeout_tv);
 
     /* Connect */
     redisOptions options = get_redis_tcp_options(config);
@@ -1538,6 +1540,7 @@ static void test_pubsub_handling(struct config config) {
 
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
     event_base_free(base);
 
     /* Verify test checkpoints */
