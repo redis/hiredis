@@ -60,7 +60,7 @@ void redisNetClose(redisContext *c) {
 ssize_t redisNetRead(redisContext *c, char *buf, size_t bufcap) {
     ssize_t nread = recv(c->fd, buf, bufcap, 0);
     if (nread == -1) {
-        if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+        if ((errno == EWOULDBLOCK && (c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
             return 0;
         } else if(errno == ETIMEDOUT && (c->flags & REDIS_BLOCK)) {
