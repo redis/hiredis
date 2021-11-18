@@ -167,7 +167,7 @@ jobs:
         uses: egor-tensin/setup-cygwin@v3
         with:
           platform: x64
-          packages: cmake gcc-core gcc-g++
+          packages: make git gcc-core
 
       - name: Build in cygwin
         env:
@@ -175,8 +175,8 @@ jobs:
         run: |
           build_hiredis() {
               cd $(cygpath -u $HIREDIS_PATH)
-              rm -rf build && mkdir build && cd build
-              cmake .. -G "Unix Makefiles" && make VERBOSE=1
+              git clean -xfd
+              make
           }
           build_hiredis
         shell: C:\tools\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
