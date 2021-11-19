@@ -4,7 +4,7 @@
 # This file is released under the BSD license, see the COPYING file
 
 OBJ=alloc.o net.o hiredis.o sds.o async.o read.o sockcompat.o
-SSL_OBJ=ssl.o
+SSL_OBJ=alloc.o net.o hiredis.o sds.o async.o read.o sockcompat.o ssl.o
 EXAMPLES=hiredis-example hiredis-example-libevent hiredis-example-libev hiredis-example-glib hiredis-example-push
 ifeq ($(USE_SSL),1)
 EXAMPLES+=hiredis-example-ssl hiredis-example-libevent-ssl
@@ -50,8 +50,8 @@ DEBUG_FLAGS?= -g -ggdb
 REAL_CFLAGS=$(OPTIMIZATION) -fPIC $(CPPFLAGS) $(CFLAGS) $(WARNINGS) $(DEBUG_FLAGS)
 REAL_LDFLAGS=$(LDFLAGS)
 
-DYLIBSUFFIX=so
-STLIBSUFFIX=a
+DYLIBSUFFIX=$(if $(WINDIR),dll,so)
+STLIBSUFFIX=$(if $(WINDIR),lib,a)
 DYLIB_MINOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_SONAME)
 DYLIB_MAJOR_NAME=$(LIBNAME).$(DYLIBSUFFIX).$(HIREDIS_MAJOR)
 DYLIBNAME=$(LIBNAME).$(DYLIBSUFFIX)
@@ -90,6 +90,13 @@ else
   OPENSSL_PREFIX?=/usr/local/opt/openssl
   CFLAGS+=-I$(OPENSSL_PREFIX)/include
   SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+endif
+
+ifeq ($(findstring MINGW,$(uname_S)),MINGW)
+  OPENSSL_PREFIX?=$(MINGW_PREFIX)
+  CFLAGS+=-I$(OPENSSL_PREFIX)/include/openssl
+  REAL_LDFLAGS+= -lwsock32 -lws2_32
+  SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto -lcrypt32
 endif
 
 ifeq ($(uname_S),SunOS)
