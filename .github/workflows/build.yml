@@ -36,7 +36,7 @@ jobs:
       #      - name: Run tests under valgrind
       #        env:
       #          SKIPS_AS_FAILS: 1
-      #          TEST_PREFIX: valgrind --track-origins=yes --leak-check=full
+      #          TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
       #        run: $GITHUB_WORKSPACE/test.sh
 
   centos7:
@@ -75,7 +75,7 @@ jobs:
         env:
           SKIPS_AS_FAILS: 1
           TEST_SSL: 1
-          TEST_PREFIX: valgrind --track-origins=yes --leak-check=full
+          TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
         run: $GITHUB_WORKSPACE/test.sh
 
   centos8:
@@ -115,7 +115,7 @@ jobs:
         env:
           SKIPS_AS_FAILS: 1
           TEST_SSL: 1
-          TEST_PREFIX: valgrind --track-origins=yes --leak-check=full
+          TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
         run: $GITHUB_WORKSPACE/test.sh
 
   macos:
