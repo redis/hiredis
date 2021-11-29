@@ -3,7 +3,9 @@
 #define HIREDIS_POLL_H
 
 #include "../async.h"
+#include "../sockcompat.h"
 #include <string.h> // for memset
+#include <errno.h>
 
 /* Values to return from redisPollTick */
 #define REDIS_POLL_HANDLED_READ    1
@@ -22,16 +24,6 @@ typedef struct redisPollEvents {
     char deleted;
     double deadline;
 } redisPollEvents;
-
-static void redisPollDoubleToTimeval(struct timeval *dst, double src) {
-#ifdef _MSC_VER
-        dst->tv_sec = (long)src;
-        dst->tv_usec = (long)((src-(int)src) * 1e6);
-#else
-        dst->tv_sec = src;
-        dst->tv_usec = (src - (double)dst->tv_sec) * 1000000.00 + .5;
-#endif
-}
 
 static double redisPollTimevalToDouble(struct timeval *tv) {
     if (tv == NULL)
@@ -58,13 +50,11 @@ static double redisPollGetNow(void) {
  * positive to wait for a maximum given time for IO, zero to poll, or negative
  * to wait forever */
 static int redisPollTick(redisAsyncContext *ac, double timeout) {
-    struct timeval tv_timeout = { 0 };
-    struct timeval *ptimeout = &tv_timeout;
     int reading, writing;
-    fd_set sr, sw, se;
+    struct pollfd pfd;
     int handled;
-    redisFD fd;
     int ns;
+    int itimeout;
 
     redisPollEvents *e = (redisPollEvents*)ac->ev.data;
     if (!e)
@@ -76,38 +66,37 @@ static int redisPollTick(redisAsyncContext *ac, double timeout) {
     if (!reading && !writing)
         return 0;
 
-    fd = e->fd;
+    pfd.fd = e->fd;
+    pfd.events = 0;
+    if (reading)
+        pfd.events = POLLIN;   
+    if (writing)
+        pfd.events |= POLLOUT;
 
-    if (reading) {
-        FD_ZERO(&sr);
-        FD_SET(fd, &sr);
+    if (timeout >= 0.0) {
+        itimeout = (int)(timeout * 1000.0);
+    } else {
+        itimeout = -1;
     }
 
-    if (writing) {
-        /* on Windows, connection failure is indicated with the Exception fdset.
-         * handle it the same as writable. */
-        FD_ZERO(&sw);
-        FD_SET(fd, &sw);
-        FD_ZERO(&se);
-        FD_SET(fd, &se);
+    ns = poll(&pfd, 1, itimeout);
+    if (ns < 0) {
+        /* ignore the EINTR error */
+        if (errno != EINTR)
+            return ns;
+        ns = 0;
     }
-
-    if (timeout > 0.0) {
-        redisPollDoubleToTimeval(&tv_timeout, timeout);
-    } else if (timeout < 0.0) {
-        ptimeout = NULL;
-    }
-
-    /* first argument is ignored on windows, therefore it is safe to cast to int */
-    ns = select((int)fd + 1, reading ? &sr : NULL, writing ? &sw : NULL, writing ? &se : NULL, ptimeout);
+    
     handled = 0;
     e->in_tick = 1;
     if (ns) {
-        if (reading && FD_ISSET(fd, &sr)) {
+        if (reading && (pfd.revents & POLLIN)) {
             redisAsyncHandleRead(ac);
             handled |= REDIS_POLL_HANDLED_READ;
         }
-        if (writing && (FD_ISSET(fd, &sw) || FD_ISSET(fd, &se))) {
+        /* on Windows, connection failure is indicated with the Exception fdset.
+         * handle it the same as writable. */
+        if (writing && (pfd.revents & (POLLOUT | POLLERR))) {
             /* context Read callback may have caused context to be deleted, e.g.
                by doing an redisAsyncDisconnect() */
             if (!e->deleted) {
