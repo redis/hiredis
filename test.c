@@ -1685,9 +1685,9 @@ static void test_async(struct config config) {
     assert(astest.ac == NULL);
     test_cond(astest.disconnect_status == REDIS_OK);
 
-    test("Async connect timeout: ");
-    if (config.type == CONN_TCP || config.type == CONN_SSL)
-    {
+    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+        /* timeout can only be simulated with network */
+        test("Async connect timeout: ");
         config.tcp.host = "192.168.254.254";  /* blackhole ip */
         config.tcp.timeout.tv_usec = 100000;
         c = do_aconnect(config, ASTEST_CONN_TIMEOUT);
