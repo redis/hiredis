@@ -569,7 +569,9 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 
         if (cb.fn != NULL) {
             __redisRunCallback(ac,&cb,reply);
-            c->reader->fn->freeObject(reply);
+            if (!(c->flags & REDIS_NO_AUTO_FREE_REPLIES)){
+                c->reader->fn->freeObject(reply);
+            }
 
             /* Proceed with free'ing when redisAsyncFree() was called. */
             if (c->flags & REDIS_FREEING) {
@@ -604,7 +606,8 @@ static int __redisAsyncHandleConnect(redisAsyncContext *ac) {
 
     if (redisCheckConnectDone(c, &completed) == REDIS_ERR) {
         /* Error! */
-        redisCheckSocketError(c);
+        if (redisCheckSocketError(c) == REDIS_ERR)
+            __redisAsyncCopyError(ac);
         __redisAsyncHandleConnectFailure(ac);
         return REDIS_ERR;
     } else if (completed == 1) {
@@ -690,9 +693,17 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
     redisCallback cb;
 
-    if ((c->flags & REDIS_CONNECTED) && ac->replies.head == NULL) {
-        /* Nothing to do - just an idle timeout */
-        return;
+    if ((c->flags & REDIS_CONNECTED)) {
+        if ( ac->replies.head == NULL) {
+            /* Nothing to do - just an idle timeout */
+            return;
+        }
+
+        if (!ac->c.command_timeout ||
+            (!ac->c.command_timeout->tv_sec && !ac->c.command_timeout->tv_usec)) {
+            /* A belated connect timeout arriving, ignore */
+            return;
+        }
     }
 
     if (!c->err) {

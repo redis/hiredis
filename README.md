@@ -1,4 +1,5 @@
-[![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
+
+[![Build Status](https://github.com/redis/hiredis/actions/workflows/build.yml/badge.svg)](https://github.com/redis/hiredis/actions/workflows/build.yml)
 
 **This Readme reflects the latest changed in the master branch. See [v1.0.0](https://github.com/redis/hiredis/tree/v1.0.0) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
 
@@ -21,6 +22,12 @@ Redis version >= 1.2.0.
 
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
+
+## Upgrading to `1.0.2`
+
+<span style="color:red">NOTE:  v1.0.1 erroneously bumped SONAME, which is why it is skipped here.</span>
+
+Version 1.0.2 is simply 1.0.0 with a fix for [CVE-2021-32765](https://github.com/redis/hiredis/security/advisories/GHSA-hfm9-39pp-55p2).  They are otherwise identical.
 
 ## Upgrading to `1.0.0`
 
@@ -169,7 +176,7 @@ Hiredis also supports every new `RESP3` data type which are as follows.  For mor
 
 * **`REDIS_REPLY_MAP`**:
     * An array with the added invariant that there will always be an even number of elements.
-      The MAP is functionally equivelant to `REDIS_REPLY_ARRAY` except for the previously mentioned invariant.
+      The MAP is functionally equivalent to `REDIS_REPLY_ARRAY` except for the previously mentioned invariant.
 
 * **`REDIS_REPLY_SET`**:
     * An array response where each entry is unique.
@@ -189,7 +196,7 @@ Hiredis also supports every new `RESP3` data type which are as follows.  For mor
 
 * **`REDIS_REPLY_VERB`**:
     * A verbatim string, intended to be presented to the user without modification.
-      The string payload is stored in the `str` memeber, and type data is stored in the `vtype` member (e.g. `txt` for raw text or `md` for markdown).
+      The string payload is stored in the `str` member, and type data is stored in the `vtype` member (e.g. `txt` for raw text or `md` for markdown).
 
 Replies should be freed using the `freeReplyObject()` function.
 Note that this function will take care of freeing sub-reply objects
@@ -261,9 +268,9 @@ a single call to `read(2)`):
 redisReply *reply;
 redisAppendCommand(context,"SET foo bar");
 redisAppendCommand(context,"GET foo");
-redisGetReply(context,(void *)&reply); // reply for SET
+redisGetReply(context,(void**)&reply); // reply for SET
 freeReplyObject(reply);
-redisGetReply(context,(void *)&reply); // reply for GET
+redisGetReply(context,(void**)&reply); // reply for GET
 freeReplyObject(reply);
 ```
 This API can also be used to implement a blocking subscriber:
