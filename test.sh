@@ -44,7 +44,7 @@ if [ "$TEST_SSL" = "1" ]; then
 fi
 
 cleanup() {
-  if [ -n "${REDIS_DOCKER}" ] ; then
+  if [ -n "${REDIS_DOCKER:-}" ] ; then
     docker kill redis-test-server
   else
     set +e
@@ -70,7 +70,7 @@ tls-key-file ${SSL_KEY}
 EOF
 fi
 
-if [ ! -n "${REDIS_DOCKER}" ]; then
+if [ ! -n "${REDIS_DOCKER:-}" ]; then
 cat >> ${tmpdir}/redis.conf <<EOF
 bind 127.0.0.1
 daemonize yes
@@ -79,7 +79,7 @@ fi
 
 echo ${tmpdir}
 cat ${tmpdir}/redis.conf
-if [ -n "${REDIS_DOCKER}" ] ; then
+if [ -n "${REDIS_DOCKER:-}" ] ; then
     chmod a+wx ${tmpdir}
     chmod a+r ${tmpdir}/*
     docker run -d --rm --name redis-test-server \
