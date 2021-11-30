@@ -1550,50 +1550,172 @@ static void test_pubsub_handling(struct config config) {
 #endif
 
 /* tests for async api using polling adapter, requires no extra libraries*/
+
+/* a static context for the async tests */
+typedef enum astest_no
+{
+    ASTEST_CONNECT=0,
+    ASTEST_CONN_TIMEOUT,
+    ASTEST_PINGPONG
+}astest_no;
+
 struct _astest {
-    int testno;
+    redisAsyncContext *ac;
+    astest_no testno;
+    int counter;
+    int connects;
+    int connect_status;
+    int disconnects;
+    int disconnect_status;
     int connected;
+    int err;
+    char errstr[256];
 };
 static struct _astest astest;
+static void asCleanup(void* data)
+{
+    struct _astest *t = (struct _astest *)data;
+    t->ac = NULL;
+}
+
 static void connectCallback(const redisAsyncContext *c, int status) {
-    (void)c;
-    if (status == REDIS_OK) 
-        astest.connected = 1;
-    else
-        astest.connected = -1;
+    struct _astest *t = (struct _astest *)c->data;
+    assert(t == &astest);
+    assert(t->connects == 0);
+    t->err = c->err;
+    strcpy(t->errstr, c->errstr);
+    t->connects++;
+    t->connect_status = status;
+    t->connected = status == REDIS_OK ? 1 : -1;
 }
 static void disconnectCallback(const redisAsyncContext *c, int status) {
-    if (status != REDIS_OK) {
-        printf("Error: %s\n", c->errstr);
-    }
-
-    printf("Connected...\n");
+    assert(c->data == (void*)&astest);
+    assert(astest.disconnects == 0);
+    astest.err = c->err;
+    strcpy(astest.errstr, c->errstr);
+    astest.disconnects++;
+    astest.disconnect_status = status;
+    astest.connected = 0;
 }
 
-static redisAsyncContext *do_aconnect(struct config config, int testno)
+static void commandCallback(struct redisAsyncContext *ac, void* _reply, void* _privdata)
 {
+    redisReply *reply = (redisReply*)_reply;
+    struct _astest *t = (struct _astest *)ac->data;
+    assert(t == &astest);
+    (void)_privdata;
+    t->err = ac->err;
+    strcpy(t->errstr, ac->errstr);
+    if (t->testno == ASTEST_PINGPONG)
+    {
+        test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+        redisAsyncFree(ac);
+    }
+}
+
+static redisAsyncContext *do_aconnect(struct config config, astest_no testno)
+{
+    redisOptions options = {0};
+    memset(&astest, 0, sizeof(astest));
+    
     astest.testno = testno;
-    astest.connected = 0;
-    redisAsyncContext *c = redisAsyncConnect(config.tcp.host, config.tcp.port);
-    test_cond(c != NULL);
+    astest.connect_status = astest.disconnect_status = -2;
+
+    if (config.type == CONN_TCP) {
+        options.type = REDIS_CONN_TCP;
+        options.connect_timeout = &config.tcp.timeout;
+        REDIS_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
+    } else if (config.type == CONN_SSL) {
+        options.type = REDIS_CONN_TCP;
+        options.connect_timeout = &config.tcp.timeout;
+        REDIS_OPTIONS_SET_TCP(&options, config.ssl.host, config.ssl.port);
+    } else if (config.type == CONN_UNIX) {
+        options.type = REDIS_CONN_UNIX;
+        options.endpoint.unix_socket = config.unix_sock.path;
+    } else if (config.type == CONN_FD) {
+        options.type = REDIS_CONN_USERFD;
+        /* Create a dummy connection just to get an fd to inherit */
+        redisContext *dummy_ctx = redisConnectUnix(config.unix_sock.path);
+        if (dummy_ctx) {
+            redisFD fd = disconnect(dummy_ctx, 1);
+            printf("Connecting to inherited fd %d\n", (int)fd);
+            options.endpoint.fd = fd;
+        }
+    }
+    redisAsyncContext *c = redisAsyncConnectWithOptions(&options);
+    assert(c);
+    astest.ac = c;
+    c->data = &astest;
+    c->dataCleanup = asCleanup;
     redisPollAttach(c);
     redisAsyncSetConnectCallback(c, connectCallback);
     redisAsyncSetDisconnectCallback(c, disconnectCallback);
     return c;
 }
 
+static void as_printerr(void) {
+    printf("Async err %d : %s\n", astest.err, astest.errstr);
+}
+
+#define ASASSERT(e) do { \
+    if (!(e)) \
+        as_printerr(); \
+    assert(e); \
+} while (0);
+
 static void test_async(struct config config) {
+    int status;
     redisAsyncContext *c;
+    struct config defaultconfig = config;
    
-    test("Async connect");
-    c = do_aconnect(config, 0);
+    test("Async connect: ");
+    c = do_aconnect(config, ASTEST_CONNECT);
     assert(c);
     while(astest.connected == 0)
         redisPollTick(c, 0.1);
+    assert(astest.connects == 1);
+    ASASSERT(astest.connect_status == REDIS_OK);
+    assert(astest.disconnects == 0);
     test_cond(astest.connected == 1);
-    redisAsyncFree(c);
-}
 
+    test("Async free after connect: ");
+    assert(astest.ac != NULL);
+    redisAsyncFree(c);
+    assert(astest.disconnects == 1);
+    assert(astest.ac == NULL);
+    test_cond(astest.disconnect_status == REDIS_OK);
+
+    test("Async connect timeout: ");
+    if (config.type == CONN_TCP || config.type == CONN_SSL)
+    {
+        config.tcp.host = "192.168.254.254";  /* blackhole ip */
+        config.tcp.timeout.tv_usec = 100000;
+        c = do_aconnect(config, ASTEST_CONN_TIMEOUT);
+        assert(c);
+        assert(c->err == 0);
+        while(astest.connected == 0)
+            redisPollTick(c, 0.1);
+        assert(astest.connected == -1);
+        /*
+         * freeing should not be done, clearing should have happened.
+         *redisAsyncFree(c);
+         */
+        assert(astest.ac == NULL);
+        test_cond(astest.connect_status == REDIS_ERR);
+        config = defaultconfig;
+    }
+      
+    /* Test a ping/pong after connection */
+    test("Async PING/PONG: ");
+    c = do_aconnect(config, ASTEST_PINGPONG);
+    while(astest.connected == 0)
+        redisPollTick(c, 0.1);
+    status = redisAsyncCommand(c, commandCallback, NULL, "PING");
+    assert(status == REDIS_OK);
+    while(astest.ac)
+        redisPollTick(c, 0.1);
+    config = defaultconfig;
+}
 
 int main(int argc, char **argv) {
     struct config cfg = {
@@ -1714,11 +1836,19 @@ int main(int argc, char **argv) {
 #endif
 
 #ifdef HIREDIS_TEST_ASYNC
+    cfg.type = CONN_TCP;
     printf("\nTesting asynchronous API against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     test_pubsub_handling(cfg);
 #endif
-    printf("\nTesting asynchronous API using polling_adapter (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
+
+    cfg.type = CONN_TCP;
+    printf("\nTesting asynchronous API using polling_adapter TCP (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     test_async(cfg);
+    if (test_unix_socket) {
+        cfg.type = CONN_UNIX;
+        printf("\nTesting asynchronous API using polling_adapter UNIX (%s):\n", cfg.unix_sock.path);
+        test_async(cfg);
+    }
 
     if (test_inherit_fd) {
         printf("\nTesting against inherited fd (%s): ", cfg.unix_sock.path);
