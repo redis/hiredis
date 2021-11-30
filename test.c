@@ -2245,6 +2245,7 @@ int main(int argc, char **argv) {
     }
 #endif
 
+    cfg.type = CONN_TCP;
 #ifdef HIREDIS_TEST_ASYNC
     printf("\nTesting asynchronous API against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     cfg.type = CONN_TCP;
