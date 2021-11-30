@@ -359,7 +359,7 @@ int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *time
     memcpy(c->command_timeout, timeout, sizeof(*c->command_timeout));
     return REDIS_OK;
 }
-
+#if 0 // REMOVE getaddrinfo for static linked
 static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
                                    const struct timeval *timeout,
                                    const char *source_addr) {
@@ -532,6 +532,123 @@ end:
 
     return rv;  // Need to return REDIS_OK if alright
 }
+#else
+static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
+                                   const struct timeval *timeout,
+                                   const char *source_addr) {
+    redisFD s;
+    int rv;
+    int blocking = (c->flags & REDIS_BLOCK);
+    int reuseaddr = (c->flags & REDIS_REUSEADDR);
+    int reuses = 0;
+    long timeout_msec = -1;
+    struct sockaddr_in server;
+
+    c->connection_type = REDIS_CONN_TCP;
+    c->tcp.port = port;
+
+    /* We need to take possession of the passed parameters
+     * to make them reusable for a reconnect.
+     * We also carefully check we don't free data we already own,
+     * as in the case of the reconnect method.
+     *
+     * This is a bit ugly, but atleast it works and doesn't leak memory.
+     **/
+    if (c->tcp.host != addr) {
+        hi_free(c->tcp.host);
+
+        c->tcp.host = hi_strdup(addr);
+        if (c->tcp.host == NULL)
+            goto oom;
+    }
+
+    if (timeout) {
+        if (redisContextUpdateConnectTimeout(c, timeout) == REDIS_ERR)
+            goto oom;
+    } else {
+        hi_free(c->connect_timeout);
+        c->connect_timeout = NULL;
+    }
+
+    if (redisContextTimeoutMsec(c, &timeout_msec) != REDIS_OK) {
+        __redisSetError(c, REDIS_ERR_IO, "Invalid timeout specified");
+        goto error;
+    }
+
+    if (source_addr == NULL) {
+        hi_free(c->tcp.source_addr);
+        c->tcp.source_addr = NULL;
+    } else if (c->tcp.source_addr != source_addr) {
+        hi_free(c->tcp.source_addr);
+        c->tcp.source_addr = hi_strdup(source_addr);
+    }
+
+addrretry:
+    // AF_INET for ip v4
+    if ((s = socket(AF_INET, SOCK_STREAM, 0)) == REDIS_INVALID_FD)
+        goto error;
+
+    c->fd = s;
+    if (redisSetBlocking(c,0) != REDIS_OK)
+        goto error;
+
+    /* For repeat connection */
+    hi_free(c->saddr);
+    c->saddr = hi_malloc(sizeof(server) + 1);
+    if (c->saddr == NULL)
+        goto oom;
+
+    server.sin_addr.s_addr = inet_addr(c->tcp.host);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(c->tcp.port);
+
+    memcpy(c->saddr, &server, sizeof(server));
+    c->addrlen = sizeof(server);
+
+    if (connect(s, (struct sockaddr *) &server, sizeof(server)) < 0) {
+        if (errno == EHOSTUNREACH) {
+            redisNetClose(c);
+            goto error;
+        } else if (errno == EINPROGRESS) {
+            if (blocking) {
+                goto wait_for_ready;
+            }
+            /* This is ok.
+             * Note that even when it's in blocking mode, we unset blocking
+             * for `connect()`
+             */
+        } else if (errno == EADDRNOTAVAIL && reuseaddr) {
+            if (++reuses >= REDIS_CONNECT_RETRIES) {
+                goto error;
+            } else {
+                redisNetClose(c);
+                goto addrretry;
+            }
+        } else {
+            wait_for_ready:
+            if (redisContextWaitReady(c,timeout_msec) != REDIS_OK)
+                goto error;
+            if (redisSetTcpNoDelay(c) != REDIS_OK)
+                goto error;
+        }
+    }
+    if (blocking && redisSetBlocking(c,1) != REDIS_OK)
+        goto error;
+
+    c->flags |= REDIS_CONNECTED;
+    rv = REDIS_OK;
+    goto end;
+
+oom:
+    __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+error:
+    rv = REDIS_ERR;
+end:
+    // xxxx
+
+    return rv;  // Need to return REDIS_OK if alright
+}
+#endif
 
 int redisContextConnectTcp(redisContext *c, const char *addr, int port,
                            const struct timeval *timeout) {

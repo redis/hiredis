@@ -820,10 +820,16 @@ static void test_allocator_injection(void) {
 #define HIREDIS_BAD_DOMAIN "idontexist-noreally.com"
 static void test_blocking_connection_errors(void) {
     redisContext *c;
+#if 0  // REMOVE getaddrinfo for static linked    
     struct addrinfo hints = {.ai_family = AF_INET};
+#endif
     struct addrinfo *ai_tmp = NULL;
 
+#if 0 // REMOVE getaddrinfo for static linked
     int rv = getaddrinfo(HIREDIS_BAD_DOMAIN, "6379", &hints, &ai_tmp);
+#else
+    int rv = 1;
+#endif
     if (rv != 0) {
         // Address does *not* exist
         test("Returns error when host cannot be resolved: ");
