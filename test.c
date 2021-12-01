@@ -1901,14 +1901,16 @@ static void test_monitor(struct config config) {
 
 /* tests for async api using polling adapter, requires no extra libraries*/
 
-/* a static context for the async tests */
+/* enum for the test cases, the callbacks have different logic based on them */
 typedef enum astest_no
 {
     ASTEST_CONNECT=0,
     ASTEST_CONN_TIMEOUT,
-    ASTEST_PINGPONG
+    ASTEST_PINGPONG,
+    ASTEST_PINGPONG_TIMEOUT
 }astest_no;
 
+/* a static context for the async tests */
 struct _astest {
     redisAsyncContext *ac;
     astest_no testno;
@@ -1922,6 +1924,17 @@ struct _astest {
     char errstr[256];
 };
 static struct _astest astest;
+
+static void asSleep(int ms)
+{
+#if _MSC_VER
+    Sleep(ms);
+#else
+    usleep(ms*1000);
+#endif
+}
+
+/* async callbacks */
 static void asCleanup(void* data)
 {
     struct _astest *t = (struct _astest *)data;
@@ -1960,6 +1973,18 @@ static void commandCallback(struct redisAsyncContext *ac, void* _reply, void* _p
     {
         test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
         redisAsyncFree(ac);
+    }
+    if (t->testno == ASTEST_PINGPONG_TIMEOUT)
+    {
+        /* two ping pongs */
+        assert(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+        if (++t->counter == 1) {
+            int status = redisAsyncCommand(ac, commandCallback, NULL, "PING");
+            assert(status == REDIS_OK);
+        } else {
+            test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+            redisAsyncFree(ac);
+        }
     }
 }
 
@@ -2064,8 +2089,26 @@ static void test_async_polling(struct config config) {
     assert(status == REDIS_OK);
     while(astest.ac)
         redisPollTick(c, 0.1);
-    config = defaultconfig;
+
+    /* Test a ping/pong after connection that didn't time out.
+     * see https://github.com/redis/hiredis/issues/945
+     */
+    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+        test("Async PING/PONG after connect timeout: ");
+        config.tcp.timeout.tv_usec = 10000; /* 10ms  */
+        c = do_aconnect(config, ASTEST_PINGPONG_TIMEOUT);
+        while(astest.connected == 0)
+            redisPollTick(c, 0.1);
+        /* sleep 0.1 s, allowing old timeout to arrive */
+        asSleep(10);
+        status = redisAsyncCommand(c, commandCallback, NULL, "PING");
+        assert(status == REDIS_OK);
+        while(astest.ac)
+            redisPollTick(c, 0.1);
+        config = defaultconfig;
+    }
 }
+/* End of Async polling_adapter driven tests */
 
 int main(int argc, char **argv) {
     struct config cfg = {
