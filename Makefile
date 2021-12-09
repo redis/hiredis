@@ -92,6 +92,16 @@ else
   SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
 endif
 
+ifeq ($(uname_S),FreeBSD)
+  LDFLAGS+=-lm
+  IS_GCC=$(shell sh -c '$(CC) --version 2>/dev/null |egrep -i -c "gcc"')
+  ifeq ($(IS_GCC),1)
+    REAL_CFLAGS+=-pedantic
+  endif
+else
+  REAL_CFLAGS+=-pedantic
+endif
+
 ifeq ($(uname_S),SunOS)
   IS_SUN_CC=$(shell sh -c '$(CC) -V 2>&1 |egrep -i -c "sun|studio"')
   ifeq ($(IS_SUN_CC),1)
@@ -231,7 +241,7 @@ check: hiredis-test
 	TEST_SSL=$(USE_SSL) ./test.sh
 
 .c.o:
-	$(CC) -std=c99 -pedantic -c $(REAL_CFLAGS) $<
+	$(CC) -std=c99 -c $(REAL_CFLAGS) $<
 
 clean:
 	rm -rf $(DYLIBNAME) $(STLIBNAME) $(SSL_DYLIBNAME) $(SSL_STLIBNAME) $(TESTS) $(PKGCONFNAME) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
