@@ -419,10 +419,11 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
     char *stype;
     sds sname;
 
-    /* Custom reply functions are not supported for pub/sub. This will fail
-     * very hard when they are used... */
-    if (reply->type == REDIS_REPLY_ARRAY || reply->type == REDIS_REPLY_PUSH) {
-        assert(reply->elements >= 2);
+    /* Match reply with the expected format of a pushed message.
+     * The type and number of elements (3 to 4) are specified at:
+     * https://redis.io/topics/pubsub#format-of-pushed-messages */
+    if ((reply->type == REDIS_REPLY_ARRAY && reply->elements >= 3) ||
+        reply->type == REDIS_REPLY_PUSH) {
         assert(reply->element[0]->type == REDIS_REPLY_STRING);
         stype = reply->element[0]->str;
         pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;
