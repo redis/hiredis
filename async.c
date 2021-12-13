@@ -466,7 +466,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
         }
         sdsfree(sname);
     } else {
-        /* Get callback for pending command during subscribe. */
+        /* Shift callback for pending command in subscribed context. */
         __redisShiftCallback(&ac->sub.replies,dstcb);
     }
     return REDIS_OK;
