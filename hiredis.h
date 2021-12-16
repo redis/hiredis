@@ -47,8 +47,8 @@ typedef long long ssize_t;
 
 #define HIREDIS_MAJOR 1
 #define HIREDIS_MINOR 0
-#define HIREDIS_PATCH 1
-#define HIREDIS_SONAME 1.0.1-dev
+#define HIREDIS_PATCH 3
+#define HIREDIS_SONAME 1.0.3-dev
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
@@ -86,6 +86,9 @@ typedef long long ssize_t;
  */
 #define REDIS_NO_AUTO_FREE 0x200
 
+/* Flag that indicates the user does not want replies to be automatically freed */
+#define REDIS_NO_AUTO_FREE_REPLIES 0x400
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
@@ -112,7 +115,8 @@ typedef struct redisReply {
     double dval; /* The double when type is REDIS_REPLY_DOUBLE */
     size_t len; /* Length of string */
     char *str; /* Used for REDIS_REPLY_ERROR, REDIS_REPLY_STRING
-                  REDIS_REPLY_VERB, and REDIS_REPLY_DOUBLE (in additional to dval). */
+                  REDIS_REPLY_VERB, REDIS_REPLY_DOUBLE (in additional to dval),
+                  and REDIS_REPLY_BIGNUM. */
     char vtype[4]; /* Used for REDIS_REPLY_VERB, contains the null
                       terminated 3 character content type, such as "txt". */
     size_t elements; /* number of elements, for REDIS_REPLY_ARRAY */
@@ -151,6 +155,11 @@ struct redisSsl;
 
 /* Don't automatically intercept and free RESP3 PUSH replies. */
 #define REDIS_OPT_NO_PUSH_AUTOFREE 0x08
+
+/**
+ * Don't automatically free replies
+ */
+#define REDIS_OPT_NOAUTOFREEREPLIES 0x10
 
 /* In Unix systems a file descriptor is a regular signed int, with -1
  * representing an invalid descriptor. In Windows it is a SOCKET

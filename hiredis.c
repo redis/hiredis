@@ -96,6 +96,8 @@ void freeReplyObject(void *reply) {
 
     switch(r->type) {
     case REDIS_REPLY_INTEGER:
+    case REDIS_REPLY_NIL:
+    case REDIS_REPLY_BOOL:
         break; /* Nothing to free */
     case REDIS_REPLY_ARRAY:
     case REDIS_REPLY_MAP:
@@ -112,6 +114,7 @@ void freeReplyObject(void *reply) {
     case REDIS_REPLY_STRING:
     case REDIS_REPLY_DOUBLE:
     case REDIS_REPLY_VERB:
+    case REDIS_REPLY_BIGNUM:
         hi_free(r->str);
         break;
     }
@@ -129,7 +132,8 @@ static void *createStringObject(const redisReadTask *task, char *str, size_t len
     assert(task->type == REDIS_REPLY_ERROR  ||
            task->type == REDIS_REPLY_STATUS ||
            task->type == REDIS_REPLY_STRING ||
-           task->type == REDIS_REPLY_VERB);
+           task->type == REDIS_REPLY_VERB   ||
+           task->type == REDIS_REPLY_BIGNUM);
 
     /* Copy string value */
     if (task->type == REDIS_REPLY_VERB) {
@@ -235,12 +239,14 @@ static void *createDoubleObject(const redisReadTask *task, double value, char *s
      * decimal string conversion artifacts. */
     memcpy(r->str, str, len);
     r->str[len] = '\0';
+    r->len = len;
 
     if (task->parent) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_SET);
+               parent->type == REDIS_REPLY_SET ||
+               parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
@@ -277,7 +283,8 @@ static void *createBoolObject(const redisReadTask *task, int bval) {
         parent = task->parent->obj;
         assert(parent->type == REDIS_REPLY_ARRAY ||
                parent->type == REDIS_REPLY_MAP ||
-               parent->type == REDIS_REPLY_SET);
+               parent->type == REDIS_REPLY_SET ||
+               parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
     return r;
@@ -797,6 +804,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
     if (options->options & REDIS_OPT_NOAUTOFREE) {
         c->flags |= REDIS_NO_AUTO_FREE;
     }
+    if (options->options & REDIS_OPT_NOAUTOFREEREPLIES) {
+        c->flags |= REDIS_NO_AUTO_FREE_REPLIES;
+    }
 
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
@@ -825,7 +835,7 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
         c->fd = options->endpoint.fd;
         c->flags |= REDIS_CONNECTED;
     } else {
-        // Unknown type - FIXME - FREE
+        redisFree(c);
         return NULL;
     }
 
@@ -987,17 +997,6 @@ oom:
     return REDIS_ERR;
 }
 
-/* Internal helper function to try and get a reply from the reader,
- * or set an error in the context otherwise. */
-int redisGetReplyFromReader(redisContext *c, void **reply) {
-    if (redisReaderGetReply(c->reader,reply) == REDIS_ERR) {
-        __redisSetError(c,c->reader->err,c->reader->errstr);
-        return REDIS_ERR;
-    }
-
-    return REDIS_OK;
-}
-
 /* Internal helper that returns 1 if the reply was a RESP3 PUSH
  * message and we handled it with a user-provided callback. */
 static int redisHandledPushReply(redisContext *c, void *reply) {
@@ -1009,12 +1008,34 @@ static int redisHandledPushReply(redisContext *c, void *reply) {
     return 0;
 }
 
+/* Get a reply from our reader or set an error in the context. */
+int redisGetReplyFromReader(redisContext *c, void **reply) {
+    if (redisReaderGetReply(c->reader, reply) == REDIS_ERR) {
+        __redisSetError(c,c->reader->err,c->reader->errstr);
+        return REDIS_ERR;
+    }
+
+    return REDIS_OK;
+}
+
+/* Internal helper to get the next reply from our reader while handling
+ * any PUSH messages we encounter along the way.  This is separate from
+ * redisGetReplyFromReader so as to not change its behavior. */
+static int redisNextInBandReplyFromReader(redisContext *c, void **reply) {
+    do {
+        if (redisGetReplyFromReader(c, reply) == REDIS_ERR)
+            return REDIS_ERR;
+    } while (redisHandledPushReply(c, *reply));
+
+    return REDIS_OK;
+}
+
 int redisGetReply(redisContext *c, void **reply) {
     int wdone = 0;
     void *aux = NULL;
 
     /* Try to read pending replies */
-    if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
+    if (redisNextInBandReplyFromReader(c,&aux) == REDIS_ERR)
         return REDIS_ERR;
 
     /* For the blocking context, flush output buffer and read reply */
@@ -1030,12 +1051,8 @@ int redisGetReply(redisContext *c, void **reply) {
             if (redisBufferRead(c) == REDIS_ERR)
                 return REDIS_ERR;
 
-            /* We loop here in case the user has specified a RESP3
-             * PUSH handler (e.g. for client tracking). */
-            do {
-                if (redisGetReplyFromReader(c,&aux) == REDIS_ERR)
-                    return REDIS_ERR;
-            } while (redisHandledPushReply(c, aux));
+            if (redisNextInBandReplyFromReader(c,&aux) == REDIS_ERR)
+                return REDIS_ERR;
         } while (aux == NULL);
     }
 

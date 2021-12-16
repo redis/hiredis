@@ -11,11 +11,16 @@
 #include <signal.h>
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 
 #include "hiredis.h"
 #include "async.h"
 #ifdef HIREDIS_TEST_SSL
 #include "hiredis_ssl.h"
+#endif
+#ifdef HIREDIS_TEST_ASYNC
+#include "adapters/libevent.h"
+#include <event2/event.h>
 #endif
 #include "net.h"
 #include "win32.h"
@@ -57,6 +62,8 @@ struct pushCounters {
     int nil;
     int str;
 };
+
+static int insecure_calloc_calls;
 
 #ifdef HIREDIS_TEST_SSL
 redisSSLContext *_ssl_ctx = NULL;
@@ -498,6 +505,20 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("Multi-bulk never overflows regardless of maxelements: ");
+    size_t bad_mbulk_len = (SIZE_MAX / sizeof(void *)) + 3;
+    char bad_mbulk_reply[100];
+    snprintf(bad_mbulk_reply, sizeof(bad_mbulk_reply), "*%llu\r\n+asdf\r\n",
+        (unsigned long long) bad_mbulk_len);
+
+    reader = redisReaderCreate();
+    reader->maxelements = 0;    /* Don't rely on default limit */
+    redisReaderFeed(reader, bad_mbulk_reply, strlen(bad_mbulk_reply));
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR && strcasecmp(reader->errstr, "Out of memory") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
 #if LLONG_MAX > SIZE_MAX
     test("Set error when array > SIZE_MAX: ");
     reader = redisReaderCreate();
@@ -583,6 +604,147 @@ static void test_reply_reader(void) {
         ((redisReply*)reply)->element[1]->integer == 42);
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    test("Can parse RESP3 doubles: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",3.14159265358979323846\r\n",25);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+              fabs(((redisReply*)reply)->dval - 3.14159265358979323846) < 0.00000001 &&
+              ((redisReply*)reply)->len == 22 &&
+              strcmp(((redisReply*)reply)->str, "3.14159265358979323846") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error on invalid RESP3 double: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",3.14159\000265358979323846\r\n",26);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad double value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Correctly parses RESP3 double INFINITY: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",inf\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+              isinf(((redisReply*)reply)->dval) &&
+              ((redisReply*)reply)->dval > 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error when RESP3 double is NaN: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",nan\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad double value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 nil: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "_\r\n",3);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_NIL);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error on invalid RESP3 nil: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "_nil\r\n",6);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad nil value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 bool (true): ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#t\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
+              ((redisReply*)reply)->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 bool (false): ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#f\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
+              !((redisReply*)reply)->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Set error on invalid RESP3 bool: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#foobar\r\n",9);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad bool value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 map: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "%2\r\n+first\r\n:123\r\n$6\r\nsecond\r\n#t\r\n",34);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_MAP &&
+        ((redisReply*)reply)->elements == 4 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_STATUS &&
+        ((redisReply*)reply)->element[0]->len == 5 &&
+        !strcmp(((redisReply*)reply)->element[0]->str,"first") &&
+        ((redisReply*)reply)->element[1]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[1]->integer == 123 &&
+        ((redisReply*)reply)->element[2]->type == REDIS_REPLY_STRING &&
+        ((redisReply*)reply)->element[2]->len == 6 &&
+        !strcmp(((redisReply*)reply)->element[2]->str,"second") &&
+        ((redisReply*)reply)->element[3]->type == REDIS_REPLY_BOOL &&
+        ((redisReply*)reply)->element[3]->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 set: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "~5\r\n+orange\r\n$5\r\napple\r\n#f\r\n:100\r\n:999\r\n",40);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_SET &&
+        ((redisReply*)reply)->elements == 5 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_STATUS &&
+        ((redisReply*)reply)->element[0]->len == 6 &&
+        !strcmp(((redisReply*)reply)->element[0]->str,"orange") &&
+        ((redisReply*)reply)->element[1]->type == REDIS_REPLY_STRING &&
+        ((redisReply*)reply)->element[1]->len == 5 &&
+        !strcmp(((redisReply*)reply)->element[1]->str,"apple") &&
+        ((redisReply*)reply)->element[2]->type == REDIS_REPLY_BOOL &&
+        !((redisReply*)reply)->element[2]->integer &&
+        ((redisReply*)reply)->element[3]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[3]->integer == 100 &&
+        ((redisReply*)reply)->element[4]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[4]->integer == 999);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can parse RESP3 bignum: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader,"(3492890328409238509324850943850943825024385\r\n",46);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_BIGNUM &&
+        ((redisReply*)reply)->len == 43 &&
+        !strcmp(((redisReply*)reply)->str,"3492890328409238509324850943850943825024385"));
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
@@ -609,6 +771,13 @@ static void *hi_calloc_fail(size_t nmemb, size_t size) {
     return NULL;
 }
 
+static void *hi_calloc_insecure(size_t nmemb, size_t size) {
+    (void)nmemb;
+    (void)size;
+    insecure_calloc_calls++;
+    return (void*)0xdeadc0de;
+}
+
 static void *hi_realloc_fail(void *ptr, size_t size) {
     (void)ptr;
     (void)size;
@@ -616,6 +785,8 @@ static void *hi_realloc_fail(void *ptr, size_t size) {
 }
 
 static void test_allocator_injection(void) {
+    void *ptr;
+
     hiredisAllocFuncs ha = {
         .mallocFn = hi_malloc_fail,
         .callocFn = hi_calloc_fail,
@@ -634,6 +805,13 @@ static void test_allocator_injection(void) {
     test("redisReader uses injected allocators: ");
     redisReader *reader = redisReaderCreate();
     test_cond(reader == NULL);
+
+    /* Make sure hiredis itself protects against a non-overflow checking calloc */
+    test("hiredis calloc wrapper protects against overflow: ");
+    ha.callocFn = hi_calloc_insecure;
+    hiredisSetAllocators(&ha);
+    ptr = hi_calloc((SIZE_MAX / sizeof(void*)) + 3, sizeof(void*));
+    test_cond(ptr == NULL && insecure_calloc_calls == 0);
 
     // Return allocators to default
     hiredisResetAllocators();
@@ -1269,6 +1447,151 @@ static void test_throughput(struct config config) {
 //     redisFree(c);
 // }
 
+#ifdef HIREDIS_TEST_ASYNC
+struct event_base *base;
+
+typedef struct TestState {
+    redisOptions *options;
+    int           checkpoint;
+    int           resp3;
+} TestState;
+
+/* Testcase timeout, will trigger a failure */
+void timeout_cb(int fd, short event, void *arg) {
+    (void) fd; (void) event; (void) arg;
+    printf("Timeout in async testing!\n");
+    exit(1);
+}
+
+/* Unexpected call, will trigger a failure */
+void unexpected_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    (void) ac; (void) r;
+    printf("Unexpected call: %s\n",(char*)privdata);
+    exit(1);
+}
+
+/* Helper function to publish a message via own client. */
+void publish_msg(redisOptions *options, const char* channel, const char* msg) {
+    redisContext *c = redisConnectWithOptions(options);
+    assert(c != NULL);
+    redisReply *reply = redisCommand(c,"PUBLISH %s %s",channel,msg);
+    assert(reply->type == REDIS_REPLY_INTEGER && reply->integer == 1);
+    freeReplyObject(reply);
+    disconnect(c, 0);
+}
+
+/* Subscribe callback for test_pubsub_handling and test_pubsub_handling_resp3:
+ * - a published message triggers an unsubscribe
+ * - an unsubscribe response triggers a disconnect */
+void subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+
+    assert(reply != NULL &&
+           reply->type == (state->resp3 ? REDIS_REPLY_PUSH : REDIS_REPLY_ARRAY) &&
+           reply->elements == 3);
+
+    if (strcmp(reply->element[0]->str,"subscribe") == 0) {
+        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
+               reply->element[2]->str == NULL);
+        publish_msg(state->options,"mychannel","Hello!");
+    } else if (strcmp(reply->element[0]->str,"message") == 0) {
+        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
+               strcmp(reply->element[2]->str,"Hello!") == 0);
+        state->checkpoint++;
+
+        /* Unsubscribe after receiving the published message. Send unsubscribe
+         * which should call the callback registered during subscribe */
+        redisAsyncCommand(ac,unexpected_cb,
+                          (void*)"unsubscribe should call subscribe_cb()",
+                          "unsubscribe");
+    } else if (strcmp(reply->element[0]->str,"unsubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
+               reply->element[2]->str == NULL);
+
+        /* Disconnect after unsubscribe */
+        redisAsyncDisconnect(ac);
+        event_base_loopbreak(base);
+    } else {
+        printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
+        exit(1);
+    }
+}
+
+static void test_pubsub_handling(struct config config) {
+    test("Subscribe, handle published message and unsubscribe: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout,base,timeout_cb,NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    redisOptions options = get_redis_tcp_options(config);
+    redisAsyncContext *ac = redisAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    redisLibeventAttach(ac,base);
+
+    /* Start subscribe */
+    TestState state = {.options = &options};
+    redisAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    assert(state.checkpoint == 1);
+}
+
+/* Unexpected push message, will trigger a failure */
+void unexpected_push_cb(redisAsyncContext *ac, void *r) {
+    (void) ac; (void) r;
+    printf("Unexpected call to the PUSH callback!\n");
+    exit(1);
+}
+
+static void test_pubsub_handling_resp3(struct config config) {
+    test("Subscribe, handle published message and unsubscribe using RESP3: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout,base,timeout_cb,NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    redisOptions options = get_redis_tcp_options(config);
+    redisAsyncContext *ac = redisAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    redisLibeventAttach(ac,base);
+
+    /* Not expecting any push messages in this test */
+    redisAsyncSetPushCallback(ac, unexpected_push_cb);
+
+    /* Switch protocol */
+    redisAsyncCommand(ac,NULL,NULL,"HELLO 3");
+
+    /* Start subscribe */
+    TestState state = {.options = &options, .resp3 = 1};
+    redisAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    assert(state.checkpoint == 1);
+}
+#endif
+
 int main(int argc, char **argv) {
     struct config cfg = {
         .tcp = {
@@ -1385,6 +1708,19 @@ int main(int argc, char **argv) {
         redisFreeSSLContext(_ssl_ctx);
         _ssl_ctx = NULL;
     }
+#endif
+
+#ifdef HIREDIS_TEST_ASYNC
+    printf("\nTesting asynchronous API against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
+    cfg.type = CONN_TCP;
+
+    int major;
+    redisContext *c = do_connect(cfg);
+    get_redis_version(c, &major, NULL);
+    disconnect(c, 0);
+
+    test_pubsub_handling(cfg);
+    if (major >= 6) test_pubsub_handling_resp3(cfg);
 #endif
 
     if (test_inherit_fd) {

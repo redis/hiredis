@@ -73,11 +73,19 @@ USE_SSL?=0
 
 # This is required for test.c only
 ifeq ($(USE_SSL),1)
-  CFLAGS+=-DHIREDIS_TEST_SSL
+  export CFLAGS+=-DHIREDIS_TEST_SSL
+endif
+ifeq ($(TEST_ASYNC),1)
+  export CFLAGS+=-DHIREDIS_TEST_ASYNC
 endif
 
 ifeq ($(uname_S),Linux)
-  SSL_LDFLAGS=-lssl -lcrypto
+  ifdef OPENSSL_PREFIX
+    CFLAGS+=-I$(OPENSSL_PREFIX)/include
+    SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+  else
+    SSL_LDFLAGS=-lssl -lcrypto
+  endif
 else
   OPENSSL_PREFIX?=/usr/local/opt/openssl
   CFLAGS+=-I$(OPENSSL_PREFIX)/include
@@ -206,6 +214,9 @@ ifeq ($(USE_SSL),1)
     TEST_LIBS += $(SSL_STLIBNAME)
     TEST_LDFLAGS = $(SSL_LDFLAGS) -lssl -lcrypto -lpthread
 endif
+ifeq ($(TEST_ASYNC),1)
+    TEST_LDFLAGS += -levent
+endif
 
 hiredis-test: test.o $(TEST_LIBS)
 	$(CC) -o $@ $(REAL_CFLAGS) -I. $^ $(REAL_LDFLAGS) $(TEST_LDFLAGS)
@@ -294,12 +305,12 @@ gprof:
 	$(MAKE) CFLAGS="-pg" LDFLAGS="-pg"
 
 gcov:
-	$(MAKE) CFLAGS="-fprofile-arcs -ftest-coverage" LDFLAGS="-fprofile-arcs"
+	$(MAKE) CFLAGS+="-fprofile-arcs -ftest-coverage" LDFLAGS="-fprofile-arcs"
 
 coverage: gcov
 	make check
 	mkdir -p tmp/lcov
-	lcov -d . -c -o tmp/lcov/hiredis.info
+	lcov -d . -c --exclude '/usr*' -o tmp/lcov/hiredis.info
 	genhtml --legend -o tmp/lcov/report tmp/lcov/hiredis.info
 
 noopt:
