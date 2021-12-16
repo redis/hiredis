@@ -1518,6 +1518,15 @@ void subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
     }
 }
 
+/* Expect a reply of type ARRAY */
+void array_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    (void) ac;
+    redisReply *reply = r;
+    TestState *state = privdata;
+    assert(reply != NULL && reply->type == REDIS_REPLY_ARRAY);
+    state->checkpoint++;
+}
+
 static void test_pubsub_handling(struct config config) {
     test("Subscribe, handle published message and unsubscribe: ");
     /* Setup event dispatcher with a testcase timeout */
@@ -1539,13 +1548,16 @@ static void test_pubsub_handling(struct config config) {
     TestState state = {.options = &options};
     redisAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
 
+    /* Make sure non-subscribe commands are handled */
+    redisAsyncCommand(ac,array_cb,&state,"PING");
+
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
     event_free(timeout);
     event_base_free(base);
 
     /* Verify test checkpoints */
-    assert(state.checkpoint == 1);
+    assert(state.checkpoint == 2);
 }
 
 /* Unexpected push message, will trigger a failure */
