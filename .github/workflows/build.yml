@@ -3,6 +3,7 @@ on: [push, pull_request]
 
 jobs:
   ubuntu:
+    name: Ubuntu
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -40,6 +41,7 @@ jobs:
       #        run: $GITHUB_WORKSPACE/test.sh
 
   centos7:
+    name: CentOS 7
     runs-on: ubuntu-latest
     container: centos:7
     steps:
@@ -79,6 +81,7 @@ jobs:
         run: $GITHUB_WORKSPACE/test.sh
 
   centos8:
+    name: CentOS 8
     runs-on: ubuntu-latest
     container: centos:8
     steps:
@@ -118,7 +121,26 @@ jobs:
           TEST_PREFIX: valgrind --error-exitcode=99 --track-origins=yes --leak-check=full
         run: $GITHUB_WORKSPACE/test.sh
 
+  freebsd:
+    runs-on: macos-10.15
+    name:  FreeBSD
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ env.GITHUB_REPOSITORY }}
+          ref: ${{ env.GITHUB_HEAD_REF }}
+
+      - name: Build in FreeBSD
+        uses: vmactions/freebsd-vm@v0.1.5
+        with:
+          prepare: pkg install -y gmake cmake
+          run: |
+            mkdir build && cd build && cmake .. && make && cd ..
+            gmake
+
   macos:
+    name: macOS
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -140,6 +162,7 @@ jobs:
         run: $GITHUB_WORKSPACE/test.sh
 
   windows:
+    name: Windows
     runs-on: windows-latest
     steps:
       - name: Checkout code
