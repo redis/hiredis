@@ -80,6 +80,9 @@ typedef long long ssize_t;
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
 #define REDIS_REUSEADDR 0x80
 
+/* Flag that is set when the async connection supports push replies. */
+#define REDIS_SUPPORTS_PUSH 0x100
+
 /**
  * Flag that indicates the user does not want the context to
  * be automatically freed upon error
