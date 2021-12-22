@@ -862,7 +862,7 @@ int redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata
 
 int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen) {
     sds cmd;
-    int len;
+    long long len;
     int status;
     len = redisFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
     if (len < 0)
