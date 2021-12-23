@@ -91,17 +91,19 @@ ifeq ($(TEST_ASYNC),1)
   export CFLAGS+=-DHIREDIS_TEST_ASYNC
 endif
 
-ifeq ($(uname_S),Linux)
-  ifdef OPENSSL_PREFIX
+ifeq ($(USE_SSL),1)
+  ifeq ($(uname_S),Linux)
+    ifdef OPENSSL_PREFIX
+      CFLAGS+=-I$(OPENSSL_PREFIX)/include
+      SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+    else
+      SSL_LDFLAGS=-lssl -lcrypto
+    endif
+  else
+    OPENSSL_PREFIX?=/usr/local/opt/openssl
     CFLAGS+=-I$(OPENSSL_PREFIX)/include
     SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
-  else
-    SSL_LDFLAGS=-lssl -lcrypto
   endif
-else
-  OPENSSL_PREFIX?=/usr/local/opt/openssl
-  CFLAGS+=-I$(OPENSSL_PREFIX)/include
-  SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
 endif
 
 ifeq ($(uname_S),FreeBSD)
@@ -231,7 +233,10 @@ hiredis-example-push: examples/example-push.c $(STLIBNAME)
 examples: $(EXAMPLES)
 
 TEST_LIBS = $(STLIBNAME) $(SSL_STLIB)
-TEST_LDFLAGS = $(SSL_LDFLAGS) -lssl -lcrypto -lpthread
+TEST_LDFLAGS = $(SSL_LDFLAGS)
+ifeq ($(USE_SSL),1)
+  TEST_LDFLAGS += -pthread
+endif
 ifeq ($(TEST_ASYNC),1)
     TEST_LDFLAGS += -levent
 endif
