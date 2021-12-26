@@ -166,6 +166,8 @@ hiredis-example-macosx: examples/example-macosx.c adapters/macosx.h $(STLIBNAME)
 hiredis-example-ssl: examples/example-ssl.c $(STLIBNAME) $(SSL_STLIBNAME)
 	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< $(STLIBNAME) $(SSL_STLIBNAME) $(REAL_LDFLAGS) $(SSL_LDFLAGS)
 
+hiredis-example-uvtm: examples/example-uvtm.c adapters/libuv.h $(STLIBNAME) $(SSL_STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. $< -luv $(STLIBNAME) $(SSL_STLIBNAME) $(REAL_LDFLAGS) $(SSL_LDFLAGS)
 
 ifndef AE_DIR
 hiredis-example-ae:

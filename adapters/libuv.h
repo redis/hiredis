@@ -71,17 +71,23 @@ static void redisLibuvDelWrite(void *privdata) {
 }
 
 static void on_timer_close(uv_handle_t *handle) {
-    // a dummy value, make sure callback is sequenced
-    handle->data = (void *)0xDEADBEEF;
+    redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
+    p->timer.data = NULL;
+    if (!p->handle.data) {
+        // both timer and handle are closed
+        hi_free(p);
+    }
+    // else, wait for `on_handle_close`
 }
 
 static void on_handle_close(uv_handle_t *handle) {
     redisLibuvEvents* p = (redisLibuvEvents*)handle->data;
-    // note that the close callbacks is called sequentially
-    // so on_timer_close is always called before on_handle_close
-    assert(p->timer.data == (void *)0xDEADBEEF);
-    // just make sure callback is sequenced
-    hi_free(p);
+    p->handle.data = NULL;
+    if (!p->timer.data) {
+        // timer never started, or timer already destroyed
+        hi_free(p);
+    }
+    // else, wait for `on_timer_close`
 }
 
 static void redisLibuvTimeout(uv_timer_t *timer) {
@@ -93,7 +99,7 @@ static void redisLibuvSetTimeout(void *privdata, struct timeval tv) {
     redisLibuvEvents* p = (redisLibuvEvents*)privdata;
 
     uint64_t millsec = tv.tv_sec * 1000 + tv.tv_usec / 1000.0;
-    if (p->timer.type == UV_UNKNOWN_HANDLE) {
+    if (!p->timer.data) {
         // timer is uninitialized
         if (uv_timer_init(p->handle.loop, &p->timer) != 0) {
             return;
@@ -109,14 +115,8 @@ static void redisLibuvCleanup(void *privdata) {
     redisLibuvEvents* p = (redisLibuvEvents*)privdata;
 
     p->context = NULL; // indicate that context might no longer exist
-    if (p->timer.type != UV_UNKNOWN_HANDLE) {
-        // note that the close callbacks is called sequentially
-        // so `on_timer_close` is always called before `on_handle_close`
-        // `uv_close` will stop the timer internally
+    if (p->timer.data) {
         uv_close((uv_handle_t*)&p->timer, on_timer_close);
-    } else {
-        p->timer.data = (void*)0xDEADBEEF;
-        // a dummy value, make sure callback is sequenced
     }
     uv_close((uv_handle_t*)&p->handle, on_handle_close);
 }
