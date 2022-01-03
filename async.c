@@ -460,8 +460,15 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
                 /* Unset subscribed flag only when no pipelined pending subscribe. */
                 if (reply->element[2]->integer == 0
                     && dictSize(ac->sub.channels) == 0
-                    && dictSize(ac->sub.patterns) == 0)
+                    && dictSize(ac->sub.patterns) == 0) {
                     c->flags &= ~REDIS_SUBSCRIBED;
+
+                    /* Move ongoing regular command callbacks. */
+                    redisCallback cb;
+                    while (__redisShiftCallback(&ac->sub.replies,&cb) == REDIS_OK) {
+                        __redisPushCallback(&ac->replies,&cb);
+                    }
+                }
             }
         }
         sdsfree(sname);
