@@ -108,7 +108,12 @@ static void redisLibuvSetTimeout(void *privdata, struct timeval tv) {
     }
     // updates the timeout if the timer has already started
     // or start the timer
-    uv_timer_start(&p->timer, redisLibuvTimeout, millsec, 0);
+    uv_timer_start(&p->timer, (uv_timer_cb)redisLibuvTimeout, millsec, 0);
+    // In some version of libuv, the `uv_timer_cb` have signature of
+    // `void(*)(uv_timer_t*, int), while in other version the signature is
+    // `void(*)(uv_timer_t*). Now that we don't care the second parameter,
+    // we simply convert the `redisLibuvTimeout` to (uv_timer_cb) to supress
+    // compiler warnings.
 }
 
 static void redisLibuvCleanup(void *privdata) {
