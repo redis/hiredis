@@ -90,7 +90,14 @@ static void on_handle_close(uv_handle_t *handle) {
     // else, wait for `on_timer_close`
 }
 
+#if UV_MAJOR_VERSION > 0 || UV_MINOR_VERSION > 11 || (defined(UV_VERSION_PATCH) && UV_VERSION_PATCH > 22)
+// libuv removed `status` parameter since v0.11.23
+// see: https://github.com/libuv/libuv/blob/v0.11.23/include/uv.h
 static void redisLibuvTimeout(uv_timer_t *timer) {
+#else
+static void redisLibuvTimeout(uv_timer_t *timer, int status) {
+    (void)status; // unused
+#endif
     redisLibuvEvents *e = (redisLibuvEvents*)timer->data;
     redisAsyncHandleTimeout(e->context);
 }
@@ -108,12 +115,7 @@ static void redisLibuvSetTimeout(void *privdata, struct timeval tv) {
     }
     // updates the timeout if the timer has already started
     // or start the timer
-    uv_timer_start(&p->timer, (uv_timer_cb)redisLibuvTimeout, millsec, 0);
-    // In some version of libuv, the `uv_timer_cb` have signature of
-    // `void(*)(uv_timer_t*, int), while in other version the signature is
-    // `void(*)(uv_timer_t*). Now that we don't care the second parameter,
-    // we simply convert the `redisLibuvTimeout` to (uv_timer_cb) to supress
-    // compiler warnings.
+    uv_timer_start(&p->timer, redisLibuvTimeout, millsec, 0);
 }
 
 static void redisLibuvCleanup(void *privdata) {
