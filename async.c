@@ -696,7 +696,7 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
     redisCallback cb;
 
     if ((c->flags & REDIS_CONNECTED)) {
-        if ( ac->replies.head == NULL) {
+        if (ac->replies.head == NULL && ac->sub.replies.head == NULL) {
             /* Nothing to do - just an idle timeout */
             return;
         }
