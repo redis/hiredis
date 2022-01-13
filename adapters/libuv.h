@@ -90,13 +90,21 @@ static void on_handle_close(uv_handle_t *handle) {
     // else, wait for `on_timer_close`
 }
 
-#if !defined(UV_VERSION_PATCH) || (UV_MAJOR_VERSION < 1 && UV_MINOR_VERSION < 12 && UV_VERSION_PATCH < 23)
 // libuv removed `status` parameter since v0.11.23
 // see: https://github.com/libuv/libuv/blob/v0.11.23/include/uv.h
-static void redisLibuvTimeout(uv_timer_t *timer) {
-#else
+// explain:
+// 1. !defined(UV_VERSION_PATCH), must < 0.10.2
+// 2. major.minor.patch < 0.11.23
+// => (major < 0) || (major == 0 && minor < 11) || (minor == 11 && patch < 23)
+//    major < 0 can't happen
+// => (major == 0 && minor < 11) || (minor == 11 && patch < 23)
+
+//          < 0.10.2 goes here                  < 0.10.2~x goes here                                     0.11.0~22 goes here
+#if !defined(UV_VERSION_PATCH) || (UV_VERSION_MAJOR == 0 && UV_VERSION_MINOR < 11) || (UV_VERSION_MINOR == 11 && UV_VERSION_PATCH < 23)
 static void redisLibuvTimeout(uv_timer_t *timer, int status) {
     (void)status; // unused
+#else
+static void redisLibuvTimeout(uv_timer_t *timer) {
 #endif
     redisLibuvEvents *e = (redisLibuvEvents*)timer->data;
     redisAsyncHandleTimeout(e->context);
