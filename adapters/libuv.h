@@ -100,7 +100,8 @@ static void on_handle_close(uv_handle_t *handle) {
 // => (major == 0 && minor < 11) || (minor == 11 && patch < 23)
 
 //          < 0.10.2 goes here                  < 0.10.2~x goes here                                     0.11.0~22 goes here
-#if !defined(UV_VERSION_PATCH) || (UV_VERSION_MAJOR == 0 && UV_VERSION_MINOR < 11) || (UV_VERSION_MINOR == 11 && UV_VERSION_PATCH < 23)
+#if (UV_VERSION_MAJOR == 0 && UV_VERSION_MINOR < 11) || \
+    (UV_VERSION_MAJOR == 0 && UV_VERSION_MINOR == 11 && UV_VERSION_PATCH < 23)
 static void redisLibuvTimeout(uv_timer_t *timer, int status) {
     (void)status; // unused
 #else
