@@ -90,7 +90,7 @@ static void on_handle_close(uv_handle_t *handle) {
     // else, wait for `on_timer_close`
 }
 
-#if UV_MAJOR_VERSION > 0 || UV_MINOR_VERSION > 11 || (defined(UV_VERSION_PATCH) && UV_VERSION_PATCH > 22)
+#if !defined(UV_VERSION_PATCH) || (UV_MAJOR_VERSION < 1 && UV_MINOR_VERSION < 12 && UV_VERSION_PATCH < 23)
 // libuv removed `status` parameter since v0.11.23
 // see: https://github.com/libuv/libuv/blob/v0.11.23/include/uv.h
 static void redisLibuvTimeout(uv_timer_t *timer) {
