@@ -1454,6 +1454,7 @@ struct event_base *base;
 typedef struct TestState {
     redisOptions *options;
     int           checkpoint;
+    int           resp3;
 } TestState;
 
 /* Testcase timeout, will trigger a failure */
@@ -1480,7 +1481,7 @@ void publish_msg(redisOptions *options, const char* channel, const char* msg) {
     disconnect(c, 0);
 }
 
-/* Subscribe callback for test_pubsub_handling:
+/* Subscribe callback for test_pubsub_handling and test_pubsub_handling_resp3:
  * - a published message triggers an unsubscribe
  * - an unsubscribe response triggers a disconnect */
 void subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
@@ -1488,7 +1489,7 @@ void subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
     TestState *state = privdata;
 
     assert(reply != NULL &&
-           reply->type == REDIS_REPLY_ARRAY &&
+           reply->type == (state->resp3 ? REDIS_REPLY_PUSH : REDIS_REPLY_ARRAY) &&
            reply->elements == 3);
 
     if (strcmp(reply->element[0]->str,"subscribe") == 0) {
@@ -1518,6 +1519,23 @@ void subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
     }
 }
 
+/* Expect a reply of type ARRAY */
+void array_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    (void) ac;
+    redisReply *reply = r;
+    TestState *state = privdata;
+    assert(reply != NULL && reply->type == REDIS_REPLY_ARRAY);
+    state->checkpoint++;
+}
+
+/* Expect a NULL reply */
+void null_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    (void) ac;
+    assert(r == NULL);
+    TestState *state = privdata;
+    state->checkpoint++;
+}
+
 static void test_pubsub_handling(struct config config) {
     test("Subscribe, handle published message and unsubscribe: ");
     /* Setup event dispatcher with a testcase timeout */
@@ -1539,15 +1557,155 @@ static void test_pubsub_handling(struct config config) {
     TestState state = {.options = &options};
     redisAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
 
+    /* Make sure non-subscribe commands are handled */
+    redisAsyncCommand(ac,array_cb,&state,"PING");
+
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
     event_free(timeout);
     event_base_free(base);
 
     /* Verify test checkpoints */
-    assert(state.checkpoint == 1);
+    assert(state.checkpoint == 2);
 }
-#endif
+
+/* Unexpected push message, will trigger a failure */
+void unexpected_push_cb(redisAsyncContext *ac, void *r) {
+    (void) ac; (void) r;
+    printf("Unexpected call to the PUSH callback!\n");
+    exit(1);
+}
+
+/* Expect a reply of type INTEGER */
+void integer_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    (void) ac;
+    redisReply *reply = r;
+    TestState *state = privdata;
+    assert(reply != NULL && reply->type == REDIS_REPLY_INTEGER);
+    state->checkpoint++;
+}
+
+static void test_pubsub_handling_resp3(struct config config) {
+    test("Subscribe, handle published message and unsubscribe using RESP3: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout,base,timeout_cb,NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    redisOptions options = get_redis_tcp_options(config);
+    redisAsyncContext *ac = redisAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    redisLibeventAttach(ac,base);
+
+    /* Not expecting any push messages in this test */
+    redisAsyncSetPushCallback(ac, unexpected_push_cb);
+
+    /* Switch protocol */
+    redisAsyncCommand(ac,NULL,NULL,"HELLO 3");
+
+    /* Start subscribe */
+    TestState state = {.options = &options, .resp3 = 1};
+    redisAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
+
+    /* Make sure non-subscribe commands are handled in RESP3 */
+    redisAsyncCommand(ac,integer_cb,&state,"LPUSH mylist foo");
+    redisAsyncCommand(ac,integer_cb,&state,"LPUSH mylist foo");
+    redisAsyncCommand(ac,integer_cb,&state,"LPUSH mylist foo");
+    /* Handle an array with 3 elements as a non-subscribe command */
+    redisAsyncCommand(ac,array_cb,&state,"LRANGE mylist 0 2");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    assert(state.checkpoint == 5);
+}
+
+/* Subscribe callback for test_command_timeout_during_pubsub:
+ * - a subscribe response triggers a published message
+ * - the published message triggers a command that times out
+ * - the command timeout triggers a disconnect */
+void subscribe_with_timeout_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+
+    /* The non-clean disconnect should trigger the
+     * subscription callback with a NULL reply. */
+    if (reply == NULL) {
+        state->checkpoint++;
+        event_base_loopbreak(base);
+        return;
+    }
+
+    assert(reply->type == (state->resp3 ? REDIS_REPLY_PUSH : REDIS_REPLY_ARRAY) &&
+           reply->elements == 3);
+
+    if (strcmp(reply->element[0]->str,"subscribe") == 0) {
+        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
+               reply->element[2]->str == NULL);
+        publish_msg(state->options,"mychannel","Hello!");
+        state->checkpoint++;
+    } else if (strcmp(reply->element[0]->str,"message") == 0) {
+        assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
+               strcmp(reply->element[2]->str,"Hello!") == 0);
+        state->checkpoint++;
+
+        /* Send a command that will trigger a timeout */
+        redisAsyncCommand(ac,null_cb,state,"DEBUG SLEEP 3");
+        redisAsyncCommand(ac,null_cb,state,"LPUSH mylist foo");
+    } else {
+        printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
+        exit(1);
+    }
+}
+
+static void test_command_timeout_during_pubsub(struct config config) {
+    test("Command timeout during Pub/Sub: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base,timeout_cb,NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout,base,timeout_cb,NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout,&timeout_tv);
+
+    /* Connect */
+    redisOptions options = get_redis_tcp_options(config);
+    redisAsyncContext *ac = redisAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    redisLibeventAttach(ac,base);
+
+    /* Configure a command timout */
+    struct timeval command_timeout = {.tv_sec = 2};
+    redisAsyncSetTimeout(ac,command_timeout);
+
+    /* Not expecting any push messages in this test */
+    redisAsyncSetPushCallback(ac,unexpected_push_cb);
+
+    /* Switch protocol */
+    redisAsyncCommand(ac,NULL,NULL,"HELLO 3");
+
+    /* Start subscribe */
+    TestState state = {.options = &options, .resp3 = 1};
+    redisAsyncCommand(ac,subscribe_with_timeout_cb,&state,"subscribe mychannel");
+
+    /* Start event dispatching loop */
+    assert(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    test_cond(state.checkpoint == 5);
+}
+#endif /* HIREDIS_TEST_ASYNC */
 
 /* tests for async api using polling adapter, requires no extra libraries*/
 
@@ -1881,8 +2039,19 @@ int main(int argc, char **argv) {
 #ifdef HIREDIS_TEST_ASYNC
     cfg.type = CONN_TCP;
     printf("\nTesting asynchronous API against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
+    cfg.type = CONN_TCP;
+
+    int major;
+    redisContext *c = do_connect(cfg);
+    get_redis_version(c, &major, NULL);
+    disconnect(c, 0);
+
     test_pubsub_handling(cfg);
-#endif
+    if (major >= 6) {
+        test_pubsub_handling_resp3(cfg);
+        test_command_timeout_during_pubsub(cfg);
+    }
+#endif /* HIREDIS_TEST_ASYNC */
 
     cfg.type = CONN_TCP;
     printf("\nTesting asynchronous API using polling_adapter TCP (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);

@@ -80,6 +80,9 @@ typedef long long ssize_t;
 /* Flag that is set when we should set SO_REUSEADDR before calling bind() */
 #define REDIS_REUSEADDR 0x80
 
+/* Flag that is set when the async connection supports push replies. */
+#define REDIS_SUPPORTS_PUSH 0x100
+
 /**
  * Flag that indicates the user does not want the context to
  * be automatically freed upon error
@@ -131,8 +134,8 @@ void freeReplyObject(void *reply);
 /* Functions to format a command according to the protocol. */
 int redisvFormatCommand(char **target, const char *format, va_list ap);
 int redisFormatCommand(char **target, const char *format, ...);
-int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
-int redisFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const size_t *argvlen);
+long long redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen);
+long long redisFormatSdsCommandArgv(sds *target, int argc, const char ** argv, const size_t *argvlen);
 void redisFreeCommand(char *cmd);
 void redisFreeSdsCommand(sds cmd);
 

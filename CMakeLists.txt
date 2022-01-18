@@ -1,6 +1,4 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.4.0)
-INCLUDE(GNUInstallDirs)
-PROJECT(hiredis)
 
 OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
@@ -21,7 +19,8 @@ getVersionBit(HIREDIS_SONAME)
 SET(VERSION "${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
 MESSAGE("Detected version: ${VERSION}")
 
-PROJECT(hiredis VERSION "${VERSION}")
+PROJECT(hiredis LANGUAGES "C" VERSION "${VERSION}")
+INCLUDE(GNUInstallDirs)
 
 # Hiredis requires C99
 SET(CMAKE_C_STANDARD 99)
@@ -48,6 +47,8 @@ ENDIF()
 
 ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
 ADD_LIBRARY(hiredis_static STATIC ${hiredis_sources})
+ADD_LIBRARY(hiredis::hiredis ALIAS hiredis)
+ADD_LIBRARY(hiredis::hiredis_static ALIAS hiredis_static)
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
@@ -59,6 +60,9 @@ SET_TARGET_PROPERTIES(hiredis_static
 IF(WIN32 OR MINGW)
     TARGET_LINK_LIBRARIES(hiredis PUBLIC ws2_32 crypt32)
     TARGET_LINK_LIBRARIES(hiredis_static PUBLIC ws2_32 crypt32)
+ELSEIF(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+    TARGET_LINK_LIBRARIES(hiredis PUBLIC m)
+    TARGET_LINK_LIBRARIES(hiredis_static PUBLIC m)
 ENDIF()
 
 TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
