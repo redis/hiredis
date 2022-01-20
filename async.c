@@ -508,7 +508,6 @@ static int redisIsSubscribeReply(redisReply *reply) {
 
 void redisProcessCallbacks(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    redisCallback cb = {NULL, NULL, 0, NULL};
     void *reply = NULL;
     int status;
 
@@ -524,6 +523,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 
             /* If monitor mode, repush callback */
             if(c->flags & REDIS_MONITORING) {
+                redisCallback cb = {NULL, NULL, 0, NULL};
                 __redisPushCallback(&ac->replies,&cb);
             }
 
@@ -547,6 +547,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 
         /* Even if the context is subscribed, pending regular
          * callbacks will get a reply before pub/sub messages arrive. */
+        redisCallback cb = {NULL, NULL, 0, NULL};
         if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
             /*
              * A spontaneous reply in a not-subscribed context can be the error
