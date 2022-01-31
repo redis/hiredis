@@ -174,7 +174,7 @@ void sdsfree(sds s) {
  * the output will be "6" as the string was modified but the logical length
  * remains 6 bytes. */
 void sdsupdatelen(sds s) {
-    int reallen = strlen(s);
+    size_t reallen = strlen(s);
     sdssetlen(s, reallen);
 }
 
@@ -580,7 +580,7 @@ sds sdscatprintf(sds s, const char *fmt, ...) {
  */
 sds sdscatfmt(sds s, char const *fmt, ...) {
     const char *f = fmt;
-    int i;
+    long i;
     va_list ap;
 
     va_start(ap,fmt);
@@ -755,14 +755,14 @@ int sdsrange(sds s, ssize_t start, ssize_t end) {
 
 /* Apply tolower() to every character of the sds string 's'. */
 void sdstolower(sds s) {
-    int len = sdslen(s), j;
+    size_t len = sdslen(s), j;
 
     for (j = 0; j < len; j++) s[j] = tolower(s[j]);
 }
 
 /* Apply toupper() to every character of the sds string 's'. */
 void sdstoupper(sds s) {
-    int len = sdslen(s), j;
+    size_t len = sdslen(s), j;
 
     for (j = 0; j < len; j++) s[j] = toupper(s[j]);
 }
