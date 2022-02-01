@@ -81,9 +81,9 @@ jobs:
         run: $GITHUB_WORKSPACE/test.sh
 
   centos8:
-    name: CentOS 8
+    name: RockyLinux 8
     runs-on: ubuntu-latest
-    container: centos:8
+    container: rockylinux:8
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
