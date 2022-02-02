@@ -1733,6 +1733,10 @@ void subscribe_channel_a_cb(redisAsyncContext *ac, void *r, void *privdata) {
         redisAsyncCommand(ac,unexpected_cb,
                           (void*)"unsubscribe should not call unexpected_cb()",
                           "unsubscribe B X A");
+        /* Unsubscribe to patterns, none which we subscribe to */
+        redisAsyncCommand(ac,unexpected_cb,
+                          (void*)"punsubscribe should not call unexpected_cb()",
+                          "punsubscribe");
         /* Send a regular command after unsubscribing, then disconnect */
         state->disconnect = 1;
         redisAsyncCommand(ac,integer_cb,state,"LPUSH mylist foo");
@@ -1769,6 +1773,8 @@ void subscribe_channel_b_cb(redisAsyncContext *ac, void *r, void *privdata) {
  * - subscribe to channel A and B
  * - a published message on A triggers an unsubscribe of channel B, X and A
  *   where channel X is not subscribed to.
+ * - the published message also triggers an unsubscribe to patterns. Since no
+ *   pattern is subscribed to the responded pattern element type is NIL.
  * - a command sent after unsubscribe triggers a disconnect */
 static void test_pubsub_multiple_channels(struct config config) {
     test("Subscribe to multiple channels: ");

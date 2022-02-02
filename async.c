@@ -431,8 +431,10 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
         else
             callbacks = ac->sub.channels;
 
+        /* Ignore replies without a channel/pattern string */
+        if (reply->element[1]->type != REDIS_REPLY_STRING) return REDIS_OK;
+
         /* Locate the right callback */
-        assert(reply->element[1]->type == REDIS_REPLY_STRING);
         sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len);
         if (sname == NULL)
             goto oom;
