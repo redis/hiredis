@@ -46,6 +46,7 @@ typedef struct redisCallback {
     struct redisCallback *next; /* simple singly linked list */
     redisCallbackFn *fn;
     int pending_subs;
+    int unsubscribe_sent;
     void *privdata;
 } redisCallback;
 
@@ -105,6 +106,7 @@ typedef struct redisAsyncContext {
         redisCallbackList replies;
         struct dict *channels;
         struct dict *patterns;
+        int pending_unsubs;
     } sub;
 
     /* Any configured RESP3 PUSH handler */
