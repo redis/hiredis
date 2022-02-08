@@ -572,13 +572,12 @@ int redisFormatCommand(char **target, const char *format, ...) {
  * lengths. If the latter is set to NULL, strlen will be used to compute the
  * argument lengths.
  */
-int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
-                              const size_t *argvlen)
+long long redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
+                                    const size_t *argvlen)
 {
     sds cmd, aux;
-    unsigned long long totlen;
+    unsigned long long totlen, len;
     int j;
-    size_t len;
 
     /* Abort on a NULL target */
     if (target == NULL)
@@ -609,7 +608,7 @@ int redisFormatSdsCommandArgv(sds *target, int argc, const char **argv,
     cmd = sdscatfmt(cmd, "*%i\r\n", argc);
     for (j=0; j < argc; j++) {
         len = argvlen ? argvlen[j] : strlen(argv[j]);
-        cmd = sdscatfmt(cmd, "$%u\r\n", len);
+        cmd = sdscatfmt(cmd, "$%U\r\n", len);
         cmd = sdscatlen(cmd, argv[j], len);
         cmd = sdscatlen(cmd, "\r\n", sizeof("\r\n")-1);
     }
@@ -629,11 +628,11 @@ void redisFreeSdsCommand(sds cmd) {
  * lengths. If the latter is set to NULL, strlen will be used to compute the
  * argument lengths.
  */
-int redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
+long long redisFormatCommandArgv(char **target, int argc, const char **argv, const size_t *argvlen) {
     char *cmd = NULL; /* final command */
-    int pos; /* position in final command */
-    size_t len;
-    int totlen, j;
+    size_t pos; /* position in final command */
+    size_t len, totlen;
+    int j;
 
     /* Abort on a NULL target */
     if (target == NULL)
@@ -804,6 +803,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
     if (options->options & REDIS_OPT_NOAUTOFREE) {
         c->flags |= REDIS_NO_AUTO_FREE;
     }
+    if (options->options & REDIS_OPT_NOAUTOFREEREPLIES) {
+        c->flags |= REDIS_NO_AUTO_FREE_REPLIES;
+    }
 
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
@@ -832,7 +834,7 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
         c->fd = options->endpoint.fd;
         c->flags |= REDIS_CONNECTED;
     } else {
-        // Unknown type - FIXME - FREE
+        redisFree(c);
         return NULL;
     }
 
@@ -1126,7 +1128,7 @@ int redisAppendCommand(redisContext *c, const char *format, ...) {
 
 int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const size_t *argvlen) {
     sds cmd;
-    int len;
+    long long len;
 
     len = redisFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
     if (len == -1) {
