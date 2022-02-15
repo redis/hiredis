@@ -131,7 +131,7 @@ export(EXPORT hiredis-targets
     FILE "${CMAKE_CURRENT_BINARY_DIR}/hiredis-targets.cmake"
     NAMESPACE hiredis::)
 
-SET(CMAKE_CONF_INSTALL_DIR share/hiredis)
+SET(CMAKE_CONF_INSTALL_DIR lib/cmake/hiredis)
 SET(INCLUDE_INSTALL_DIR include)
 include(CMakePackageConfigHelpers)
 configure_package_config_file(hiredis-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
