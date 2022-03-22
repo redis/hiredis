@@ -206,10 +206,11 @@ hiredis-example-ae: examples/example-ae.c adapters/ae.h $(STLIBNAME)
 endif
 
 ifndef LIBUV_DIR
-hiredis-example-libuv:
-	@echo "Please specify LIBUV_DIR (e.g. ../libuv/)"
-	@false
+# dynamic link libuv.so
+hiredis-example-libuv: examples/example-libuv.c adapters/libuv.h $(STLIBNAME)
+	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. -I$(LIBUV_DIR)/include $< -luv -lpthread -lrt $(STLIBNAME) $(REAL_LDFLAGS)
 else
+# use user provided static lib
 hiredis-example-libuv: examples/example-libuv.c adapters/libuv.h $(STLIBNAME)
 	$(CC) -o examples/$@ $(REAL_CFLAGS) -I. -I$(LIBUV_DIR)/include $< $(LIBUV_DIR)/.libs/libuv.a -lpthread -lrt $(STLIBNAME) $(REAL_LDFLAGS)
 endif

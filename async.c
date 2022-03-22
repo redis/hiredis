@@ -460,8 +460,15 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
                 /* Unset subscribed flag only when no pipelined pending subscribe. */
                 if (reply->element[2]->integer == 0
                     && dictSize(ac->sub.channels) == 0
-                    && dictSize(ac->sub.patterns) == 0)
+                    && dictSize(ac->sub.patterns) == 0) {
                     c->flags &= ~REDIS_SUBSCRIBED;
+
+                    /* Move ongoing regular command callbacks. */
+                    redisCallback cb;
+                    while (__redisShiftCallback(&ac->sub.replies,&cb) == REDIS_OK) {
+                        __redisPushCallback(&ac->replies,&cb);
+                    }
+                }
             }
         }
         sdsfree(sname);
@@ -501,7 +508,6 @@ static int redisIsSubscribeReply(redisReply *reply) {
 
 void redisProcessCallbacks(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    redisCallback cb = {NULL, NULL, 0, NULL};
     void *reply = NULL;
     int status;
 
@@ -514,12 +520,6 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
                 __redisAsyncDisconnect(ac);
                 return;
             }
-
-            /* If monitor mode, repush callback */
-            if(c->flags & REDIS_MONITORING) {
-                __redisPushCallback(&ac->replies,&cb);
-            }
-
             /* When the connection is not being disconnected, simply stop
              * trying to get replies and wait for the next loop tick. */
             break;
@@ -540,6 +540,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 
         /* Even if the context is subscribed, pending regular
          * callbacks will get a reply before pub/sub messages arrive. */
+        redisCallback cb = {NULL, NULL, 0, NULL};
         if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
             /*
              * A spontaneous reply in a not-subscribed context can be the error
@@ -563,9 +564,9 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
                 __redisAsyncDisconnect(ac);
                 return;
             }
-            /* No more regular callbacks and no errors, the context *must* be subscribed or monitoring. */
-            assert((c->flags & REDIS_SUBSCRIBED || c->flags & REDIS_MONITORING));
-            if(c->flags & REDIS_SUBSCRIBED)
+            /* No more regular callbacks and no errors, the context *must* be subscribed. */
+            assert(c->flags & REDIS_SUBSCRIBED);
+            if (c->flags & REDIS_SUBSCRIBED)
                 __redisGetSubscribeCallback(ac,reply,&cb);
         }
 
@@ -586,6 +587,11 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
              * abort with an error, but simply ignore it because the client
              * doesn't know what the server will spit out over the wire. */
             c->reader->fn->freeObject(reply);
+        }
+
+        /* If in monitor mode, repush the callback */
+        if (c->flags & REDIS_MONITORING) {
+            __redisPushCallback(&ac->replies,&cb);
         }
     }
 

@@ -1455,7 +1455,14 @@ typedef struct TestState {
     redisOptions *options;
     int           checkpoint;
     int           resp3;
+    int           disconnect;
 } TestState;
+
+/* Helper to disconnect and stop event loop */
+void async_disconnect(redisAsyncContext *ac) {
+    redisAsyncDisconnect(ac);
+    event_base_loopbreak(base);
+}
 
 /* Testcase timeout, will trigger a failure */
 void timeout_cb(int fd, short event, void *arg) {
@@ -1481,9 +1488,18 @@ void publish_msg(redisOptions *options, const char* channel, const char* msg) {
     disconnect(c, 0);
 }
 
+/* Expect a reply of type INTEGER */
+void integer_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+    assert(reply != NULL && reply->type == REDIS_REPLY_INTEGER);
+    state->checkpoint++;
+    if (state->disconnect) async_disconnect(ac);
+}
+
 /* Subscribe callback for test_pubsub_handling and test_pubsub_handling_resp3:
  * - a published message triggers an unsubscribe
- * - an unsubscribe response triggers a disconnect */
+ * - a command is sent before the unsubscribe response is received. */
 void subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
     redisReply *reply = r;
     TestState *state = privdata;
@@ -1506,13 +1522,13 @@ void subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
         redisAsyncCommand(ac,unexpected_cb,
                           (void*)"unsubscribe should call subscribe_cb()",
                           "unsubscribe");
+        /* Send a regular command after unsubscribing, then disconnect */
+        state->disconnect = 1;
+        redisAsyncCommand(ac,integer_cb,state,"LPUSH mylist foo");
+
     } else if (strcmp(reply->element[0]->str,"unsubscribe") == 0) {
         assert(strcmp(reply->element[1]->str,"mychannel") == 0 &&
                reply->element[2]->str == NULL);
-
-        /* Disconnect after unsubscribe */
-        redisAsyncDisconnect(ac);
-        event_base_loopbreak(base);
     } else {
         printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
         exit(1);
@@ -1521,11 +1537,11 @@ void subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
 
 /* Expect a reply of type ARRAY */
 void array_cb(redisAsyncContext *ac, void *r, void *privdata) {
-    (void) ac;
     redisReply *reply = r;
     TestState *state = privdata;
     assert(reply != NULL && reply->type == REDIS_REPLY_ARRAY);
     state->checkpoint++;
+    if (state->disconnect) async_disconnect(ac);
 }
 
 /* Expect a NULL reply */
@@ -1566,7 +1582,7 @@ static void test_pubsub_handling(struct config config) {
     event_base_free(base);
 
     /* Verify test checkpoints */
-    assert(state.checkpoint == 2);
+    assert(state.checkpoint == 3);
 }
 
 /* Unexpected push message, will trigger a failure */
@@ -1574,15 +1590,6 @@ void unexpected_push_cb(redisAsyncContext *ac, void *r) {
     (void) ac; (void) r;
     printf("Unexpected call to the PUSH callback!\n");
     exit(1);
-}
-
-/* Expect a reply of type INTEGER */
-void integer_cb(redisAsyncContext *ac, void *r, void *privdata) {
-    (void) ac;
-    redisReply *reply = r;
-    TestState *state = privdata;
-    assert(reply != NULL && reply->type == REDIS_REPLY_INTEGER);
-    state->checkpoint++;
 }
 
 static void test_pubsub_handling_resp3(struct config config) {
@@ -1625,7 +1632,7 @@ static void test_pubsub_handling_resp3(struct config config) {
     event_base_free(base);
 
     /* Verify test checkpoints */
-    assert(state.checkpoint == 5);
+    assert(state.checkpoint == 6);
 }
 
 /* Subscribe callback for test_command_timeout_during_pubsub:
@@ -1704,6 +1711,174 @@ static void test_command_timeout_during_pubsub(struct config config) {
 
     /* Verify test checkpoints */
     test_cond(state.checkpoint == 5);
+}
+
+/* Subscribe callback for test_pubsub_multiple_channels */
+void subscribe_channel_a_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+
+    assert(reply != NULL && reply->type == REDIS_REPLY_ARRAY &&
+           reply->elements == 3);
+
+    if (strcmp(reply->element[0]->str,"subscribe") == 0) {
+        assert(strcmp(reply->element[1]->str,"A") == 0);
+        publish_msg(state->options,"A","Hello!");
+        state->checkpoint++;
+    } else if (strcmp(reply->element[0]->str,"message") == 0) {
+        assert(strcmp(reply->element[1]->str,"A") == 0 &&
+               strcmp(reply->element[2]->str,"Hello!") == 0);
+        state->checkpoint++;
+
+        /* Unsubscribe to channels, including a channel X which we don't subscribe to */
+        redisAsyncCommand(ac,unexpected_cb,
+                          (void*)"unsubscribe should not call unexpected_cb()",
+                          "unsubscribe B X A");
+        /* Send a regular command after unsubscribing, then disconnect */
+        state->disconnect = 1;
+        redisAsyncCommand(ac,integer_cb,state,"LPUSH mylist foo");
+    } else if (strcmp(reply->element[0]->str,"unsubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str,"A") == 0);
+        state->checkpoint++;
+    } else {
+        printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
+        exit(1);
+    }
+}
+
+/* Subscribe callback for test_pubsub_multiple_channels */
+void subscribe_channel_b_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+
+    assert(reply != NULL && reply->type == REDIS_REPLY_ARRAY &&
+           reply->elements == 3);
+
+    if (strcmp(reply->element[0]->str,"subscribe") == 0) {
+        assert(strcmp(reply->element[1]->str,"B") == 0);
+        state->checkpoint++;
+    } else if (strcmp(reply->element[0]->str,"unsubscribe") == 0) {
+        assert(strcmp(reply->element[1]->str,"B") == 0);
+        state->checkpoint++;
+    } else {
+        printf("Unexpected pubsub command: %s\n", reply->element[0]->str);
+        exit(1);
+    }
+}
+
+/* Test handling of multiple channels
+ * - subscribe to channel A and B
+ * - a published message on A triggers an unsubscribe of channel B, X and A
+ *   where channel X is not subscribed to.
+ * - a command sent after unsubscribe triggers a disconnect */
+static void test_pubsub_multiple_channels(struct config config) {
+    test("Subscribe to multiple channels: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base,timeout_cb,NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout,base,timeout_cb,NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout,&timeout_tv);
+
+    /* Connect */
+    redisOptions options = get_redis_tcp_options(config);
+    redisAsyncContext *ac = redisAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    redisLibeventAttach(ac,base);
+
+    /* Not expecting any push messages in this test */
+    redisAsyncSetPushCallback(ac,unexpected_push_cb);
+
+    /* Start subscribing to two channels */
+    TestState state = {.options = &options};
+    redisAsyncCommand(ac,subscribe_channel_a_cb,&state,"subscribe A");
+    redisAsyncCommand(ac,subscribe_channel_b_cb,&state,"subscribe B");
+
+    /* Start event dispatching loop */
+    assert(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    test_cond(state.checkpoint == 6);
+}
+
+/* Command callback for test_monitor() */
+void monitor_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+
+    /* NULL reply is received when BYE triggers a disconnect. */
+    if (reply == NULL) {
+        event_base_loopbreak(base);
+        return;
+    }
+
+    assert(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    state->checkpoint++;
+
+    if (state->checkpoint == 1) {
+        /* Response from MONITOR */
+        redisContext *c = redisConnectWithOptions(state->options);
+        assert(c != NULL);
+        redisReply *reply = redisCommand(c,"SET first 1");
+        assert(reply->type == REDIS_REPLY_STATUS);
+        freeReplyObject(reply);
+        redisFree(c);
+    } else if (state->checkpoint == 2) {
+        /* Response for monitored command 'SET first 1' */
+        assert(strstr(reply->str,"first") != NULL);
+        redisContext *c = redisConnectWithOptions(state->options);
+        assert(c != NULL);
+        redisReply *reply = redisCommand(c,"SET second 2");
+        assert(reply->type == REDIS_REPLY_STATUS);
+        freeReplyObject(reply);
+        redisFree(c);
+    } else if (state->checkpoint == 3) {
+        /* Response for monitored command 'SET second 2' */
+        assert(strstr(reply->str,"second") != NULL);
+        /* Send QUIT to disconnect */
+        redisAsyncCommand(ac,NULL,NULL,"QUIT");
+    }
+}
+
+/* Test handling of the monitor command
+ * - sends MONITOR to enable monitoring.
+ * - sends SET commands via separate clients to be monitored.
+ * - sends QUIT to stop monitoring and disconnect. */
+static void test_monitor(struct config config) {
+    test("Enable monitoring: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout,base,timeout_cb,NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    redisOptions options = get_redis_tcp_options(config);
+    redisAsyncContext *ac = redisAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    redisLibeventAttach(ac,base);
+
+    /* Not expecting any push messages in this test */
+    redisAsyncSetPushCallback(ac,unexpected_push_cb);
+
+    /* Start monitor */
+    TestState state = {.options = &options};
+    redisAsyncCommand(ac,monitor_cb,&state,"monitor");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoints */
+    assert(state.checkpoint == 3);
 }
 #endif /* HIREDIS_TEST_ASYNC */
 
@@ -2047,6 +2222,8 @@ int main(int argc, char **argv) {
     disconnect(c, 0);
 
     test_pubsub_handling(cfg);
+    test_pubsub_multiple_channels(cfg);
+    test_monitor(cfg);
     if (major >= 6) {
         test_pubsub_handling_resp3(cfg);
         test_command_timeout_during_pubsub(cfg);
