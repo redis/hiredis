@@ -32,7 +32,6 @@ SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 SET(hiredis_sources
     alloc.c
     async.c
-    dict.c
     hiredis.c
     net.c
     read.c
