@@ -50,6 +50,11 @@ ADD_LIBRARY(hiredis_static STATIC ${hiredis_sources})
 ADD_LIBRARY(hiredis::hiredis ALIAS hiredis)
 ADD_LIBRARY(hiredis::hiredis_static ALIAS hiredis_static)
 
+IF(NOT MSVC)
+    SET_TARGET_PROPERTIES(hiredis_static
+        PROPERTIES OUTPUT_NAME hiredis)
+ENDIF()
+
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
     VERSION "${HIREDIS_SONAME}")
@@ -160,6 +165,10 @@ IF(ENABLE_SSL)
             ${hiredis_ssl_sources})
     ADD_LIBRARY(hiredis_ssl_static STATIC
             ${hiredis_ssl_sources})
+    IF(NOT MSVC)
+        SET_TARGET_PROPERTIES(hiredis_ssl_static
+            PROPERTIES OUTPUT_NAME hiredis_ssl)
+    ENDIF()
 
     IF (APPLE)
         SET_PROPERTY(TARGET hiredis_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
