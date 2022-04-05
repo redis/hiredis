@@ -1729,10 +1729,14 @@ void subscribe_channel_a_cb(redisAsyncContext *ac, void *r, void *privdata) {
                strcmp(reply->element[2]->str,"Hello!") == 0);
         state->checkpoint++;
 
-        /* Unsubscribe to channels, including a channel X which we don't subscribe to */
+        /* Unsubscribe to channels, including channel X & Z which we don't subscribe to */
         redisAsyncCommand(ac,unexpected_cb,
                           (void*)"unsubscribe should not call unexpected_cb()",
-                          "unsubscribe B X A");
+                          "unsubscribe B X A A Z");
+        /* Unsubscribe to patterns, none which we subscribe to */
+        redisAsyncCommand(ac,unexpected_cb,
+                          (void*)"punsubscribe should not call unexpected_cb()",
+                          "punsubscribe");
         /* Send a regular command after unsubscribing, then disconnect */
         state->disconnect = 1;
         redisAsyncCommand(ac,integer_cb,state,"LPUSH mylist foo");
@@ -1767,8 +1771,10 @@ void subscribe_channel_b_cb(redisAsyncContext *ac, void *r, void *privdata) {
 
 /* Test handling of multiple channels
  * - subscribe to channel A and B
- * - a published message on A triggers an unsubscribe of channel B, X and A
- *   where channel X is not subscribed to.
+ * - a published message on A triggers an unsubscribe of channel B, X, A and Z
+ *   where channel X and Z are not subscribed to.
+ * - the published message also triggers an unsubscribe to patterns. Since no
+ *   pattern is subscribed to the responded pattern element type is NIL.
  * - a command sent after unsubscribe triggers a disconnect */
 static void test_pubsub_multiple_channels(struct config config) {
     test("Subscribe to multiple channels: ");
