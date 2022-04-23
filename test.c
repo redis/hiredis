@@ -914,6 +914,11 @@ static void test_resp3_push_handler(redisContext *c) {
     old = redisSetPushCallback(c, push_handler);
     test("We can set a custom RESP3 PUSH handler: ");
     reply = redisCommand(c, "SET key:0 val:0");
+    /* We need another command because depending on the version of Redis, the
+     * notification may be delivered after the command's reply. */
+    test_cond(reply != NULL);
+    freeReplyObject(reply);
+    reply = redisCommand(c, "PING");
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && pc.str == 1);
     freeReplyObject(reply);
 
@@ -929,6 +934,12 @@ static void test_resp3_push_handler(redisContext *c) {
     assert((reply = redisCommand(c, "GET key:0")) != NULL);
     freeReplyObject(reply);
     assert((reply = redisCommand(c, "SET key:0 invalid")) != NULL);
+    /* Depending on Redis version, we may receive either push notification or
+     * status reply. Both cases are valid. */
+    if (reply->type == REDIS_REPLY_STATUS) {
+        freeReplyObject(reply);
+        reply = redisCommand(c, "PING");
+    }
     test_cond(reply->type == REDIS_REPLY_PUSH);
     freeReplyObject(reply);
 
