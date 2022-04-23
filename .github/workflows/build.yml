@@ -197,6 +197,7 @@ jobs:
           HIREDIS_PATH: ${{ github.workspace }}
         run: |
           build_hiredis() {
+              git config --global --add safe.directory "$(cygpath -u $HIREDIS_PATH)"
               cd $(cygpath -u $HIREDIS_PATH)
               git clean -xfd
               make
