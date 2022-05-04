@@ -5,8 +5,15 @@ REDIS_PORT=${REDIS_PORT:-56379}
 REDIS_SSL_PORT=${REDIS_SSL_PORT:-56443}
 TEST_SSL=${TEST_SSL:-0}
 SKIPS_AS_FAILS=${SKIPS_AS_FAILS-:0}
+ENABLE_DEBUG_CMD=
 SSL_TEST_ARGS=
 SKIPS_ARG=
+
+# We need to enable the DEBUG command for redis-server >= 7.0.0
+REDIS_MAJOR_VERSION="$(redis-server --version|awk -F'[^0-9]+' '{ print $2 }')"
+if [ "$REDIS_MAJOR_VERSION" -gt "6" ]; then
+    ENABLE_DEBUG_CMD="enable-debug-command local"
+fi
 
 tmpdir=$(mktemp -d)
 PID_FILE=${tmpdir}/hiredis-test-redis.pid
@@ -49,8 +56,10 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT
 
+
 cat > ${tmpdir}/redis.conf <<EOF
 daemonize yes
+${ENABLE_DEBUG_CMD}
 pidfile ${PID_FILE}
 port ${REDIS_PORT}
 bind 127.0.0.1
