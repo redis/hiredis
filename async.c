@@ -148,6 +148,7 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     ac->sub.replies.tail = NULL;
     ac->sub.channels = channels;
     ac->sub.patterns = patterns;
+    ac->sub.pending_unsubs = 0;
 
     return ac;
 oom:
@@ -411,11 +412,11 @@ void redisAsyncDisconnect(redisAsyncContext *ac) {
 static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply, redisCallback *dstcb) {
     redisContext *c = &(ac->c);
     dict *callbacks;
-    redisCallback *cb;
+    redisCallback *cb = NULL;
     dictEntry *de;
     int pvariant;
     char *stype;
-    sds sname;
+    sds sname = NULL;
 
     /* Match reply with the expected format of a pushed message.
      * The type and number of elements (3 to 4) are specified at:
@@ -432,36 +433,44 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
             callbacks = ac->sub.channels;
 
         /* Locate the right callback */
-        assert(reply->element[1]->type == REDIS_REPLY_STRING);
-        sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len);
-        if (sname == NULL)
-            goto oom;
+        if (reply->element[1]->type == REDIS_REPLY_STRING) {
+            sname = sdsnewlen(reply->element[1]->str,reply->element[1]->len);
+            if (sname == NULL) goto oom;
 
-        de = dictFind(callbacks,sname);
-        if (de != NULL) {
-            cb = dictGetEntryVal(de);
-
-            /* If this is an subscribe reply decrease pending counter. */
-            if (strcasecmp(stype+pvariant,"subscribe") == 0) {
-                cb->pending_subs -= 1;
+            if ((de = dictFind(callbacks,sname)) != NULL) {
+                cb = dictGetEntryVal(de);
+                memcpy(dstcb,cb,sizeof(*dstcb));
             }
+        }
 
-            memcpy(dstcb,cb,sizeof(*dstcb));
+        /* If this is an subscribe reply decrease pending counter. */
+        if (strcasecmp(stype+pvariant,"subscribe") == 0) {
+            assert(cb != NULL);
+            cb->pending_subs -= 1;
 
-            /* If this is an unsubscribe message, remove it. */
-            if (strcasecmp(stype+pvariant,"unsubscribe") == 0) {
-                if (cb->pending_subs == 0)
-                    dictDelete(callbacks,sname);
+        } else if (strcasecmp(stype+pvariant,"unsubscribe") == 0) {
+            if (cb == NULL)
+                ac->sub.pending_unsubs -= 1;
+            else if (cb->pending_subs == 0)
+                dictDelete(callbacks,sname);
 
-                /* If this was the last unsubscribe message, revert to
-                 * non-subscribe mode. */
-                assert(reply->element[2]->type == REDIS_REPLY_INTEGER);
+            /* If this was the last unsubscribe message, revert to
+             * non-subscribe mode. */
+            assert(reply->element[2]->type == REDIS_REPLY_INTEGER);
 
-                /* Unset subscribed flag only when no pipelined pending subscribe. */
-                if (reply->element[2]->integer == 0
-                    && dictSize(ac->sub.channels) == 0
-                    && dictSize(ac->sub.patterns) == 0)
-                    c->flags &= ~REDIS_SUBSCRIBED;
+            /* Unset subscribed flag only when no pipelined pending subscribe
+             * or pending unsubscribe replies. */
+            if (reply->element[2]->integer == 0
+                && dictSize(ac->sub.channels) == 0
+                && dictSize(ac->sub.patterns) == 0
+                && ac->sub.pending_unsubs == 0) {
+                c->flags &= ~REDIS_SUBSCRIBED;
+
+                /* Move ongoing regular command callbacks. */
+                redisCallback cb;
+                while (__redisShiftCallback(&ac->sub.replies,&cb) == REDIS_OK) {
+                    __redisPushCallback(&ac->replies,&cb);
+                }
             }
         }
         sdsfree(sname);
@@ -501,7 +510,6 @@ static int redisIsSubscribeReply(redisReply *reply) {
 
 void redisProcessCallbacks(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    redisCallback cb = {NULL, NULL, 0, NULL};
     void *reply = NULL;
     int status;
 
@@ -514,12 +522,6 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
                 __redisAsyncDisconnect(ac);
                 return;
             }
-
-            /* If monitor mode, repush callback */
-            if(c->flags & REDIS_MONITORING) {
-                __redisPushCallback(&ac->replies,&cb);
-            }
-
             /* When the connection is not being disconnected, simply stop
              * trying to get replies and wait for the next loop tick. */
             break;
@@ -540,6 +542,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
 
         /* Even if the context is subscribed, pending regular
          * callbacks will get a reply before pub/sub messages arrive. */
+        redisCallback cb = {NULL, NULL, 0, 0, NULL};
         if (__redisShiftCallback(&ac->replies,&cb) != REDIS_OK) {
             /*
              * A spontaneous reply in a not-subscribed context can be the error
@@ -563,9 +566,9 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
                 __redisAsyncDisconnect(ac);
                 return;
             }
-            /* No more regular callbacks and no errors, the context *must* be subscribed or monitoring. */
-            assert((c->flags & REDIS_SUBSCRIBED || c->flags & REDIS_MONITORING));
-            if(c->flags & REDIS_SUBSCRIBED)
+            /* No more regular callbacks and no errors, the context *must* be subscribed. */
+            assert(c->flags & REDIS_SUBSCRIBED);
+            if (c->flags & REDIS_SUBSCRIBED)
                 __redisGetSubscribeCallback(ac,reply,&cb);
         }
 
@@ -586,6 +589,11 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
              * abort with an error, but simply ignore it because the client
              * doesn't know what the server will spit out over the wire. */
             c->reader->fn->freeObject(reply);
+        }
+
+        /* If in monitor mode, repush the callback */
+        if (c->flags & REDIS_MONITORING) {
+            __redisPushCallback(&ac->replies,&cb);
         }
     }
 
@@ -751,6 +759,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     redisContext *c = &(ac->c);
     redisCallback cb;
     struct dict *cbdict;
+    dictIterator it;
     dictEntry *de;
     redisCallback *existcb;
     int pvariant, hasnext;
@@ -767,6 +776,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     cb.fn = fn;
     cb.privdata = privdata;
     cb.pending_subs = 1;
+    cb.unsubscribe_sent = 0;
 
     /* Find out which command will be appended. */
     p = nextArgument(cmd,&cstr,&clen);
@@ -805,6 +815,51 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
         /* It is only useful to call (P)UNSUBSCRIBE when the context is
          * subscribed to one or more channels or patterns. */
         if (!(c->flags & REDIS_SUBSCRIBED)) return REDIS_ERR;
+
+        if (pvariant)
+            cbdict = ac->sub.patterns;
+        else
+            cbdict = ac->sub.channels;
+
+        if (hasnext) {
+            /* Send an unsubscribe with specific channels/patterns.
+             * Bookkeeping the number of expected replies */
+            while ((p = nextArgument(p,&astr,&alen)) != NULL) {
+                sname = sdsnewlen(astr,alen);
+                if (sname == NULL)
+                    goto oom;
+
+                de = dictFind(cbdict,sname);
+                if (de != NULL) {
+                    existcb = dictGetEntryVal(de);
+                    if (existcb->unsubscribe_sent == 0)
+                        existcb->unsubscribe_sent = 1;
+                    else
+                        /* Already sent, reply to be ignored */
+                        ac->sub.pending_unsubs += 1;
+                } else {
+                    /* Not subscribed to, reply to be ignored */
+                    ac->sub.pending_unsubs += 1;
+                }
+                sdsfree(sname);
+            }
+        } else {
+            /* Send an unsubscribe without specific channels/patterns.
+             * Bookkeeping the number of expected replies */
+            int no_subs = 1;
+            dictInitIterator(&it,cbdict);
+            while ((de = dictNext(&it)) != NULL) {
+                existcb = dictGetEntryVal(de);
+                if (existcb->unsubscribe_sent == 0) {
+                    existcb->unsubscribe_sent = 1;
+                    no_subs = 0;
+                }
+            }
+            /* Unsubscribing to all channels/patterns, where none is
+             * subscribed to, results in a single reply to be ignored. */
+            if (no_subs == 1)
+                ac->sub.pending_unsubs += 1;
+        }
 
         /* (P)UNSUBSCRIBE does not have its own response: every channel or
          * pattern that is unsubscribed will receive a message. This means we

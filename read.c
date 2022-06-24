@@ -374,7 +374,7 @@ static int processLineItem(redisReader *r) {
             if (r->fn && r->fn->createString)
                 obj = r->fn->createString(cur,p,len);
             else
-                obj = (void*)(size_t)(cur->type);
+                obj = (void*)(uintptr_t)(cur->type);
         }
 
         if (obj == NULL) {
@@ -439,7 +439,7 @@ static int processBulkItem(redisReader *r) {
                 if (r->fn && r->fn->createString)
                     obj = r->fn->createString(cur,s+2,len);
                 else
-                    obj = (void*)(long)cur->type;
+                    obj = (void*)(uintptr_t)cur->type;
                 success = 1;
             }
         }
@@ -536,7 +536,7 @@ static int processAggregateItem(redisReader *r) {
             if (r->fn && r->fn->createArray)
                 obj = r->fn->createArray(cur,elements);
             else
-                obj = (void*)(long)cur->type;
+                obj = (void*)(uintptr_t)cur->type;
 
             if (obj == NULL) {
                 __redisReaderSetErrorOOM(r);

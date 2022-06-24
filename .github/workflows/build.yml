@@ -14,7 +14,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo add-apt-repository -y ppa:chris-lea/redis-server
+          curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
           sudo apt-get update
           sudo apt-get install -y redis-server valgrind libevent-dev
       
@@ -81,9 +82,9 @@ jobs:
         run: $GITHUB_WORKSPACE/test.sh
 
   centos8:
-    name: CentOS 8
+    name: RockyLinux 8
     runs-on: ubuntu-latest
-    container: centos:8
+    container: rockylinux:8
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -197,6 +198,7 @@ jobs:
           HIREDIS_PATH: ${{ github.workspace }}
         run: |
           build_hiredis() {
+              git config --global --add safe.directory "$(cygpath -u $HIREDIS_PATH)"
               cd $(cygpath -u $HIREDIS_PATH)
               git clean -xfd
               make
