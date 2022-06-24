@@ -356,7 +356,7 @@ have the following prototype:
 void(const redisAsyncContext *c, int status);
 ```
 
-On a *connect*, the `status` argument is set to `REDIS_OK` if the connection attempted.  In this
+On a *connect*, the `status` argument is set to `REDIS_OK` if the connection attempt succeeded.  In this
 case, the context is ready to accept commands.  If it is called with  `REDIS_ERR` then the
 connection attempt failed. The `err` field in the context can be accessed to find out the cause of the error.
 After a failed connection attempt, the context object is automatically freed by the libary after calling
@@ -375,7 +375,7 @@ api will return `REDIS_ERR`. The function to set the callbacks have the followin
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 ```
-`ac->data` may be used to pass user data to both of these this callbacks.  An typical implementation
+`ac->data` may be used to pass user data to both of thes callbacks.  An typical implementation
 might look something like this:
 ```c
 void appOnConnect(redisAsyncContext *c, int status)
