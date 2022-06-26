@@ -320,23 +320,48 @@ Redis. It returns a pointer to the newly created `redisAsyncContext` struct. The
 should be checked after creation to see if there were errors creating the connection.
 Because the connection that will be created is non-blocking, the kernel is not able to
 instantly return if the specified host and port is able to accept a connection.
+In case of error, it is the caller's responsibility to free the context using `redisAsyncFree()`
 
 *Note: A `redisAsyncContext` is not thread-safe.*
 
+An application function creating a connection might look like this:
+
 ```c
-redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
-if (c->err) {
-    printf("Error: %s\n", c->errstr);
-    // handle error
+void appConnect(myAppData *appData)
+{
+    redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
+    if (c->err) {
+        printf("Error: %s\n", c->errstr);
+        // handle error
+        redisAsyncFree(c);
+        c = NULL;
+    } else {
+        appData->context = c;
+        appData->connecting = 1;
+        c->data = appData; /* store application pointer for the callbacks */
+        redisAsyncSetConnectCallback(c, appOnConnect);
+        redisAsyncSetDisconnectCallback(c, appOnDisconnect);
+    }
 }
+
 ```
 
-The asynchronous context can hold a disconnect callback function that is called when the
-connection is disconnected (either because of an error or per user request). This function should
+
+The asynchronous context _should_ hold a *connect* callback function that is called when the connection
+attempt completes, either successfully or with an error.
+It _can_ also hold a *disconnect* callback function that is called when the
+connection is disconnected (either because of an error or per user request). Both callbacks should
 have the following prototype:
 ```c
 void(const redisAsyncContext *c, int status);
 ```
+
+On a *connect*, the `status` argument is set to `REDIS_OK` if the connection attempt succeeded.  In this
+case, the context is ready to accept commands.  If it is called with  `REDIS_ERR` then the
+connection attempt failed. The `err` field in the context can be accessed to find out the cause of the error.
+After a failed connection attempt, the context object is automatically freed by the libary after calling
+the connect callback.  This may be a good point to create a new context and retry the connection.
+
 On a disconnect, the `status` argument is set to `REDIS_OK` when disconnection was initiated by the
 user, or `REDIS_ERR` when the disconnection was caused by an error. When it is `REDIS_ERR`, the `err`
 field in the context can be accessed to find out the cause of the error.
@@ -344,12 +369,45 @@ field in the context can be accessed to find out the cause of the error.
 The context object is always freed after the disconnect callback fired. When a reconnect is needed,
 the disconnect callback is a good point to do so.
 
-Setting the disconnect callback can only be done once per context. For subsequent calls it will
-return `REDIS_ERR`. The function to set the disconnect callback has the following prototype:
+Setting the connect or disconnect callbacks can only be done once per context. For subsequent calls the
+api will return `REDIS_ERR`. The function to set the callbacks have the following prototype:
 ```c
+int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 ```
-`ac->data` may be used to pass user data to this callback, the same can be done for redisConnectCallback.
+`ac->data` may be used to pass user data to both of thes callbacks.  An typical implementation
+might look something like this:
+```c
+void appOnConnect(redisAsyncContext *c, int status)
+{
+    myAppData *appData = (myAppData*)c->data; /* get my application specific context*/
+    appData->connecting = 0;
+    if (status == REDIS_OK) {
+        appData->connected = 1;
+    } else {
+        appData->connected = 0;
+        appData->err = c->err;
+        appData->context = NULL; /* avoid stale pointer when callback returns */
+    }
+    appAttemptReconnect();
+}
+
+void appOnDisconnect(redisAsyncContext *c, int status)
+{
+    myAppData *appData = (myAppData*)c->data; /* get my application specific context*/
+    appData->connected = 0;
+    appData->err = c->err;
+    appData->context = NULL; /* avoid stale pointer when callback returns */
+    if (status == REDIS_OK) {
+        appNotifyDisconnectCompleted(mydata);
+    } else {
+        appNotifyUnexpectedDisconnect(mydata);
+        appAttemptReconnect();
+    }
+}
+```
+
+
 ### Sending commands and their callbacks
 
 In an asynchronous context, commands are automatically pipelined due to the nature of an event loop.
@@ -382,6 +440,14 @@ valid for the duration of the callback.
 
 All pending callbacks are called with a `NULL` reply when the context encountered an error.
 
+For every command issued, with the exception of **SUBSCRIBE** and **PSUBSCRIBE**, the callback is
+called exactly once.  Even if the context object id disconnected or deleted, every pending callback
+will be called with a `NULL` reply.
+
+For **SUBSCRIBE** and **PSUBSCRIBE**, the callbacks may be called repeatedly until a `unsubscribe`
+message arrives.  This will be the last invocation of the callback. In case of error, the callbacks
+may reive a final `NULL` reply instead.
+
 ### Disconnecting
 
 An asynchronous connection can be terminated using:
@@ -393,6 +459,15 @@ commands are no longer accepted and the connection is only terminated when all p
 have been written to the socket, their respective replies have been read and their respective
 callbacks have been executed. After this, the disconnection callback is executed with the
 `REDIS_OK` status and the context object is freed.
+
+The connection can be forcefully disconnected using
+```c
+void redisAsyncFree(redisAsyncContext *ac);
+```
+In this case, nothing more is written to the socket, all pending callbacks are called with a `NULL`
+reply and the disconnection callback is called with `REDIS_OK`, after which the context object
+is freed.
+
 
 ### Hooking it up to event library *X*
 
@@ -549,9 +624,9 @@ ssl_context = redisCreateSSLContext(
 
 if(ssl_context == NULL || ssl_error != 0) {
     /* Handle error and abort... */
-    /* e.g. 
-    printf("SSL error: %s\n", 
-        (ssl_error != 0) ? 
+    /* e.g.
+    printf("SSL error: %s\n",
+        (ssl_error != 0) ?
             redisSSLContextGetError(ssl_error) : "Unknown error");
     // Abort
     */
