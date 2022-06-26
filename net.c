@@ -278,20 +278,19 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
         return REDIS_OK;
     }
     int error = errno;
-    if (error == EINPROGRESS)
-    {
+    if (error == EINPROGRESS) {
         /* must check error to see if connect failed.  Get the socket error */
         int fail, so_error;
         socklen_t optlen = sizeof(so_error);
         fail = getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &so_error, &optlen);
         if (fail == 0) {
             if (so_error == 0) {
-                /* ocket is connected! */
+                /* Socket is connected! */
                 *completed = 1;
                 return REDIS_OK;
             }
             /* connection error; */
-            errno = so_error; 
+            errno = so_error;
             error = so_error;
         }
     }
