@@ -399,7 +399,7 @@ void appOnDisconnect(redisAsyncContext *c, int status)
     appData->err = c->err;
     appData->context = NULL; /* avoid stale pointer when callback returns */
     if (status == REDIS_OK) {
-        appNotifyDisconnectCompleted(mydata); 
+        appNotifyDisconnectCompleted(mydata);
     } else {
         appNotifyUnexpectedDisconnect(mydata);
         appAttemptReconnect();
@@ -624,9 +624,9 @@ ssl_context = redisCreateSSLContext(
 
 if(ssl_context == NULL || ssl_error != 0) {
     /* Handle error and abort... */
-    /* e.g. 
-    printf("SSL error: %s\n", 
-        (ssl_error != 0) ? 
+    /* e.g.
+    printf("SSL error: %s\n",
+        (ssl_error != 0) ?
             redisSSLContextGetError(ssl_error) : "Unknown error");
     // Abort
     */
