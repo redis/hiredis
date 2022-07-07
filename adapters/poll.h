@@ -69,7 +69,7 @@ static int redisPollTick(redisAsyncContext *ac, double timeout) {
     pfd.fd = e->fd;
     pfd.events = 0;
     if (reading)
-        pfd.events = POLLIN;   
+        pfd.events = POLLIN;
     if (writing)
         pfd.events |= POLLOUT;
 
@@ -86,7 +86,7 @@ static int redisPollTick(redisAsyncContext *ac, double timeout) {
             return ns;
         ns = 0;
     }
-    
+
     handled = 0;
     e->in_tick = 1;
     if (ns) {
