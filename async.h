@@ -57,7 +57,7 @@ typedef struct redisCallbackList {
 
 /* Connection callback prototypes */
 typedef void (redisDisconnectCallback)(const struct redisAsyncContext*, int status);
-typedef void (redisConnectCallback)(const struct redisAsyncContext*, int status);
+typedef void (redisConnectCallback)(struct redisAsyncContext*, int status);
 typedef void(redisTimerCallback)(void *timer, void *privdata);
 
 /* Context for an async connection to Redis */

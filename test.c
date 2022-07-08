@@ -1946,7 +1946,7 @@ static void asCleanup(void* data)
 
 static void commandCallback(struct redisAsyncContext *ac, void* _reply, void* _privdata);
 
-static void connectCallback(const redisAsyncContext *c, int status) {
+static void connectCallback(redisAsyncContext *c, int status) {
     struct _astest *t = (struct _astest *)c->data;
     assert(t == &astest);
     assert(t->connects == 0);
