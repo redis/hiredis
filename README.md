@@ -250,7 +250,7 @@ following two execution paths:
     * Read from the socket until a single reply could be parsed
 
 The function `redisGetReply` is exported as part of the Hiredis API and can be used when a reply
-is expected on the socket. To pipeline commands, the only things that needs to be done is
+is expected on the socket. To pipeline commands, the only thing that needs to be done is
 filling up the output buffer. For this cause, two commands can be used that are identical
 to the `redisCommand` family, apart from not returning a reply:
 ```c
@@ -357,9 +357,9 @@ void(const redisAsyncContext *c, int status);
 ```
 
 On a *connect*, the `status` argument is set to `REDIS_OK` if the connection attempt succeeded.  In this
-case, the context is ready to accept commands.  If it is called with  `REDIS_ERR` then the
+case, the context is ready to accept commands.  If it is called with `REDIS_ERR` then the
 connection attempt failed. The `err` field in the context can be accessed to find out the cause of the error.
-After a failed connection attempt, the context object is automatically freed by the libary after calling
+After a failed connection attempt, the context object is automatically freed by the library after calling
 the connect callback.  This may be a good point to create a new context and retry the connection.
 
 On a disconnect, the `status` argument is set to `REDIS_OK` when disconnection was initiated by the
@@ -375,7 +375,7 @@ api will return `REDIS_ERR`. The function to set the callbacks have the followin
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 ```
-`ac->data` may be used to pass user data to both of thes callbacks.  An typical implementation
+`ac->data` may be used to pass user data to both callbacks.  A typical implementation
 might look something like this:
 ```c
 void appOnConnect(redisAsyncContext *c, int status)
@@ -444,9 +444,9 @@ For every command issued, with the exception of **SUBSCRIBE** and **PSUBSCRIBE**
 called exactly once.  Even if the context object id disconnected or deleted, every pending callback
 will be called with a `NULL` reply.
 
-For **SUBSCRIBE** and **PSUBSCRIBE**, the callbacks may be called repeatedly until a `unsubscribe`
+For **SUBSCRIBE** and **PSUBSCRIBE**, the callbacks may be called repeatedly until an `unsubscribe`
 message arrives.  This will be the last invocation of the callback. In case of error, the callbacks
-may reive a final `NULL` reply instead.
+may receive a final `NULL` reply instead.
 
 ### Disconnecting
 
@@ -708,7 +708,7 @@ If you have a unique use-case where you don't want hiredis to automatically inte
     redisSetPushCallback(context, NULL);
     ```
 
-    _Note:  With no handler configured, calls to `redisCommand` may generate more than one reply, so this strategy is only applicable when there's some kind of blocking`redisGetReply()` loop (e.g. `MONITOR` or `SUBSCRIBE` workloads)._
+    _Note:  With no handler configured, calls to `redisCommand` may generate more than one reply, so this strategy is only applicable when there's some kind of blocking `redisGetReply()` loop (e.g. `MONITOR` or `SUBSCRIBE` workloads)._
 
 ## Allocator injection
 
