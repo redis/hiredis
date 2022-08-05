@@ -133,7 +133,7 @@ jobs:
           ref: ${{ env.GITHUB_HEAD_REF }}
 
       - name: Build in FreeBSD
-        uses: vmactions/freebsd-vm@v0.2.0
+        uses: vmactions/freebsd-vm@v0
         with:
           prepare: pkg install -y gmake cmake
           run: |
