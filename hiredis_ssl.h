@@ -61,6 +61,27 @@ typedef enum {
     REDIS_SSL_CTX_OS_CERT_ADD_FAILED            /* Failed to add CA certificates obtained from system to the SSL context */
 } redisSSLContextError;
 
+/* Constants that mirror OpenSSL's verify modes. By default,
+ * REDIS_SSL_VERIFY_PEER is used with redisCreateSSLContext().
+ * Some Redis clients disable peer verification if there are no
+ * certificates specified.
+ */
+#define REDIS_SSL_VERIFY_NONE 0x00
+#define REDIS_SSL_VERIFY_PEER 0x01
+#define REDIS_SSL_VERIFY_FAIL_IF_NO_PEER_CERT 0x02
+#define REDIS_SSL_VERIFY_CLIENT_ONCE 0x04
+#define REDIS_SSL_VERIFY_POST_HANDSHAKE 0x08
+
+/* Options to create an OpenSSL context. */
+typedef struct {
+    const char *cacert_filename;
+    const char *capath;
+    const char *cert_filename;
+    const char *private_key_filename;
+    const char *server_name;
+    int verify_mode;
+} redisSSLOptions;
+
 /**
  * Return the error message corresponding with the specified error code.
  */
@@ -100,6 +121,18 @@ int redisInitOpenSSL(void);
 redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *capath,
         const char *cert_filename, const char *private_key_filename,
         const char *server_name, redisSSLContextError *error);
+
+/**
+  * Helper function to initialize an OpenSSL context that can be used
+  * to initiate SSL connections. This is a more extensible version of redisCreateSSLContext().
+  *
+  * options contains a structure of SSL options to use.
+  *
+  * If error is non-null, it will be populated in case the context creation fails
+  * (returning a NULL).
+*/
+redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options,
+        redisSSLContextError *error);
 
 /**
  * Free a previously created OpenSSL context.
