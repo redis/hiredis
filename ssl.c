@@ -219,6 +219,25 @@ redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *
         const char *cert_filename, const char *private_key_filename,
         const char *server_name, redisSSLContextError *error)
 {
+    redisSSLOptions options = {
+        .cacert_filename = cacert_filename,
+        .capath = capath,
+        .cert_filename = cert_filename,
+        .private_key_filename = private_key_filename,
+        .server_name = server_name,
+        .verify_mode = REDIS_SSL_VERIFY_PEER,
+    };
+
+    return redisCreateSSLContextWithOptions(&options, error);
+}
+
+redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redisSSLContextError *error) {
+    const char *cacert_filename = options->cacert_filename;
+    const char *capath = options->capath;
+    const char *cert_filename = options->cert_filename;
+    const char *private_key_filename = options->private_key_filename;
+    const char *server_name = options->server_name;
+
 #ifdef _WIN32
     HCERTSTORE win_store = NULL;
     PCCERT_CONTEXT win_ctx = NULL;
@@ -235,7 +254,7 @@ redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *
     }
 
     SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-    SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_verify(ctx->ssl_ctx, options->verify_mode, NULL);
 
     if ((cert_filename != NULL && private_key_filename == NULL) ||
             (private_key_filename != NULL && cert_filename == NULL)) {
