@@ -1907,7 +1907,9 @@ typedef enum astest_no
     ASTEST_CONNECT=0,
     ASTEST_CONN_TIMEOUT,
     ASTEST_PINGPONG,
-    ASTEST_PINGPONG_TIMEOUT
+    ASTEST_PINGPONG_TIMEOUT,
+    ASTEST_ISSUE_931,
+    ASTEST_ISSUE_931_PING
 }astest_no;
 
 /* a static context for the async tests */
@@ -1918,6 +1920,7 @@ struct _astest {
     int connects;
     int connect_status;
     int disconnects;
+    int pongs;
     int disconnect_status;
     int connected;
     int err;
@@ -1941,7 +1944,9 @@ static void asCleanup(void* data)
     t->ac = NULL;
 }
 
-static void connectCallback(const redisAsyncContext *c, int status) {
+static void commandCallback(struct redisAsyncContext *ac, void* _reply, void* _privdata);
+
+static void connectCallback(redisAsyncContext *c, int status) {
     struct _astest *t = (struct _astest *)c->data;
     assert(t == &astest);
     assert(t->connects == 0);
@@ -1950,6 +1955,15 @@ static void connectCallback(const redisAsyncContext *c, int status) {
     t->connects++;
     t->connect_status = status;
     t->connected = status == REDIS_OK ? 1 : -1;
+
+    if (t->testno == ASTEST_ISSUE_931) {
+        /* disconnect again */
+        redisAsyncDisconnect(c);
+    }
+    else if (t->testno == ASTEST_ISSUE_931_PING)
+    {
+        status = redisAsyncCommand(c, commandCallback, NULL, "PING");
+    }
 }
 static void disconnectCallback(const redisAsyncContext *c, int status) {
     assert(c->data == (void*)&astest);
@@ -1969,20 +1983,22 @@ static void commandCallback(struct redisAsyncContext *ac, void* _reply, void* _p
     (void)_privdata;
     t->err = ac->err;
     strcpy(t->errstr, ac->errstr);
-    if (t->testno == ASTEST_PINGPONG)
+    t->counter++;
+    if (t->testno == ASTEST_PINGPONG ||t->testno == ASTEST_ISSUE_931_PING)
     {
-        test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+        assert(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
+        t->pongs++;
         redisAsyncFree(ac);
     }
     if (t->testno == ASTEST_PINGPONG_TIMEOUT)
     {
         /* two ping pongs */
         assert(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
-        if (++t->counter == 1) {
+        t->pongs++;
+        if (t->counter == 1) {
             int status = redisAsyncCommand(ac, commandCallback, NULL, "PING");
             assert(status == REDIS_OK);
         } else {
-            test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
             redisAsyncFree(ac);
         }
     }
@@ -2089,6 +2105,7 @@ static void test_async_polling(struct config config) {
     assert(status == REDIS_OK);
     while(astest.ac)
         redisPollTick(c, 0.1);
+    test_cond(astest.pongs == 1);
 
     /* Test a ping/pong after connection that didn't time out.
      * see https://github.com/redis/hiredis/issues/945
@@ -2105,8 +2122,33 @@ static void test_async_polling(struct config config) {
         assert(status == REDIS_OK);
         while(astest.ac)
             redisPollTick(c, 0.1);
+        test_cond(astest.pongs == 2);
         config = defaultconfig;
     }
+
+    /* Test disconnect from an on_connect callback
+     * see https://github.com/redis/hiredis/issues/931
+     */
+    test("Disconnect from onConnected callback (Issue #931): ");
+    c = do_aconnect(config, ASTEST_ISSUE_931);
+    while(astest.disconnects == 0)
+        redisPollTick(c, 0.1);
+    assert(astest.connected == 0);
+    assert(astest.connects == 1);
+    test_cond(astest.disconnects == 1);
+
+    /* Test ping/pong from an on_connect callback
+     * see https://github.com/redis/hiredis/issues/931
+     */
+    test("Ping/Pong from onConnected callback (Issue #931): ");
+    c = do_aconnect(config, ASTEST_ISSUE_931_PING);
+    /* connect callback issues ping, reponse callback destroys context */
+    while(astest.ac)
+        redisPollTick(c, 0.1);
+    assert(astest.connected == 0);
+    assert(astest.connects == 1);
+    assert(astest.disconnects == 1);
+    test_cond(astest.pongs == 1);
 }
 /* End of Async polling_adapter driven tests */
 
