@@ -140,6 +140,7 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     ac->ev.scheduleTimer = NULL;
 
     ac->onConnect = NULL;
+    ac->onConnectNC = NULL;
     ac->onDisconnect = NULL;
 
     ac->replies.head = NULL;
@@ -226,17 +227,34 @@ redisAsyncContext *redisAsyncConnectUnix(const char *path) {
     return redisAsyncConnectWithOptions(&options);
 }
 
-int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn) {
-    if (ac->onConnect == NULL) {
-        ac->onConnect = fn;
+static int
+redisAsyncSetConnectCallbackImpl(redisAsyncContext *ac, redisConnectCallback *fn,
+                                 redisConnectCallbackNC *fn_nc)
+{
+    /* If either are already set, this is an error */
+    if (ac->onConnect || ac->onConnectNC)
+        return REDIS_ERR;
 
-        /* The common way to detect an established connection is to wait for
-         * the first write event to be fired. This assumes the related event
-         * library functions are already set. */
-        _EL_ADD_WRITE(ac);
-        return REDIS_OK;
+    if (fn) {
+        ac->onConnect = fn;
+    } else if (fn_nc) {
+        ac->onConnectNC = fn_nc;
     }
-    return REDIS_ERR;
+
+    /* The common way to detect an established connection is to wait for
+     * the first write event to be fired. This assumes the related event
+     * library functions are already set. */
+    _EL_ADD_WRITE(ac);
+
+    return REDIS_OK;
+}
+
+int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn) {
+    return redisAsyncSetConnectCallbackImpl(ac, fn, NULL);
+}
+
+int redisAsyncSetConnectCallbackNC(redisAsyncContext *ac, redisConnectCallbackNC *fn) {
+    return redisAsyncSetConnectCallbackImpl(ac, NULL, fn);
 }
 
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn) {
@@ -305,14 +323,23 @@ static void __redisRunPushCallback(redisAsyncContext *ac, redisReply *reply) {
 
 static void __redisRunConnectCallback(redisAsyncContext *ac, int status)
 {
-    if (ac->onConnect) {
-        if (!(ac->c.flags & REDIS_IN_CALLBACK)) {
-            ac->c.flags |= REDIS_IN_CALLBACK;
+    if (ac->onConnect == NULL && ac->onConnectNC == NULL)
+        return;
+
+    if (!(ac->c.flags & REDIS_IN_CALLBACK)) {
+        ac->c.flags |= REDIS_IN_CALLBACK;
+        if (ac->onConnect) {
             ac->onConnect(ac, status);
-            ac->c.flags &= ~REDIS_IN_CALLBACK;
         } else {
-            /* already in callback */
+            ac->onConnectNC(ac, status);
+        }
+        ac->c.flags &= ~REDIS_IN_CALLBACK;
+    } else {
+        /* already in callback */
+        if (ac->onConnect) {
             ac->onConnect(ac, status);
+        } else {
+            ac->onConnectNC(ac, status);
         }
     }
 }

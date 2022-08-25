@@ -372,6 +372,8 @@ the disconnect callback is a good point to do so.
 Setting the connect or disconnect callbacks can only be done once per context. For subsequent calls the
 api will return `REDIS_ERR`. The function to set the callbacks have the following prototype:
 ```c
+/* Alternatively you can use redisAsyncSetConnectCallbackNC which will be passed a non-const
+   redisAsyncContext* on invocation (e.g. allowing writes to the privdata member). */
 int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 ```

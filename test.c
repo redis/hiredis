@@ -2008,7 +2008,7 @@ static redisAsyncContext *do_aconnect(struct config config, astest_no testno)
 {
     redisOptions options = {0};
     memset(&astest, 0, sizeof(astest));
-    
+
     astest.testno = testno;
     astest.connect_status = astest.disconnect_status = -2;
 
@@ -2039,7 +2039,7 @@ static redisAsyncContext *do_aconnect(struct config config, astest_no testno)
     c->data = &astest;
     c->dataCleanup = asCleanup;
     redisPollAttach(c);
-    redisAsyncSetConnectCallback(c, connectCallback);
+    redisAsyncSetConnectCallbackNC(c, connectCallback);
     redisAsyncSetDisconnectCallback(c, disconnectCallback);
     return c;
 }
@@ -2058,7 +2058,7 @@ static void test_async_polling(struct config config) {
     int status;
     redisAsyncContext *c;
     struct config defaultconfig = config;
-   
+
     test("Async connect: ");
     c = do_aconnect(config, ASTEST_CONNECT);
     assert(c);
@@ -2095,7 +2095,7 @@ static void test_async_polling(struct config config) {
         test_cond(astest.connect_status == REDIS_ERR);
         config = defaultconfig;
     }
-      
+
     /* Test a ping/pong after connection */
     test("Async PING/PONG: ");
     c = do_aconnect(config, ASTEST_PINGPONG);
