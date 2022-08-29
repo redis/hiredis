@@ -221,6 +221,9 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
 static void *createDoubleObject(const redisReadTask *task, double value, char *str, size_t len) {
     redisReply *r, *parent;
 
+    if (len == SIZE_MAX) // Prevents hi_malloc(0) if len equals to SIZE_MAX
+        return NULL;
+
     r = createReplyObject(REDIS_REPLY_DOUBLE);
     if (r == NULL)
         return NULL;
