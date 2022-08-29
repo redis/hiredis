@@ -76,6 +76,15 @@ static int tests = 0, fails = 0, skips = 0;
 #define test_cond(_c) if(_c) printf("\033[0;32mPASSED\033[0;0m\n"); else {printf("\033[0;31mFAILED\033[0;0m\n"); fails++;}
 #define test_skipped() { printf("\033[01;33mSKIPPED\033[0;0m\n"); skips++; }
 
+static void millisleep(int ms)
+{
+#if _MSC_VER
+    Sleep(ms);
+#else
+    usleep(ms*1000);
+#endif
+}
+
 static long long usec(void) {
 #ifndef _MSC_VER
     struct timeval tv;
@@ -1177,7 +1186,7 @@ static void test_blocking_connection_timeouts(struct config config) {
         freeReplyObject(reply);
 
         // wait for the DEBUG SLEEP to complete so that Redis server is unblocked for the following tests
-        sleep(3);
+        millisleep(3000);
     } else {
         test_skipped();
     }
@@ -1938,15 +1947,6 @@ struct _astest {
 };
 static struct _astest astest;
 
-static void asSleep(int ms)
-{
-#if _MSC_VER
-    Sleep(ms);
-#else
-    usleep(ms*1000);
-#endif
-}
-
 /* async callbacks */
 static void asCleanup(void* data)
 {
@@ -2127,7 +2127,7 @@ static void test_async_polling(struct config config) {
         while(astest.connected == 0)
             redisPollTick(c, 0.1);
         /* sleep 0.1 s, allowing old timeout to arrive */
-        asSleep(10);
+        millisleep(10);
         status = redisAsyncCommand(c, commandCallback, NULL, "PING");
         assert(status == REDIS_OK);
         while(astest.ac)
