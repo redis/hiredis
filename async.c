@@ -535,6 +535,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
     return REDIS_OK;
 oom:
     __redisSetError(&(ac->c), REDIS_ERR_OOM, "Out of memory");
+    __redisAsyncCopyError(ac);
     return REDIS_ERR;
 }
 
