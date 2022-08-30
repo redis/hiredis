@@ -48,6 +48,7 @@ extern int redisContextUpdateConnectTimeout(redisContext *c, const struct timeva
 extern int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
 
 static redisContextFuncs redisContextDefaultFuncs = {
+    .close = redisNetClose,
     .free_privctx = NULL,
     .async_read = redisAsyncRead,
     .async_write = redisAsyncWrite,
@@ -729,7 +730,10 @@ static redisContext *redisContextInit(void) {
 void redisFree(redisContext *c) {
     if (c == NULL)
         return;
-    redisNetClose(c);
+
+    if (c->funcs && c->funcs->close) {
+        c->funcs->close(c);
+    }
 
     sdsfree(c->obuf);
     redisReaderFree(c->reader);
@@ -766,7 +770,9 @@ int redisReconnect(redisContext *c) {
         c->privctx = NULL;
     }
 
-    redisNetClose(c);
+    if (c->funcs && c->funcs->close) {
+        c->funcs->close(c);
+    }
 
     sdsfree(c->obuf);
     redisReaderFree(c->reader);
