@@ -234,6 +234,7 @@ typedef struct {
     (opts)->free_privdata = dtor;                    \
 
 typedef struct redisContextFuncs {
+    void (*close)(struct redisContext *);
     void (*free_privctx)(void *);
     void (*async_read)(struct redisAsyncContext *);
     void (*async_write)(struct redisAsyncContext *);
