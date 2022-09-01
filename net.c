@@ -50,6 +50,8 @@
 /* Defined in hiredis.c */
 void __redisSetError(redisContext *c, int type, const char *str);
 
+int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
+
 void redisNetClose(redisContext *c) {
     if (c && c->fd != REDIS_INVALID_FD) {
         close(c->fd);
@@ -277,12 +279,28 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
         *completed = 1;
         return REDIS_OK;
     }
-    switch (errno) {
+    int error = errno;
+    if (error == EINPROGRESS) {
+        /* must check error to see if connect failed.  Get the socket error */
+        int fail, so_error;
+        socklen_t optlen = sizeof(so_error);
+        fail = getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &so_error, &optlen);
+        if (fail == 0) {
+            if (so_error == 0) {
+                /* Socket is connected! */
+                *completed = 1;
+                return REDIS_OK;
+            }
+            /* connection error; */
+            errno = so_error;
+            error = so_error;
+        }
+    }
+    switch (error) {
     case EISCONN:
         *completed = 1;
         return REDIS_OK;
     case EALREADY:
-    case EINPROGRESS:
     case EWOULDBLOCK:
         *completed = 0;
         return REDIS_OK;
@@ -317,6 +335,10 @@ int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
     const void *to_ptr = &tv;
     size_t to_sz = sizeof(tv);
 
+    if (redisContextUpdateCommandTimeout(c, &tv) != REDIS_OK) {
+        __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
+        return REDIS_ERR;
+    }
     if (setsockopt(c->fd,SOL_SOCKET,SO_RCVTIMEO,to_ptr,to_sz) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(SO_RCVTIMEO)");
         return REDIS_ERR;
@@ -417,17 +439,25 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
-    /* Try with IPv6 if no IPv4 address was found. We do it in this order since
-     * in a Redis client you can't afford to test if you have IPv6 connectivity
-     * as this would add latency to every connect. Otherwise a more sensible
-     * route could be: Use IPv6 if both addresses are available and there is IPv6
-     * connectivity. */
-    if ((rv = getaddrinfo(c->tcp.host,_port,&hints,&servinfo)) != 0) {
-         hints.ai_family = AF_INET6;
-         if ((rv = getaddrinfo(addr,_port,&hints,&servinfo)) != 0) {
-            __redisSetError(c,REDIS_ERR_OTHER,gai_strerror(rv));
-            return REDIS_ERR;
-        }
+    /* DNS lookup. To use dual stack, set both flags to prefer both IPv4 and
+     * IPv6. By default, for historical reasons, we try IPv4 first and then we
+     * try IPv6 only if no IPv4 address was found. */
+    if (c->flags & REDIS_PREFER_IPV6 && c->flags & REDIS_PREFER_IPV4)
+        hints.ai_family = AF_UNSPEC;
+    else if (c->flags & REDIS_PREFER_IPV6)
+        hints.ai_family = AF_INET6;
+    else
+        hints.ai_family = AF_INET;
+
+    rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
+    if (rv != 0 && hints.ai_family != AF_UNSPEC) {
+        /* Try again with the other IP version. */
+        hints.ai_family = (hints.ai_family == AF_INET) ? AF_INET6 : AF_INET;
+        rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
+    }
+    if (rv != 0) {
+        __redisSetError(c, REDIS_ERR_OTHER, gai_strerror(rv));
+        return REDIS_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
 addrretry:

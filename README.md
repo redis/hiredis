@@ -1,10 +1,11 @@
-[![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
+
+[![Build Status](https://github.com/redis/hiredis/actions/workflows/build.yml/badge.svg)](https://github.com/redis/hiredis/actions/workflows/build.yml)
 
 **This Readme reflects the latest changed in the master branch. See [v1.0.0](https://github.com/redis/hiredis/tree/v1.0.0) for the Readme and documentation for the latest release ([API/ABI history](https://abi-laboratory.pro/?view=timeline&l=hiredis)).**
 
 # HIREDIS
 
-Hiredis is a minimalistic C client library for the [Redis](http://redis.io/) database.
+Hiredis is a minimalistic C client library for the [Redis](https://redis.io/) database.
 
 It is minimalistic because it just adds minimal support for the protocol, but
 at the same time it uses a high level printf-alike API in order to make it
@@ -21,6 +22,12 @@ Redis version >= 1.2.0.
 
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
+
+## Upgrading to `1.0.2`
+
+<span style="color:red">NOTE:  v1.0.1 erroneously bumped SONAME, which is why it is skipped here.</span>
+
+Version 1.0.2 is simply 1.0.0 with a fix for [CVE-2021-32765](https://github.com/redis/hiredis/security/advisories/GHSA-hfm9-39pp-55p2).  They are otherwise identical.
 
 ## Upgrading to `1.0.0`
 
@@ -169,7 +176,7 @@ Hiredis also supports every new `RESP3` data type which are as follows.  For mor
 
 * **`REDIS_REPLY_MAP`**:
     * An array with the added invariant that there will always be an even number of elements.
-      The MAP is functionally equivelant to `REDIS_REPLY_ARRAY` except for the previously mentioned invariant.
+      The MAP is functionally equivalent to `REDIS_REPLY_ARRAY` except for the previously mentioned invariant.
 
 * **`REDIS_REPLY_SET`**:
     * An array response where each entry is unique.
@@ -189,7 +196,7 @@ Hiredis also supports every new `RESP3` data type which are as follows.  For mor
 
 * **`REDIS_REPLY_VERB`**:
     * A verbatim string, intended to be presented to the user without modification.
-      The string payload is stored in the `str` memeber, and type data is stored in the `vtype` member (e.g. `txt` for raw text or `md` for markdown).
+      The string payload is stored in the `str` member, and type data is stored in the `vtype` member (e.g. `txt` for raw text or `md` for markdown).
 
 Replies should be freed using the `freeReplyObject()` function.
 Note that this function will take care of freeing sub-reply objects
@@ -243,7 +250,7 @@ following two execution paths:
     * Read from the socket until a single reply could be parsed
 
 The function `redisGetReply` is exported as part of the Hiredis API and can be used when a reply
-is expected on the socket. To pipeline commands, the only things that needs to be done is
+is expected on the socket. To pipeline commands, the only thing that needs to be done is
 filling up the output buffer. For this cause, two commands can be used that are identical
 to the `redisCommand` family, apart from not returning a reply:
 ```c
@@ -261,9 +268,9 @@ a single call to `read(2)`):
 redisReply *reply;
 redisAppendCommand(context,"SET foo bar");
 redisAppendCommand(context,"GET foo");
-redisGetReply(context,(void *)&reply); // reply for SET
+redisGetReply(context,(void**)&reply); // reply for SET
 freeReplyObject(reply);
-redisGetReply(context,(void *)&reply); // reply for GET
+redisGetReply(context,(void**)&reply); // reply for GET
 freeReplyObject(reply);
 ```
 This API can also be used to implement a blocking subscriber:
@@ -313,23 +320,48 @@ Redis. It returns a pointer to the newly created `redisAsyncContext` struct. The
 should be checked after creation to see if there were errors creating the connection.
 Because the connection that will be created is non-blocking, the kernel is not able to
 instantly return if the specified host and port is able to accept a connection.
+In case of error, it is the caller's responsibility to free the context using `redisAsyncFree()`
 
 *Note: A `redisAsyncContext` is not thread-safe.*
 
+An application function creating a connection might look like this:
+
 ```c
-redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
-if (c->err) {
-    printf("Error: %s\n", c->errstr);
-    // handle error
+void appConnect(myAppData *appData)
+{
+    redisAsyncContext *c = redisAsyncConnect("127.0.0.1", 6379);
+    if (c->err) {
+        printf("Error: %s\n", c->errstr);
+        // handle error
+        redisAsyncFree(c);
+        c = NULL;
+    } else {
+        appData->context = c;
+        appData->connecting = 1;
+        c->data = appData; /* store application pointer for the callbacks */
+        redisAsyncSetConnectCallback(c, appOnConnect);
+        redisAsyncSetDisconnectCallback(c, appOnDisconnect);
+    }
 }
+
 ```
 
-The asynchronous context can hold a disconnect callback function that is called when the
-connection is disconnected (either because of an error or per user request). This function should
+
+The asynchronous context _should_ hold a *connect* callback function that is called when the connection
+attempt completes, either successfully or with an error.
+It _can_ also hold a *disconnect* callback function that is called when the
+connection is disconnected (either because of an error or per user request). Both callbacks should
 have the following prototype:
 ```c
 void(const redisAsyncContext *c, int status);
 ```
+
+On a *connect*, the `status` argument is set to `REDIS_OK` if the connection attempt succeeded.  In this
+case, the context is ready to accept commands.  If it is called with `REDIS_ERR` then the
+connection attempt failed. The `err` field in the context can be accessed to find out the cause of the error.
+After a failed connection attempt, the context object is automatically freed by the library after calling
+the connect callback.  This may be a good point to create a new context and retry the connection.
+
 On a disconnect, the `status` argument is set to `REDIS_OK` when disconnection was initiated by the
 user, or `REDIS_ERR` when the disconnection was caused by an error. When it is `REDIS_ERR`, the `err`
 field in the context can be accessed to find out the cause of the error.
@@ -337,12 +369,47 @@ field in the context can be accessed to find out the cause of the error.
 The context object is always freed after the disconnect callback fired. When a reconnect is needed,
 the disconnect callback is a good point to do so.
 
-Setting the disconnect callback can only be done once per context. For subsequent calls it will
-return `REDIS_ERR`. The function to set the disconnect callback has the following prototype:
+Setting the connect or disconnect callbacks can only be done once per context. For subsequent calls the
+api will return `REDIS_ERR`. The function to set the callbacks have the following prototype:
 ```c
+/* Alternatively you can use redisAsyncSetConnectCallbackNC which will be passed a non-const
+   redisAsyncContext* on invocation (e.g. allowing writes to the privdata member). */
+int redisAsyncSetConnectCallback(redisAsyncContext *ac, redisConnectCallback *fn);
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn);
 ```
-`ac->data` may be used to pass user data to this callback, the same can be done for redisConnectCallback.
+`ac->data` may be used to pass user data to both callbacks.  A typical implementation
+might look something like this:
+```c
+void appOnConnect(redisAsyncContext *c, int status)
+{
+    myAppData *appData = (myAppData*)c->data; /* get my application specific context*/
+    appData->connecting = 0;
+    if (status == REDIS_OK) {
+        appData->connected = 1;
+    } else {
+        appData->connected = 0;
+        appData->err = c->err;
+        appData->context = NULL; /* avoid stale pointer when callback returns */
+    }
+    appAttemptReconnect();
+}
+
+void appOnDisconnect(redisAsyncContext *c, int status)
+{
+    myAppData *appData = (myAppData*)c->data; /* get my application specific context*/
+    appData->connected = 0;
+    appData->err = c->err;
+    appData->context = NULL; /* avoid stale pointer when callback returns */
+    if (status == REDIS_OK) {
+        appNotifyDisconnectCompleted(mydata);
+    } else {
+        appNotifyUnexpectedDisconnect(mydata);
+        appAttemptReconnect();
+    }
+}
+```
+
+
 ### Sending commands and their callbacks
 
 In an asynchronous context, commands are automatically pipelined due to the nature of an event loop.
@@ -375,6 +442,14 @@ valid for the duration of the callback.
 
 All pending callbacks are called with a `NULL` reply when the context encountered an error.
 
+For every command issued, with the exception of **SUBSCRIBE** and **PSUBSCRIBE**, the callback is
+called exactly once.  Even if the context object id disconnected or deleted, every pending callback
+will be called with a `NULL` reply.
+
+For **SUBSCRIBE** and **PSUBSCRIBE**, the callbacks may be called repeatedly until an `unsubscribe`
+message arrives.  This will be the last invocation of the callback. In case of error, the callbacks
+may receive a final `NULL` reply instead.
+
 ### Disconnecting
 
 An asynchronous connection can be terminated using:
@@ -386,6 +461,15 @@ commands are no longer accepted and the connection is only terminated when all p
 have been written to the socket, their respective replies have been read and their respective
 callbacks have been executed. After this, the disconnection callback is executed with the
 `REDIS_OK` status and the context object is freed.
+
+The connection can be forcefully disconnected using
+```c
+void redisAsyncFree(redisAsyncContext *ac);
+```
+In this case, nothing more is written to the socket, all pending callbacks are called with a `NULL`
+reply and the disconnection callback is called with `REDIS_OK`, after which the context object
+is freed.
+
 
 ### Hooking it up to event library *X*
 
@@ -522,7 +606,7 @@ redisSSLContext *ssl_context;
 /* An error variable to indicate what went wrong, if the context fails to
  * initialize.
  */
-redisSSLContextError ssl_error;
+redisSSLContextError ssl_error = REDIS_SSL_CTX_NONE;
 
 /* Initialize global OpenSSL state.
  *
@@ -540,11 +624,11 @@ ssl_context = redisCreateSSLContext(
     "redis.mydomain.com",   /* Server name to request (SNI), optional */
     &ssl_error);
 
-if(ssl_context == NULL || ssl_error != 0) {
+if(ssl_context == NULL || ssl_error != REDIS_SSL_CTX_NONE) {
     /* Handle error and abort... */
-    /* e.g. 
-    printf("SSL error: %s\n", 
-        (ssl_error != 0) ? 
+    /* e.g.
+    printf("SSL error: %s\n",
+        (ssl_error != REDIS_SSL_CTX_NONE) ?
             redisSSLContextGetError(ssl_error) : "Unknown error");
     // Abort
     */
@@ -626,7 +710,7 @@ If you have a unique use-case where you don't want hiredis to automatically inte
     redisSetPushCallback(context, NULL);
     ```
 
-    _Note:  With no handler configured, calls to `redisCommand` may generate more than one reply, so this strategy is only applicable when there's some kind of blocking`redisGetReply()` loop (e.g. `MONITOR` or `SUBSCRIBE` workloads)._
+    _Note:  With no handler configured, calls to `redisCommand` may generate more than one reply, so this strategy is only applicable when there's some kind of blocking `redisGetReply()` loop (e.g. `MONITOR` or `SUBSCRIBE` workloads)._
 
 ## Allocator injection
 
