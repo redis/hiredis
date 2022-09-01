@@ -439,17 +439,25 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
-    /* Try with IPv6 if no IPv4 address was found. We do it in this order since
-     * in a Redis client you can't afford to test if you have IPv6 connectivity
-     * as this would add latency to every connect. Otherwise a more sensible
-     * route could be: Use IPv6 if both addresses are available and there is IPv6
-     * connectivity. */
-    if ((rv = getaddrinfo(c->tcp.host,_port,&hints,&servinfo)) != 0) {
-         hints.ai_family = AF_INET6;
-         if ((rv = getaddrinfo(addr,_port,&hints,&servinfo)) != 0) {
-            __redisSetError(c,REDIS_ERR_OTHER,gai_strerror(rv));
-            return REDIS_ERR;
-        }
+    /* DNS lookup. To use dual stack, set both flags to prefer both IPv4 and
+     * IPv6. By default, for historical reasons, we try IPv4 first and then we
+     * try IPv6 only if no IPv4 address was found. */
+    if (c->flags & REDIS_PREFER_IPV6 && c->flags & REDIS_PREFER_IPV4)
+        hints.ai_family = AF_UNSPEC;
+    else if (c->flags & REDIS_PREFER_IPV6)
+        hints.ai_family = AF_INET6;
+    else
+        hints.ai_family = AF_INET;
+
+    rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
+    if (rv != 0 && hints.ai_family != AF_UNSPEC) {
+        /* Try again with the other IP version. */
+        hints.ai_family = (hints.ai_family == AF_INET) ? AF_INET6 : AF_INET;
+        rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
+    }
+    if (rv != 0) {
+        __redisSetError(c, REDIS_ERR_OTHER, gai_strerror(rv));
+        return REDIS_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
 addrretry:

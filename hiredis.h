@@ -92,6 +92,11 @@ typedef long long ssize_t;
 /* Flag that indicates the user does not want replies to be automatically freed */
 #define REDIS_NO_AUTO_FREE_REPLIES 0x400
 
+/* Flags to prefer IPv6 or IPv4 when doing DNS lookup. (If both are set,
+ * AF_UNSPEC is used.) */
+#define REDIS_PREFER_IPV4 0x800
+#define REDIS_PREFER_IPV6 0x1000
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
@@ -149,6 +154,8 @@ struct redisSsl;
 
 #define REDIS_OPT_NONBLOCK 0x01
 #define REDIS_OPT_REUSEADDR 0x02
+#define REDIS_OPT_PREFER_IPV4 0x04
+#define REDIS_OPT_PREFER_IPV6 0x08
 
 /**
  * Don't automatically free the async object on a connection failure,
