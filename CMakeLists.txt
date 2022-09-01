@@ -122,7 +122,7 @@ endif()
 INSTALL(FILES hiredis.targets
     DESTINATION build/native)
 
-INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h
+INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h sockcompat.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
 
 INSTALL(DIRECTORY adapters
