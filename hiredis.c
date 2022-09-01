@@ -362,12 +362,6 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
             newarg = curarg;
 
             switch(c[1]) {
-            case 's':
-                arg = va_arg(ap,char*);
-                size = strlen(arg);
-                if (size > 0)
-                    newarg = sdscatlen(curarg,arg,size);
-                break;
             case 'b':
                 arg = va_arg(ap,char*);
                 size = va_arg(ap,size_t);
@@ -391,16 +385,28 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     while (*_p != '\0' && strchr(flags,*_p) != NULL) _p++;
 
                     /* Field width */
-                    while (*_p != '\0' && isdigit(*_p)) _p++;
+                    while (*_p != '\0' && (isdigit(*_p) || *_p == '*')) _p++;
 
                     /* Precision */
                     if (*_p == '.') {
                         _p++;
-                        while (*_p != '\0' && isdigit(*_p)) _p++;
+                        while (*_p != '\0' && (isdigit(*_p) || *_p == '*')) _p++;
                     }
 
                     /* Copy va_list before consuming with va_arg */
                     va_copy(_cpy,ap);
+
+                    /* Char conversion (without modifiers) */
+                    if (*_p == 'c') {
+                        va_arg(ap,int);
+                        goto fmt_valid;
+                    }
+
+                    /* String conversion (without modifiers) */
+                    if (*_p == 's') {
+                        va_arg(ap,char*);
+                        goto fmt_valid;
+                    }
 
                     /* Integer conversion (without modifiers) */
                     if (strchr(intfmts,*_p) != NULL) {
