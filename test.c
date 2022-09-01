@@ -339,8 +339,12 @@ static void test_format_commands(void) {
     FLOAT_WIDTH_TEST(float);
     FLOAT_WIDTH_TEST(double);
 
-    test("Format command with invalid printf format: ");
+    test("Format command with unhandled printf format (specifier 'p' not supported): ");
     len = redisFormatCommand(&cmd,"key:%08p %b",(void*)1234,"foo",(size_t)3);
+    test_cond(len == -1);
+
+    test("Format command with invalid printf format (specifier missing): ");
+    len = redisFormatCommand(&cmd,"%-");
     test_cond(len == -1);
 
     const char *argv[3];
