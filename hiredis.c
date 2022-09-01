@@ -399,6 +399,11 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     /* Copy va_list before consuming with va_arg */
                     va_copy(_cpy,ap);
 
+                    /* Make sure we have more characters otherwise strchr() accepts
+                     * '\0' as an integer specifier. This is checked after above
+                     * va_copy() to avoid UB in fmt_invalid's call to va_end(). */
+                    if (*_p == '\0') goto fmt_invalid;
+
                     /* Integer conversion (without modifiers) */
                     if (strchr(intfmts,*_p) != NULL) {
                         va_arg(ap,int);
