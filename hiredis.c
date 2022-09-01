@@ -478,7 +478,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
             touched = 1;
             c++;
 	    if (*c == '\0')
-             continue;
+                 break;
         }
         c++;
     }
