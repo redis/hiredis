@@ -82,6 +82,7 @@ an error state. The field `errstr` will contain a string with a description of
 the error. More information on errors can be found in the **Errors** section.
 After trying to connect to Redis using `redisConnect` you should
 check the `err` field to see if establishing the connection was successful:
+
 ```c
 redisContext *c = redisConnect("127.0.0.1", 6379);
 if (c == NULL || c->err) {
@@ -93,6 +94,40 @@ if (c == NULL || c->err) {
     }
 }
 ```
+
+One can also use `redisConnectWithOptions` which takes a `redisOptions` argument
+that can be configured with endpoint information as well as many different flags
+to change how the `redisContext` will be configured.
+
+```c
+redisOptions opt = {0};
+
+/* One can set the endpoint with one of our helper macros */
+if (tcp) {
+    REDIS_OPTIONS_SET_TCP(&opt, "localhost", 6379);
+} else {
+    REDIS_OPTIONS_SET_UNIX(&opt, "/tmp/redis.sock");
+}
+
+/* And privdata can be specified with another helper */
+REDIS_OPTIONS_SET_PRIVDATA(&opt, myPrivData, myPrivDataDtor);
+
+/* Finally various options may be set via the `options` member, as described below */
+opt->options |= REDIS_OPT_PREFER_IPV4;
+```
+
+### Configurable redisOptions flags
+
+There are several flags you may set in the `redisOptions` struct to change default behavior.  You can specify the flags via the `redisOptions->options` member.
+
+| Flag | Description  |
+| --- | --- |
+| REDIS\_OPT\_NONBLOCK | Tells hiredis to make a non-blocking connection. |
+| REDIS\_OPT\_REUSEADDR | Tells hiredis to set the [SO_REUSEADDR](https://man7.org/linux/man-pages/man7/socket.7.html) socket option |
+| REDIS\_OPT\_PREFER\_IPV4<br>REDIS\_OPT\_PREFER_IPV6 | Informs hiredis to either prefer `IPV4` or `IPV6` when invoking [getaddrinfo](https://man7.org/linux/man-pages/man3/gai_strerror.3.html).  Note that both of the options may be set at once, which will cause hiredis to spcify `AF_UNSPEC` in the getaddrinfo call, which means both `IPV4` and `IPV6` addresses will be searched simultaneously. | 
+| REDIS\_OPT\_NO\_PUSH\_AUTOFREE | Tells hiredis to not install the default RESP3 PUSH handler (which just intercepts and frees the replies).  This is useful in situations where you want to process these messages in-band. |
+| REDIS\_OPT\_NOAUOTFREEREPLIES | **ASYNC**: tells hiredis not to automatically invoke `freeReplyObject` after executing the reply callback. |
+| REDIS\_OPT\_NOAUTOFREE | **ASYNC**: Tells hiredis not to automatically free the `redisAsyncContext` on connection/communication failure, but only if the user makes an explicit call to `redisAsyncDisconnect` or `redisAsyncFree` |
 
 *Note: A `redisContext` is not thread-safe.*
 
