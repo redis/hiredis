@@ -809,6 +809,12 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
     if (options->options & REDIS_OPT_NOAUTOFREEREPLIES) {
         c->flags |= REDIS_NO_AUTO_FREE_REPLIES;
     }
+    if (options->options & REDIS_OPT_PREFER_IPV4) {
+        c->flags |= REDIS_PREFER_IPV4;
+    }
+    if (options->options & REDIS_OPT_PREFER_IPV6) {
+        c->flags |= REDIS_PREFER_IPV6;
+    }
 
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
