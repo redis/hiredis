@@ -364,6 +364,7 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
             switch(c[1]) {
             case 's':
                 arg = va_arg(ap,char*);
+                if (arg == NULL) break; /* argument missing */
                 size = strlen(arg);
                 if (size > 0)
                     newarg = sdscatlen(curarg,arg,size);
