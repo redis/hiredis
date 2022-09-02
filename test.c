@@ -353,18 +353,6 @@ static void test_format_commands(void) {
         len == 4+4+2);
     hi_free(cmd);
 
-    test("Format command with missing integer argument for %%d: ");
-    len = redisFormatCommand(&cmd,"%d");
-    test_cond(strncmp(cmd,"*1\r\n$1\r\n0\r\n",len) == 0 &&
-        len == 4+4+3);
-    hi_free(cmd);
-
-    test("Format command with missing argument for %%b: ");
-    len = redisFormatCommand(&cmd,"%b", "");
-    test_cond(strncmp(cmd,"*1\r\n$0\r\n\r\n",len) == 0 &&
-        len == 4+4+2);
-    hi_free(cmd);
-
     const char *argv[3];
     argv[0] = "SET";
     argv[1] = "foo\0xxx";
