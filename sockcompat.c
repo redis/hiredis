@@ -260,4 +260,21 @@ int win32_poll(struct pollfd *fds, nfds_t nfds, int timeout) {
     _updateErrno(ret != SOCKET_ERROR);
     return ret != SOCKET_ERROR ? ret : -1;
 }
+
+int win32_redisKeepAlive(SOCKET sockfd, int interval_ms) {
+    struct tcp_keepalive cfg;
+    DWORD bytes_in;
+    int res;
+
+    cfg.onoff = 1;
+    cfg.keepaliveinterval = interval_ms;
+    cfg.keepalivetime = interval_ms;
+
+    res = WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &cfg,
+                   sizeof(struct tcp_keepalive), NULL, 0,
+                   &bytes_in, NULL, NULL);
+
+    return res == 0 ? 0 : _wsaErrorToErrno(res);
+}
+
 #endif /* _WIN32 */

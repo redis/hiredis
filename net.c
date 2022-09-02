@@ -168,6 +168,7 @@ int redisKeepAlive(redisContext *c, int interval) {
     int val = 1;
     redisFD fd = c->fd;
 
+#ifndef _WIN32
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1){
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));
         return REDIS_ERR;
@@ -201,7 +202,15 @@ int redisKeepAlive(redisContext *c, int interval) {
     }
 #endif
 #endif
+#else
+    int res;
 
+    res = win32_redisKeepAlive(fd, interval);
+    if (res != 0) {
+        __redisSetError(c, REDIS_ERR_OTHER, strerror(res));
+        return REDIS_ERR;
+    }
+#endif
     return REDIS_OK;
 }
 
