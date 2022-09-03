@@ -405,6 +405,16 @@ static void test_append_formatted_commands(struct config config) {
     disconnect(c, 0);
 }
 
+static void test_tcp_options(struct config cfg) {
+    redisContext *c;
+
+    c = do_connect(cfg);
+    test("We can enable TCP_KEEPALIVE: ");
+    test_cond(redisEnableKeepAlive(c) == REDIS_OK);
+
+    disconnect(c, 0);
+}
+
 static void test_reply_reader(void) {
     redisReader *reader;
     void *reply, *root;
@@ -2261,6 +2271,7 @@ int main(int argc, char **argv) {
     test_blocking_io_errors(cfg);
     test_invalid_timeout_errors(cfg);
     test_append_formatted_commands(cfg);
+    test_tcp_options(cfg);
     if (throughput) test_throughput(cfg);
 
     printf("\nTesting against Unix socket connection (%s): ", cfg.unix_sock.path);
