@@ -156,6 +156,7 @@ struct redisSsl;
 #define REDIS_OPT_REUSEADDR 0x02
 #define REDIS_OPT_PREFER_IPV4 0x04
 #define REDIS_OPT_PREFER_IPV6 0x08
+#define REDIS_OPT_PREFER_IP_UNSPEC (REDIS_OPT_PREFER_IPV4 | REDIS_OPT_PREFER_IPV6)
 
 /**
  * Don't automatically free the async object on a connection failure,
@@ -244,6 +245,7 @@ typedef struct {
     } while(0)
 
 typedef struct redisContextFuncs {
+    void (*close)(struct redisContext *);
     void (*free_privctx)(void *);
     void (*async_read)(struct redisAsyncContext *);
     void (*async_write)(struct redisAsyncContext *);

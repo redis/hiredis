@@ -32,6 +32,7 @@
 
 #include "hiredis.h"
 #include "async.h"
+#include "net.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -579,6 +580,7 @@ static void redisSSLAsyncWrite(redisAsyncContext *ac) {
 }
 
 redisContextFuncs redisContextSSLFuncs = {
+    .close = redisNetClose,
     .free_privctx = redisSSLFree,
     .async_read = redisSSLAsyncRead,
     .async_write = redisSSLAsyncWrite,

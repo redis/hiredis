@@ -205,7 +205,8 @@ int redisKeepAlive(redisContext *c, int interval) {
 #else
     int res;
 
-    res = win32_redisKeepAlive(fd, interval);
+    res = win32_redisKeepAlive(fd, interval * 1000);
+
     if (res != 0) {
         __redisSetError(c, REDIS_ERR_OTHER, strerror(res));
         return REDIS_ERR;
