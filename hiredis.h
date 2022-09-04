@@ -249,9 +249,15 @@ typedef struct redisContextFuncs {
     void (*free_privctx)(void *);
     void (*async_read)(struct redisAsyncContext *);
     void (*async_write)(struct redisAsyncContext *);
+
+    /* Read/Write data to the underlying communication stream, returning the
+     * number of bytes read/written.  In the event of an unrecoverable error
+     * these functions shall return a value < 0.  In the event of a
+     * recoverable error, they should return 0. */
     ssize_t (*read)(struct redisContext *, char *, size_t);
     ssize_t (*write)(struct redisContext *);
 } redisContextFuncs;
+
 
 /* Context for a connection to Redis */
 typedef struct redisContext {

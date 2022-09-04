@@ -82,7 +82,19 @@ ssize_t redisNetRead(redisContext *c, char *buf, size_t bufcap) {
 }
 
 ssize_t redisNetWrite(redisContext *c) {
-    ssize_t nwritten = send(c->fd, c->obuf, sdslen(c->obuf), 0);
+    ssize_t nwritten;
+
+    nwritten = send(c->fd, c->obuf, sdslen(c->obuf), 0);
+    if (nwritten < 0) {
+        if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+            /* Try again */
+            return 0;
+        } else {
+            __redisSetError(c, REDIS_ERR_IO, strerror(errno));
+            return -1;
+        }
+    }
+
     return nwritten;
 }
 
