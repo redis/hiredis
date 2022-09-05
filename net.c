@@ -70,7 +70,7 @@ ssize_t redisNetRead(redisContext *c, char *buf, size_t bufcap) {
             __redisSetError(c, REDIS_ERR_TIMEOUT, "recv timeout");
             return -1;
         } else {
-            __redisSetError(c, REDIS_ERR_IO, NULL);
+            __redisSetError(c, REDIS_ERR_IO, strerror(errno));
             return -1;
         }
     } else if (nread == 0) {
