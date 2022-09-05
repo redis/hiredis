@@ -986,8 +986,8 @@ int redisBufferRead(redisContext *c) {
  * successfully written to the socket. When the buffer is empty after the
  * write operation, "done" is set to 1 (if given).
  *
- * Returns REDIS_ERR if an error occurred trying to write and sets
- * c->errstr to hold the appropriate error string.
+ * Returns REDIS_ERR if an unrecoverable error occurred in the underlying
+ * c->funcs->write function.
  */
 int redisBufferWrite(redisContext *c, int *done) {
 
