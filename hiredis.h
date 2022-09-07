@@ -216,6 +216,10 @@ typedef struct {
         redisFD fd;
     } endpoint;
 
+    /* Socket callback function executed after socket creation but before
+     * we connect. This can be used to set OS specific socket options. */
+    int (*socket_cb)(redisFD fd, void *privdata, char **errstr);
+
     /* Optional user defined data/destructor */
     void *privdata;
     void (*free_privdata)(void *);
@@ -237,6 +241,10 @@ typedef struct {
 #define REDIS_OPTIONS_SET_UNIX(opts, path) do { \
         (opts)->type = REDIS_CONN_UNIX;         \
         (opts)->endpoint.unix_socket = path;    \
+    } while(0)
+
+#define REDIS_OPTIONS_SET_SOCKET_CB(opts, cb) do { \
+        (opts)->socket_cb = cb;                    \
     } while(0)
 
 #define REDIS_OPTIONS_SET_PRIVDATA(opts, data, dtor) do {  \
@@ -287,6 +295,11 @@ typedef struct redisContext {
     /* For non-blocking connect */
     struct sockaddr *saddr;
     size_t addrlen;
+
+    /* A callback to be invoked after successful socket creation but before we
+     * connect.  This can be usefull for setting OS specific socket flags.
+     * The callback may optionally set errstr in the event of an error. */
+    int (*socket_cb)(redisFD fd, void *privdata, char **errstr);
 
     /* Optional data and corresponding destructor users can use to provide
      * context to a given redisContext.  Not used by hiredis. */

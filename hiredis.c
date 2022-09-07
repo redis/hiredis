@@ -829,6 +829,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
         c->flags |= REDIS_PREFER_IPV6;
     }
 
+    /* Set any configured socket callback function */
+    c->socket_cb = options->socket_cb;
+
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
     if (options->push_cb != NULL)

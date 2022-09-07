@@ -402,6 +402,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     int rv, n;
     char _port[6];  /* strlen("65535"); */
     struct addrinfo hints, *servinfo, *bservinfo, *p, *b;
+    char *errstr;
     int blocking = (c->flags & REDIS_BLOCK);
     int reuseaddr = (c->flags & REDIS_REUSEADDR);
     int reuses = 0;
@@ -476,6 +477,13 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
 addrretry:
         if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == REDIS_INVALID_FD)
             continue;
+
+        /* Invoke any user-provided socket callback */
+        errstr = NULL;
+        if (c->socket_cb && c->socket_cb(s, c->privdata, &errstr) != REDIS_OK) {
+            __redisSetError(c, REDIS_ERR_OTHER, errstr ? errstr : "Failure in user-defined socket callback");
+            goto error;
+        }
 
         c->fd = s;
         if (redisSetBlocking(c,0) != REDIS_OK)
