@@ -444,6 +444,13 @@ void __redisAsyncDisconnect(redisAsyncContext *ac) {
      * callbacks with a NULL-reply. */
     if (!(c->flags & REDIS_NO_AUTO_FREE)) {
       __redisAsyncFree(ac);
+    } else {
+        if (c->flags & REDIS_CONNECTED) {
+            __redisRunDisconnectCallback(ac, ac->err == 0 ? REDIS_OK : REDIS_ERR);
+        }
+        if (ac->dataCleanup) {
+            ac->dataCleanup(ac->data);
+        }
     }
 }
 
