@@ -747,7 +747,7 @@ void redisFree(redisContext *c) {
     if (c->privdata && c->free_privdata)
         c->free_privdata(c->privdata);
 
-    if (c->funcs->free_privctx)
+    if (c->funcs && c->funcs->free_privctx)
         c->funcs->free_privctx(c->privctx);
 
     memset(c, 0xff, sizeof(*c));
