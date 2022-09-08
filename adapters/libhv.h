@@ -43,6 +43,23 @@ static void redisLibhvCleanup(void *privdata) {
     hevent_set_userdata(io, NULL);
 }
 
+static void redisLibhvTimeout(htimer_t* timer) {
+    hio_t* io = (hio_t*)hevent_userdata(timer);
+    redisAsyncHandleTimeout(hevent_userdata(io));
+}
+
+static void redisLibhvSetTimeout(void *privdata, struct timeval tv) {
+    hio_t* io = (hio_t*)privdata;
+    hloop_t* loop = hevent_loop(io);
+    htimer_t *timer;
+    uint32_t millis;
+
+    millis = tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    timer = htimer_add(loop, redisLibhvTimeout, millis, 1);
+
+    hevent_set_userdata(timer, io);
+}
+
 static int redisLibhvAttach(redisAsyncContext* ac, hloop_t* loop) {
     redisContext *c = &(ac->c);
     hio_t* io = NULL;
@@ -62,6 +79,7 @@ static int redisLibhvAttach(redisAsyncContext* ac, hloop_t* loop) {
     ac->ev.addWrite = redisLibhvAddWrite;
     ac->ev.delWrite = redisLibhvDelWrite;
     ac->ev.cleanup  = redisLibhvCleanup;
+    ac->ev.scheduleTimer = redisLibhvSetTimeout;
     ac->ev.data     = io;
 
     return REDIS_OK;
