@@ -1999,7 +1999,7 @@ static void connectCallback(redisAsyncContext *c, int status) {
     }
     else if (t->testno == ASTEST_ISSUE_931_PING)
     {
-        status = redisAsyncCommand(c, commandCallback, NULL, "PING");
+        redisAsyncCommand(c, commandCallback, NULL, "PING");
     }
 }
 static void disconnectCallback(const redisAsyncContext *c, int status) {
