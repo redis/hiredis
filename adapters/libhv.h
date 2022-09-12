@@ -67,22 +67,19 @@ static void redisLibhvSetTimeout(void *privdata, struct timeval tv) {
     events = (redisLibhvEvents*)privdata;
     millis = tv.tv_sec * 1000 + tv.tv_usec / 1000;
 
-    /* Libhv disallows zero'd timers so handle that condition first */
     if (millis == 0) {
+        /* Libhv disallows zero'd timers so treat this as a delete or NO OP */
         if (events->timer) {
             htimer_del(events->timer);
             events->timer = NULL;
         }
-
-        return;
-    }
-
-    /* Either create or reset an existing timer */
-    if (events->timer == NULL) {
+    } else if (events->timer == NULL) {
+        /* Add new timer */
         loop = hevent_loop(events->io);
         events->timer = htimer_add(loop, redisLibhvTimeout, millis, 1);
         hevent_set_userdata(events->timer, events->io);
     } else {
+        /* Update existing timer */
         htimer_reset(events->timer, millis);
     }
 }
