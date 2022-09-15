@@ -41,7 +41,7 @@ SET(hiredis_sources
 SET(hiredis_sources ${hiredis_sources})
 
 IF(WIN32)
-    ADD_COMPILE_DEFINITIONS(_CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /D_CRT_SECURE_NO_WARNINGS /D_WIN32_LEAN_AND_MEAN")
 ENDIF()
 
 ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
@@ -113,9 +113,12 @@ if (MSVC)
     INSTALL(FILES $<TARGET_PDB_FILE:hiredis>
         DESTINATION ${CMAKE_INSTALL_BINDIR}
         CONFIGURATIONS Debug RelWithDebInfo)
-    INSTALL(FILES $<TARGET_FILE_DIR:hiredis_static>/$<TARGET_FILE_BASE_NAME:hiredis_static>.pdb
+    INSTALL(FILES $<TARGET_FILE_DIR:hiredis_static>/$<TARGET_NAME:hiredis_static>${CMAKE_DEBUG_POSTFIX}.pdb
         DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        CONFIGURATIONS Debug RelWithDebInfo)
+        CONFIGURATIONS Debug)
+    INSTALL(FILES $<TARGET_FILE_DIR:hiredis_static>/$<TARGET_NAME:hiredis_static>${CMAKE_RELEASE_POSTFIX}.pdb
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        CONFIGURATIONS RelWithDebInfo Release)
 endif()
 
 # For NuGet packages
@@ -206,9 +209,12 @@ IF(ENABLE_SSL)
         INSTALL(FILES $<TARGET_PDB_FILE:hiredis_ssl>
             DESTINATION ${CMAKE_INSTALL_BINDIR}
             CONFIGURATIONS Debug RelWithDebInfo)
-        INSTALL(FILES $<TARGET_FILE_DIR:hiredis_ssl_static>/$<TARGET_FILE_BASE_NAME:hiredis_ssl_static>.pdb
+        INSTALL(FILES $<TARGET_FILE_DIR:hiredis_ssl_static>/$<TARGET_NAME:hiredis_ssl_static>${CMAKE_DEBUG_POSTFIX}.pdb
             DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            CONFIGURATIONS Debug RelWithDebInfo)
+            CONFIGURATIONS Debug)
+        INSTALL(FILES $<TARGET_FILE_DIR:hiredis_ssl_static>/$<TARGET_NAME:hiredis_ssl_static>${CMAKE_RELEASE_POSTFIX}.pdb
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            CONFIGURATIONS RelWithDebInfo Release)
     endif()
 
     INSTALL(FILES hiredis_ssl.h
