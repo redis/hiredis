@@ -41,7 +41,7 @@ SET(hiredis_sources
 SET(hiredis_sources ${hiredis_sources})
 
 IF(WIN32)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /D_CRT_SECURE_NO_WARNINGS /D_WIN32_LEAN_AND_MEAN")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /D_CRT_SECURE_NO_WARNINGS /DWIN32_LEAN_AND_MEAN")
 ENDIF()
 
 ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
