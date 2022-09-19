@@ -275,20 +275,22 @@ $(PKGCONFNAME): hiredis.h
 	@echo prefix=$(PREFIX) > $@
 	@echo exec_prefix=\$${prefix} >> $@
 	@echo libdir=$(PREFIX)/$(LIBRARY_PATH) >> $@
-	@echo includedir=$(PREFIX)/$(INCLUDE_PATH) >> $@
+	@echo includedir=$(PREFIX)/include >> $@
+	@echo pkgincludedir=$(PREFIX)/$(INCLUDE_PATH) >> $@
 	@echo >> $@
 	@echo Name: hiredis >> $@
 	@echo Description: Minimalistic C client library for Redis. >> $@
 	@echo Version: $(HIREDIS_MAJOR).$(HIREDIS_MINOR).$(HIREDIS_PATCH) >> $@
 	@echo Libs: -L\$${libdir} -lhiredis >> $@
-	@echo Cflags: -I\$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
+	@echo Cflags: -I\$${pkgincludedir} -I\$${includedir} -D_FILE_OFFSET_BITS=64 >> $@
 
 $(SSL_PKGCONFNAME): hiredis_ssl.h
 	@echo "Generating $@ for pkgconfig..."
 	@echo prefix=$(PREFIX) > $@
 	@echo exec_prefix=\$${prefix} >> $@
 	@echo libdir=$(PREFIX)/$(LIBRARY_PATH) >> $@
-	@echo includedir=$(PREFIX)/$(INCLUDE_PATH) >> $@
+	@echo includedir=$(PREFIX)/include >> $@
+	@echo pkgincludedir=$(PREFIX)/$(INCLUDE_PATH) >> $@
 	@echo >> $@
 	@echo Name: hiredis_ssl >> $@
 	@echo Description: SSL Support for hiredis. >> $@
