@@ -609,8 +609,8 @@ unaffected so no additional dependencies are introduced.
 First, you'll need to make sure you include the SSL header file:
 
 ```c
-#include "hiredis.h"
-#include "hiredis_ssl.h"
+#include <hiredis/hiredis.h>
+#include <hiredis/hiredis_ssl.h>
 ```
 
 You will also need to link against `libhiredis_ssl`, **in addition** to
