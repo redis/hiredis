@@ -954,7 +954,7 @@ static void test_resp3_push_handler(redisContext *c) {
     reply = redisCommand(c, "SET key:0 val:0");
     /* We need another command because depending on the version of Redis, the
      * notification may be delivered after the command's reply. */
-    test_cond(reply != NULL);
+    assert(reply != NULL);
     freeReplyObject(reply);
     reply = redisCommand(c, "PING");
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && pc.str == 1);
@@ -962,6 +962,9 @@ static void test_resp3_push_handler(redisContext *c) {
 
     test("We properly handle a NIL invalidation payload: ");
     reply = redisCommand(c, "FLUSHDB");
+    assert(reply != NULL);
+    freeReplyObject(reply);
+    reply = redisCommand(c, "PING");
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && pc.nil == 1);
     freeReplyObject(reply);
 
