@@ -35,11 +35,11 @@ enum connection_type {
 
 struct config {
     enum connection_type type;
+    struct timeval connect_timeout;
 
     struct {
         const char *host;
         int port;
-        struct timeval timeout;
     } tcp;
 
     struct {
@@ -782,6 +782,20 @@ static void test_reply_reader(void) {
         !strcmp(((redisReply*)reply)->str,"3492890328409238509324850943850943825024385"));
     freeReplyObject(reply);
     redisReaderFree(reader);
+
+    test("Can parse RESP3 doubles in an array: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "*1\r\n,3.14159265358979323846\r\n",31);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
+        ((redisReply*)reply)->elements == 1 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_DOUBLE &&
+        fabs(((redisReply*)reply)->element[0]->dval - 3.14159265358979323846) < 0.00000001 &&
+        ((redisReply*)reply)->element[0]->len == 22 &&
+        strcmp(((redisReply*)reply)->element[0]->str, "3.14159265358979323846") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
 }
 
 static void test_free_null(void) {
@@ -1141,6 +1155,13 @@ static void test_blocking_connection(struct config config) {
               strcasecmp(reply->element[1]->str,"pong") == 0);
     freeReplyObject(reply);
 
+    test("Send command by passing argc/argv: ");
+    const char *argv[3] = {"SET", "foo", "bar"};
+    size_t argvlen[3] = {3, 3, 3};
+    reply = redisCommandArgv(c,3,argv,argvlen);
+    test_cond(reply->type == REDIS_REPLY_STATUS);
+    freeReplyObject(reply);
+
     /* Make sure passing NULL to redisGetReply is safe */
     test("Can pass NULL to redisGetReply: ");
     assert(redisAppendCommand(c, "PING") == REDIS_OK);
@@ -1287,22 +1308,34 @@ static void test_blocking_io_errors(struct config config) {
 static void test_invalid_timeout_errors(struct config config) {
     redisContext *c;
 
-    test("Set error when an invalid timeout usec value is given to redisConnectWithTimeout: ");
+    test("Set error when an invalid timeout usec value is used during connect: ");
 
-    config.tcp.timeout.tv_sec = 0;
-    config.tcp.timeout.tv_usec = 10000001;
+    config.connect_timeout.tv_sec = 0;
+    config.connect_timeout.tv_usec = 10000001;
 
-    c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
+    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+        c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
+    } else if(config.type == CONN_UNIX) {
+        c = redisConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
+    } else {
+        assert(NULL);
+    }
 
     test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
     redisFree(c);
 
-    test("Set error when an invalid timeout sec value is given to redisConnectWithTimeout: ");
+    test("Set error when an invalid timeout sec value is used during connect: ");
 
-    config.tcp.timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
-    config.tcp.timeout.tv_usec = 0;
+    config.connect_timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
+    config.connect_timeout.tv_usec = 0;
 
-    c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.tcp.timeout);
+    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+        c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
+    } else if(config.type == CONN_UNIX) {
+        c = redisConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
+    } else {
+        assert(NULL);
+    }
 
     test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
     redisFree(c);
@@ -2054,11 +2087,11 @@ static redisAsyncContext *do_aconnect(struct config config, astest_no testno)
 
     if (config.type == CONN_TCP) {
         options.type = REDIS_CONN_TCP;
-        options.connect_timeout = &config.tcp.timeout;
+        options.connect_timeout = &config.connect_timeout;
         REDIS_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
     } else if (config.type == CONN_SSL) {
         options.type = REDIS_CONN_TCP;
-        options.connect_timeout = &config.tcp.timeout;
+        options.connect_timeout = &config.connect_timeout;
         REDIS_OPTIONS_SET_TCP(&options, config.ssl.host, config.ssl.port);
     } else if (config.type == CONN_UNIX) {
         options.type = REDIS_CONN_UNIX;
@@ -2120,7 +2153,7 @@ static void test_async_polling(struct config config) {
         /* timeout can only be simulated with network */
         test("Async connect timeout: ");
         config.tcp.host = "192.168.254.254";  /* blackhole ip */
-        config.tcp.timeout.tv_usec = 100000;
+        config.connect_timeout.tv_usec = 100000;
         c = do_aconnect(config, ASTEST_CONN_TIMEOUT);
         assert(c);
         assert(c->err == 0);
@@ -2152,7 +2185,7 @@ static void test_async_polling(struct config config) {
      */
     if (config.type == CONN_TCP || config.type == CONN_SSL) {
         test("Async PING/PONG after connect timeout: ");
-        config.tcp.timeout.tv_usec = 10000; /* 10ms  */
+        config.connect_timeout.tv_usec = 10000; /* 10ms  */
         c = do_aconnect(config, ASTEST_PINGPONG_TIMEOUT);
         while(astest.connected == 0)
             redisPollTick(c, 0.1);
@@ -2284,6 +2317,7 @@ int main(int argc, char **argv) {
         test_blocking_connection(cfg);
         test_blocking_connection_timeouts(cfg);
         test_blocking_io_errors(cfg);
+        test_invalid_timeout_errors(cfg);
         if (throughput) test_throughput(cfg);
     } else {
         test_skipped();

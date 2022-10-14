@@ -338,7 +338,8 @@ coverage: gcov
 	make check
 	mkdir -p tmp/lcov
 	lcov -d . -c --exclude '/usr*' -o tmp/lcov/hiredis.info
-	genhtml --legend -o tmp/lcov/report tmp/lcov/hiredis.info
+	lcov -q -l tmp/lcov/hiredis.info
+	genhtml --legend -q -o tmp/lcov/report tmp/lcov/hiredis.info
 
 noopt:
 	$(MAKE) OPTIMIZATION=""
