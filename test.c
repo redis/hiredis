@@ -1305,36 +1305,37 @@ static void test_blocking_io_errors(struct config config) {
 static void test_invalid_timeout_errors(struct config config) {
     redisContext *c;
 
-    if(config.type == CONN_TCP) {
-        test("Set error when an invalid timeout usec value is given to redisConnectWithTimeout: ");
+    test("Set error when an invalid timeout usec value is used during connect: ");
 
-        config.connect_timeout.tv_sec = 0;
-        config.connect_timeout.tv_usec = 10000001;
+    config.connect_timeout.tv_sec = 0;
+    config.connect_timeout.tv_usec = 10000001;
 
+    if (config.type == CONN_TCP || config.type == CONN_SSL) {
         c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
-
-        test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
-        redisFree(c);
-
-        test("Set error when an invalid timeout sec value is given to redisConnectWithTimeout: ");
-
-        config.connect_timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
-        config.connect_timeout.tv_usec = 0;
-
-        c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
-
-        test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
-        redisFree(c);
     } else if(config.type == CONN_UNIX) {
-        test("Set error when an invalid timeout usec value is given to redisConnectUnixWithTimeout: ");
-
-        config.connect_timeout.tv_sec = 0;
-        config.connect_timeout.tv_usec = 10000001;
-
         c = redisConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
-        test_cond(c->err == REDIS_ERR_IO);
-        redisFree(c);
+    } else {
+        assert(NULL);
     }
+
+    test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+    redisFree(c);
+
+    test("Set error when an invalid timeout sec value is used during connect: ");
+
+    config.connect_timeout.tv_sec = (((LONG_MAX) - 999) / 1000) + 1;
+    config.connect_timeout.tv_usec = 0;
+
+    if (config.type == CONN_TCP || config.type == CONN_SSL) {
+        c = redisConnectWithTimeout(config.tcp.host, config.tcp.port, config.connect_timeout);
+    } else if(config.type == CONN_UNIX) {
+        c = redisConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
+    } else {
+        assert(NULL);
+    }
+
+    test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+    redisFree(c);
 }
 
 /* Wrap malloc to abort on failure so OOM checks don't make the test logic

@@ -238,6 +238,7 @@ static int redisContextTimeoutMsec(redisContext *c, long *result)
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
         if (timeout->tv_usec > 1000000 || timeout->tv_sec > __MAX_MSEC) {
+            __redisSetError(c, REDIS_ERR_IO, "Invalid timeout specified");
             *result = msec;
             return REDIS_ERR;
         }
@@ -435,7 +436,6 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     }
 
     if (redisContextTimeoutMsec(c, &timeout_msec) != REDIS_OK) {
-        __redisSetError(c, REDIS_ERR_IO, "Invalid timeout specified");
         goto error;
     }
 
