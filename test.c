@@ -783,14 +783,17 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
-    /* Test type in array. */
-    test("Don't do empty allocation for empty multi bulk: ");
+    test("Can parse RESP3 doubles in an array: ");
     reader = redisReaderCreate();
-    redisReaderFeed(reader,(char*)"*4\r\n#t\r\n:1\r\n,1.23\r\n_\r\n",22);
+    redisReaderFeed(reader, "*1\r\n,3.14159265358979323846\r\n",31);
     ret = redisReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_OK &&
         ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
-        ((redisReply*)reply)->elements == 4);
+        ((redisReply*)reply)->elements == 1 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_DOUBLE &&
+        fabs(((redisReply*)reply)->element[0]->dval - 3.14159265358979323846) < 0.00000001 &&
+        ((redisReply*)reply)->element[0]->len == 22 &&
+        strcmp(((redisReply*)reply)->element[0]->str, "3.14159265358979323846") == 0);
     freeReplyObject(reply);
     redisReaderFree(reader);
 }
