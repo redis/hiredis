@@ -463,26 +463,6 @@ static void test_reply_reader(void) {
     freeReplyObject(root);
     redisReaderFree(reader);
 
-    test("Correctly parse double: ");
-    reader = redisReaderCreate();
-    redisReaderFeed(reader, ",1.23\r\n",7);
-    ret = redisReaderGetReply(reader,&reply);
-    test_cond(ret == REDIS_OK &&
-            ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
-            ((redisReply*)reply)->dval == 1.23);
-    freeReplyObject(reply);
-    redisReaderFree(reader);
-
-    test("Correctly parse bool: ");
-    reader = redisReaderCreate();
-    redisReaderFeed(reader, "#t\r\n",4);
-    ret = redisReaderGetReply(reader,&reply);
-    test_cond(ret == REDIS_OK &&
-            ((redisReply*)reply)->type == REDIS_REPLY_BOOL &&
-            ((redisReply*)reply)->integer == 1);
-    freeReplyObject(reply);
-    redisReaderFree(reader);
-
     test("Correctly parses LLONG_MAX: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, ":9223372036854775807\r\n",22);
