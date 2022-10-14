@@ -1114,13 +1114,6 @@ static void test_blocking_connection(struct config config) {
     test_cond(reply->len == 11)
     freeReplyObject(reply);
 
-    test("Test redisCommandArgv func: ");
-    const char *argv[3] = {"SET", "foo", "bar"};
-    size_t argvlen[3] = {3, 3, 3};
-    reply = redisCommandArgv(c, 3, argv, argvlen);
-    test_cond (reply->type == REDIS_REPLY_STATUS);
-    freeReplyObject(reply);
-
     test("Can parse nil replies: ");
     reply = redisCommand(c,"GET nokey");
     test_cond(reply->type == REDIS_REPLY_NIL)
@@ -1157,6 +1150,13 @@ static void test_blocking_connection(struct config config) {
               !memcmp(reply->element[0]->element[1]->str,"foo",3) &&
               reply->element[1]->type == REDIS_REPLY_STATUS &&
               strcasecmp(reply->element[1]->str,"pong") == 0);
+    freeReplyObject(reply);
+
+    test("Send command by passing argc/argv: ");
+    const char *argv[3] = {"SET", "foo", "bar"};
+    size_t argvlen[3] = {3, 3, 3};
+    reply = redisCommandArgv(c,3,argv,argvlen);
+    test_cond(reply->type == REDIS_REPLY_STATUS);
     freeReplyObject(reply);
 
     /* Make sure passing NULL to redisGetReply is safe */
