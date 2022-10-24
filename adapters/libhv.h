@@ -56,7 +56,7 @@ static void redisLibhvCleanup(void *privdata) {
 
 static void redisLibhvTimeout(htimer_t* timer) {
     hio_t* io = (hio_t*)hevent_userdata(timer);
-    redisAsyncHandleTimeout(hevent_userdata(io));
+    redisAsyncHandleTimeout((redisAsyncContext*)hevent_userdata(io));
 }
 
 static void redisLibhvSetTimeout(void *privdata, struct timeval tv) {
@@ -94,7 +94,7 @@ static int redisLibhvAttach(redisAsyncContext* ac, hloop_t* loop) {
     }
 
     /* Create container struct to keep track of our io and any timer */
-    events = hi_malloc(sizeof(*events));
+    events = (redisLibhvEvents*)hi_malloc(sizeof(*events));
     if (events == NULL) {
         return REDIS_ERR;
     }
