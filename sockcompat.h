@@ -50,7 +50,7 @@
 #include <ws2tcpip.h>
 #include <stddef.h>
 #include <errno.h>
-#include <Mstcpip.h>
+#include <mstcpip.h>
 
 #ifdef _MSC_VER
 typedef long long ssize_t;
