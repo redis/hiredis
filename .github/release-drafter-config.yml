@@ -34,7 +34,7 @@ categories:
       - 'BUG'
   - title: '🧰 Maintenance'
     label: 'maintenance'
-change-template: '- $TITLE (#$NUMBER)'
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 exclude-labels:
   - 'skip-changelog'
 template: |
