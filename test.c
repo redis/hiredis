@@ -1847,6 +1847,7 @@ void subscribe_channel_a_cb(redisAsyncContext *ac, void *r, void *privdata) {
 void subscribe_channel_b_cb(redisAsyncContext *ac, void *r, void *privdata) {
     redisReply *reply = r;
     TestState *state = privdata;
+    (void)ac;
 
     assert(reply != NULL && reply->type == REDIS_REPLY_ARRAY &&
            reply->elements == 3);
