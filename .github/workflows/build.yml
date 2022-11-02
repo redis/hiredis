@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ${{ env.GITHUB_REPOSITORY }}
           ref: ${{ env.GITHUB_HEAD_REF }}
@@ -18,9 +18,9 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
           sudo apt-get update
           sudo apt-get install -y redis-server valgrind libevent-dev
-      
+
       - name: Build using cmake
-        env: 
+        env:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
@@ -47,7 +47,7 @@ jobs:
     container: centos:7
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ${{ env.GITHUB_REPOSITORY }}
           ref: ${{ env.GITHUB_HEAD_REF }}
@@ -59,7 +59,7 @@ jobs:
           yum -y install gcc gcc-c++ make openssl openssl-devel cmake3 valgrind libevent-devel
 
       - name: Build using cmake
-        env: 
+        env:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
@@ -87,20 +87,21 @@ jobs:
     container: rockylinux:8
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ${{ env.GITHUB_REPOSITORY }}
           ref: ${{ env.GITHUB_HEAD_REF }}
 
       - name: Install dependencies
         run: |
+          dnf -y upgrade --refresh
           dnf -y install https://rpms.remirepo.net/enterprise/remi-release-8.rpm
           dnf -y module install redis:remi-6.0
           dnf -y group install "Development Tools"
           dnf -y install openssl-devel cmake valgrind libevent-devel
 
       - name: Build using cmake
-        env: 
+        env:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
@@ -127,7 +128,7 @@ jobs:
     name:  FreeBSD
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ${{ env.GITHUB_REPOSITORY }}
           ref: ${{ env.GITHUB_HEAD_REF }}
@@ -145,7 +146,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ${{ env.GITHUB_REPOSITORY }}
           ref: ${{ env.GITHUB_HEAD_REF }}
@@ -168,7 +169,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ${{ env.GITHUB_REPOSITORY }}
           ref: ${{ env.GITHUB_HEAD_REF }}
@@ -188,21 +189,13 @@ jobs:
         run: |
           ./build/hiredis-test.exe
 
-      - name: Setup cygwin
-        uses: egor-tensin/setup-cygwin@v3
+      - name: Install Cygwin Action
+        uses: cygwin/cygwin-install-action@v2
         with:
-          platform: x64
           packages: make git gcc-core
 
       - name: Build in cygwin
         env:
           HIREDIS_PATH: ${{ github.workspace }}
         run: |
-          build_hiredis() {
-              git config --global --add safe.directory "$(cygpath -u $HIREDIS_PATH)"
-              cd $(cygpath -u $HIREDIS_PATH)
-              git clean -xfd
-              make
-          }
-          build_hiredis
-        shell: C:\tools\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
+          make clean && make
