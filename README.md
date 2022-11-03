@@ -23,6 +23,10 @@ Redis version >= 1.2.0.
 The library comes with multiple APIs. There is the
 *synchronous API*, the *asynchronous API* and the *reply parsing API*.
 
+## Upgrading to `1.1.0`
+
+You will need to recompile your application when upgrading from v1.0.0 to v1.1.0, but other than that no changes should be needed.
+
 ## Upgrading to `1.0.2`
 
 <span style="color:red">NOTE:  v1.0.1 erroneously bumped SONAME, which is why it is skipped here.</span>
