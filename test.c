@@ -674,12 +674,13 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
-    test("Set error when RESP3 double is NaN: ");
+    test("Correctly parses RESP3 double NaN: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, ",nan\r\n",6);
     ret = redisReaderGetReply(reader,&reply);
-    test_cond(ret == REDIS_ERR &&
-              strcasecmp(reader->errstr,"Bad double value") == 0);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+              isnan(((redisReply*)reply)->dval));
     freeReplyObject(reply);
     redisReaderFree(reader);
 
