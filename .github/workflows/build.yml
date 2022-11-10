@@ -24,7 +24,7 @@ jobs:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
-        run: mkdir build-ubuntu && cd build-ubuntu && cmake ..
+        run: mkdir build && cd build && cmake .. && make
 
       - name: Build using makefile
         run: USE_SSL=1 TEST_ASYNC=1 make
@@ -63,7 +63,7 @@ jobs:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
-        run: mkdir build-centos7 && cd build-centos7 && cmake3 ..
+        run: mkdir build && cd build && cmake3 .. && make
 
       - name: Build using Makefile
         run: USE_SSL=1 TEST_ASYNC=1 make
@@ -105,7 +105,7 @@ jobs:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
-        run: mkdir build-centos8 && cd build-centos8 && cmake ..
+        run: mkdir build && cd build && cmake .. && make
 
       - name: Build using Makefile
         run: USE_SSL=1 TEST_ASYNC=1 make
