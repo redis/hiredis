@@ -2,25 +2,23 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ master, dev ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
 jobs:
   full-build:
     name: Build all, plus default examples, run tests against redis
-
     runs-on: ubuntu-latest
     env:
       # the docker image used by the test.sh
       REDIS_DOCKER: redis:alpine
 
     steps:
-
-    - name: install prerequisites
+    - name: Install prerequisites
       run: sudo apt-get update && sudo apt-get install -y libev-dev libevent-dev libglib2.0-dev libssl-dev valgrind
     - uses: actions/checkout@v3
-    - name: run make
+    - name: Run make
       run: make all examples
     - name: Run unittests
       run: make check
@@ -29,15 +27,15 @@ jobs:
         TEST_PREFIX: valgrind --error-exitcode=100
         SKIPS_ARG: --skip-throughput
       run: make check
-  
+
   build-32-bit:
     name: Build and test minimal 32 bit linux
     runs-on: ubuntu-latest
     steps:
-    - name: install prerequisites
+    - name: Install prerequisites
       run: sudo apt-get update && sudo apt-get install gcc-multilib
     - uses: actions/checkout@v3
-    - name: run make
+    - name: Run make
       run: make all
       env:
         PLATFORM_FLAGS: -m32
@@ -60,14 +58,14 @@ jobs:
             emulator: qemu-aarch64
 
     steps:
-    - name: install qemu
+    - name: Install qemu
       if: matrix.emulator
-      run: sudo apt-get install  -y qemu-user 
-    - name: install ploatform toolset
+      run: sudo apt-get install -y qemu-user
+    - name: Install platform toolset
       if: matrix.toolset
       run: sudo apt-get install -y gcc-${{matrix.toolset}}
     - uses: actions/checkout@v3
-    - name: run make
+    - name: Run make
       run: make all
       env:
         CC: ${{matrix.toolset}}-gcc
@@ -84,19 +82,17 @@ jobs:
     steps:
       - uses: microsoft/setup-msbuild@v1.0.2
       - uses: actions/checkout@v3
-      - name: Cmake
+      - name: Run CMake
         run: cmake -Wno-dev CmakeLists.txt
-      - name: build redis
+      - name: Build hiredis
         run: MSBuild hiredis.vcxproj /p:Configuration=Debug
-      - name: build redis_static
+      - name: Build hiredis_static
         run: MSBuild hiredis_static.vcxproj /p:Configuration=Debug
-      - name: build redis-test
+      - name: Build hiredis-test
         run: MSBuild hiredis-test.vcxproj /p:Configuration=Debug
       # use memurai, redis compatible server, since it is easy to install.  Can't
       # install official redis containers on the windows runner
-      - name: install Memurai redis server
+      - name: Install Memurai redis server
         run: choco install -y memurai-developer.install
-      - name: run tests
+      - name: Run tests
         run: Debug\hiredis-test.exe
-      
-      
