@@ -6,11 +6,7 @@ jobs:
     name: Ubuntu
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.GITHUB_REPOSITORY }}
-          ref: ${{ env.GITHUB_HEAD_REF }}
+      - uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
@@ -24,7 +20,7 @@ jobs:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
-        run: mkdir build-ubuntu && cd build-ubuntu && cmake ..
+        run: mkdir build && cd build && cmake .. && make
 
       - name: Build using makefile
         run: USE_SSL=1 TEST_ASYNC=1 make
@@ -46,11 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     container: centos:7
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.GITHUB_REPOSITORY }}
-          ref: ${{ env.GITHUB_HEAD_REF }}
+      - uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
@@ -63,7 +55,7 @@ jobs:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
-        run: mkdir build-centos7 && cd build-centos7 && cmake3 ..
+        run: mkdir build && cd build && cmake3 .. && make
 
       - name: Build using Makefile
         run: USE_SSL=1 TEST_ASYNC=1 make
@@ -86,11 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     container: rockylinux:8
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.GITHUB_REPOSITORY }}
-          ref: ${{ env.GITHUB_HEAD_REF }}
+      - uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
@@ -105,7 +93,7 @@ jobs:
           EXTRA_CMAKE_OPTS: -DENABLE_EXAMPLES:BOOL=ON -DENABLE_SSL:BOOL=ON -DENABLE_SSL_TESTS:BOOL=ON -DENABLE_ASYNC_TESTS:BOOL=ON
           CFLAGS: -Werror
           CXXFLAGS: -Werror
-        run: mkdir build-centos8 && cd build-centos8 && cmake ..
+        run: mkdir build && cd build && cmake .. && make
 
       - name: Build using Makefile
         run: USE_SSL=1 TEST_ASYNC=1 make
@@ -127,11 +115,7 @@ jobs:
     runs-on: macos-12
     name:  FreeBSD
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.GITHUB_REPOSITORY }}
-          ref: ${{ env.GITHUB_HEAD_REF }}
+      - uses: actions/checkout@v3
 
       - name: Build in FreeBSD
         uses: vmactions/freebsd-vm@v0
@@ -145,11 +129,7 @@ jobs:
     name: macOS
     runs-on: macos-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.GITHUB_REPOSITORY }}
-          ref: ${{ env.GITHUB_HEAD_REF }}
+      - uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
@@ -168,11 +148,7 @@ jobs:
     name: Windows
     runs-on: windows-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.GITHUB_REPOSITORY }}
-          ref: ${{ env.GITHUB_HEAD_REF }}
+      - uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
