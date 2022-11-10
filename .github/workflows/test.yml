@@ -19,7 +19,7 @@ jobs:
 
     - name: install prerequisites
       run: sudo apt-get update && sudo apt-get install -y libev-dev libevent-dev libglib2.0-dev libssl-dev valgrind
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: run make
       run: make all examples
     - name: Run unittests
@@ -36,7 +36,7 @@ jobs:
     steps:
     - name: install prerequisites
       run: sudo apt-get update && sudo apt-get install gcc-multilib
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: run make
       run: make all
       env:
@@ -66,7 +66,7 @@ jobs:
     - name: install ploatform toolset
       if: matrix.toolset
       run: sudo apt-get install -y gcc-${{matrix.toolset}}
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: run make
       run: make all
       env:
@@ -83,7 +83,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: microsoft/setup-msbuild@v1.0.2
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Cmake
         run: cmake -Wno-dev CmakeLists.txt
       - name: build redis
