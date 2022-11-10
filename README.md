@@ -130,7 +130,7 @@ There are several flags you may set in the `redisOptions` struct to change defau
 | REDIS\_OPT\_REUSEADDR | Tells hiredis to set the [SO_REUSEADDR](https://man7.org/linux/man-pages/man7/socket.7.html) socket option |
 | REDIS\_OPT\_PREFER\_IPV4<br>REDIS\_OPT\_PREFER_IPV6<br>REDIS\_OPT\_PREFER\_IP\_UNSPEC | Informs hiredis to either prefer IPv4 or IPv6 when invoking [getaddrinfo](https://man7.org/linux/man-pages/man3/gai_strerror.3.html).  `REDIS_OPT_PREFER_IP_UNSPEC` will cause hiredis to specify `AF_UNSPEC` in the getaddrinfo call, which means both IPv4 and IPv6 addresses will be searched simultaneously.<br>Hiredis prefers IPv4 by default. |
 | REDIS\_OPT\_NO\_PUSH\_AUTOFREE | Tells hiredis to not install the default RESP3 PUSH handler (which just intercepts and frees the replies).  This is useful in situations where you want to process these messages in-band. |
-| REDIS\_OPT\_NOAUOTFREEREPLIES | **ASYNC**: tells hiredis not to automatically invoke `freeReplyObject` after executing the reply callback. |
+| REDIS\_OPT\_NOAUTOFREEREPLIES | **ASYNC**: tells hiredis not to automatically invoke `freeReplyObject` after executing the reply callback. |
 | REDIS\_OPT\_NOAUTOFREE | **ASYNC**: Tells hiredis not to automatically free the `redisAsyncContext` on connection/communication failure, but only if the user makes an explicit call to `redisAsyncDisconnect` or `redisAsyncFree` |
 
 *Note: A `redisContext` is not thread-safe.*
