@@ -413,7 +413,11 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
  * free'ing. To do so, a flag is set on the context which is picked up by
  * redisProcessCallbacks(). Otherwise, the context is immediately free'd. */
 void redisAsyncFree(redisAsyncContext *ac) {
+    if (ac == NULL)
+        return;
+
     redisContext *c = &(ac->c);
+
     c->flags |= REDIS_FREEING;
     if (!(c->flags & REDIS_IN_CALLBACK))
         __redisAsyncFree(ac);
