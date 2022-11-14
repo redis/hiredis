@@ -25,7 +25,10 @@ The library comes with multiple APIs. There is the
 
 ## Upgrading to `1.1.0`
 
-You will need to recompile your application when upgrading from v1.0.0 to v1.1.0, but other than that no changes should be needed.
+Almost all users will simply need to recompile their applications against the newer version of hiredis.
+
+**NOTE**:  Hiredis can now return `nan` in addition to `-inf` and `inf` in a `REDIS_REPLY_DOUBLE`.
+           Applications that deal with `RESP3` doubles should make sure to account for this.
 
 ## Upgrading to `1.0.2`
 

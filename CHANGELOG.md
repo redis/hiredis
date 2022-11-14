@@ -1,3 +1,32 @@
+## [1.1.0](https://github.com/redis/hiredis/tree/v1.1.0) - (2022-11-15)
+
+Announcing Hiredis v1.1.0 GA with better SSL convenience, new async adapters and a great many bug fixes.
+
+**NOTE**:  Hiredis can now return `nan` in addition to `-inf` and `inf` when returning a `REDIS_REPLY_DOUBLE`. 
+
+## 🐛 Bug Fixes
+
+- Add support for nan in RESP3 double [@filipecosta90](https://github.com/filipecosta90) 
+  ([\#1133](https://github.com/redis/hiredis/pull/1133))
+
+## 🧰 Maintenance
+
+- Add an example that calls redisCommandArgv [@michael-grunder](https://github.com/michael-grunder)
+  ([\#1140](https://github.com/redis/hiredis/pull/1140))
+- fix flag reference [@pata00](https://github.com/pata00) ([\#1136](https://github.com/redis/hiredis/pull/1136))
+- Make freeing a NULL redisAsyncContext a no op. [@michael-grunder](https://github.com/michael-grunder) 
+  ([\#1135](https://github.com/redis/hiredis/pull/1135))
+- CI updates ([@bjosv](https://github.com/redis/bjosv) ([\#1139](https://github.com/redis/hiredis/pull/1139))
+
+
+## Contributors
+We'd like to thank all the contributors who worked on this release!
+
+<a href="https://github.com/bjsov"><img src="https://github.com/bjosv.png" width="32" height="32"></a>
+<a href="https://github.com/filipecosta90"><img src="https://github.com/filipecosta90.png" width="32" height="32"></a>
+<a href="https://github.com/michael-grunder"><img src="https://github.com/michael-grunder.png" width="32" height="32"></a>
+<a href="https://github.com/pata00"><img src="https://github.com/pata00.png" width="32" height="32"></a>
+
 ## [1.1.0-rc1](https://github.com/redis/hiredis/tree/v1.1.0-rc1) - (2022-11-06)
 
 Announcing Hiredis v1.1.0-rc1, with better SSL convenience, new async adapters, and a great many bug fixes.
