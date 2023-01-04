@@ -40,6 +40,14 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <wincrypt.h>
+#ifdef OPENSSL_IS_BORINGSSL
+#undef X509_NAME
+#undef X509_EXTENSIONS
+#undef PKCS7_ISSUER_AND_SERIAL
+#undef PKCS7_SIGNER_INFO
+#undef OCSP_REQUEST
+#undef OCSP_RESPONSE
+#endif
 #else
 #include <pthread.h>
 #endif
