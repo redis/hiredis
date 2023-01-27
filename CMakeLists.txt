@@ -1,5 +1,6 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.4.0)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 
+OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
 OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
@@ -34,7 +35,6 @@ SET(CMAKE_DEBUG_POSTFIX d)
 SET(hiredis_sources
     alloc.c
     async.c
-    dict.c
     hiredis.c
     net.c
     read.c
@@ -44,7 +44,7 @@ SET(hiredis_sources
 SET(hiredis_sources ${hiredis_sources})
 
 IF(WIN32)
-    ADD_COMPILE_DEFINITIONS(_CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN)
+    ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
 ENDIF()
 
 ADD_LIBRARY(hiredis ${hiredis_sources})
@@ -97,7 +97,7 @@ INSTALL(TARGETS hiredis
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-if(MSVC AND BUILD_SHARED_LIBS)
+if (MSVC AND BUILD_SHARED_LIBS)
     INSTALL(FILES $<TARGET_PDB_FILE:hiredis>
         DESTINATION ${CMAKE_INSTALL_BINDIR}
         CONFIGURATIONS Debug RelWithDebInfo)
@@ -107,7 +107,7 @@ endif()
 INSTALL(FILES hiredis.targets
     DESTINATION build/native)
 
-INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h
+INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h sockcompat.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
 
 INSTALL(DIRECTORY adapters
@@ -120,7 +120,11 @@ export(EXPORT hiredis-targets
     FILE "${CMAKE_CURRENT_BINARY_DIR}/hiredis-targets.cmake"
     NAMESPACE hiredis::)
 
-SET(CMAKE_CONF_INSTALL_DIR share/hiredis)
+if(WIN32)
+    SET(CMAKE_CONF_INSTALL_DIR share/hiredis)
+else()
+    SET(CMAKE_CONF_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/hiredis)
+endif()
 SET(INCLUDE_INSTALL_DIR include)
 include(CMakePackageConfigHelpers)
 configure_package_config_file(hiredis-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
@@ -148,7 +152,7 @@ IF(ENABLE_SSL)
     ADD_LIBRARY(hiredis_ssl ${hiredis_ssl_sources})
     ADD_LIBRARY(hiredis::hiredis_ssl ALIAS hiredis_ssl)
 
-    IF (APPLE)
+    IF (APPLE AND BUILD_SHARED_LIBS)
         SET_PROPERTY(TARGET hiredis_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
     ENDIF()
 
@@ -169,7 +173,7 @@ IF(ENABLE_SSL)
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-    if(MSVC AND BUILD_SHARED_LIBS)
+    if (MSVC AND BUILD_SHARED_LIBS)
         INSTALL(FILES $<TARGET_PDB_FILE:hiredis_ssl>
             DESTINATION ${CMAKE_INSTALL_BINDIR}
             CONFIGURATIONS Debug RelWithDebInfo)
@@ -185,7 +189,11 @@ IF(ENABLE_SSL)
            FILE "${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl-targets.cmake"
            NAMESPACE hiredis::)
 
-    SET(CMAKE_CONF_INSTALL_DIR share/hiredis_ssl)
+    if(WIN32)
+        SET(CMAKE_CONF_INSTALL_DIR share/hiredis_ssl)
+    else()
+        SET(CMAKE_CONF_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/hiredis_ssl)
+    endif()
     configure_package_config_file(hiredis_ssl-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis_ssl-config.cmake
                                   INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
                                   PATH_VARS INCLUDE_INSTALL_DIR)
