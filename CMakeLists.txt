@@ -5,7 +5,6 @@ OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
 OPTION(ENABLE_EXAMPLES "Enable building hiredis examples" OFF)
-OPTION(HIREDIS_PIC "Build Position-Independent-Code (PIC) static libs (when BUILD_SHARED_LIBS OFF)" ON)
 OPTION(ENABLE_ASYNC_TESTS "Should we run all asynchronous API tests" OFF)
 
 MACRO(getVersionBit name)
@@ -27,9 +26,6 @@ INCLUDE(GNUInstallDirs)
 
 # Hiredis requires C99
 SET(CMAKE_C_STANDARD 99)
-IF(NOT BUILD_SHARED_LIBS AND HIREDIS_PIC)
-  SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
-ENDIF()
 SET(CMAKE_DEBUG_POSTFIX d)
 
 SET(hiredis_sources
