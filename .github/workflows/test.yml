@@ -82,12 +82,14 @@ jobs:
     steps:
       - uses: microsoft/setup-msbuild@v1.0.2
       - uses: actions/checkout@v3
-      - name: Run CMake
-        run: cmake -Wno-dev CmakeLists.txt
-      - name: Build hiredis
+      - name: Run CMake (shared lib)
+        run: cmake -Wno-dev CmakeLists.txt -DBUILD_SHARED_LIBS=ON
+      - name: Build hiredis (shared lib)
         run: MSBuild hiredis.vcxproj /p:Configuration=Debug
-      - name: Build hiredis_static
-        run: MSBuild hiredis_static.vcxproj /p:Configuration=Debug
+      - name: Run CMake (static lib)
+        run: cmake -Wno-dev CmakeLists.txt
+      - name: Build hiredis (static lib)
+        run: MSBuild hiredis.vcxproj /p:Configuration=Debug
       - name: Build hiredis-test
         run: MSBuild hiredis-test.vcxproj /p:Configuration=Debug
       # use memurai, redis compatible server, since it is easy to install.  Can't
