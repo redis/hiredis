@@ -83,11 +83,11 @@ jobs:
       - uses: microsoft/setup-msbuild@v1.0.2
       - uses: actions/checkout@v3
       - name: Run CMake (shared lib)
-        run: cmake -Wno-dev CmakeLists.txt -DBUILD_SHARED_LIBS=ON
+        run: cmake -Wno-dev CMakeLists.txt
       - name: Build hiredis (shared lib)
         run: MSBuild hiredis.vcxproj /p:Configuration=Debug
       - name: Run CMake (static lib)
-        run: cmake -Wno-dev CmakeLists.txt
+        run: cmake -Wno-dev CMakeLists.txt -DBUILD_SHARED_LIBS=OFF
       - name: Build hiredis (static lib)
         run: MSBuild hiredis.vcxproj /p:Configuration=Debug
       - name: Build hiredis-test

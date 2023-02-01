@@ -51,7 +51,7 @@ ENDIF()
 
 IF (ENABLE_SSL)
     ADD_EXECUTABLE(example-ssl example-ssl.c)
-    TARGET_LINK_LIBRARIES(example-ssl hiredis ${HIREDIS_SSL_DEFAULT_LIBRARY})
+    TARGET_LINK_LIBRARIES(example-ssl hiredis hiredis_ssl)
 ENDIF()
 
 ADD_EXECUTABLE(example example.c)
