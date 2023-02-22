@@ -100,9 +100,20 @@ ifeq ($(USE_SSL),1)
       SSL_LDFLAGS=-lssl -lcrypto
     endif
   else
-    OPENSSL_PREFIX?=/usr/local/opt/openssl
-    CFLAGS+=-I$(OPENSSL_PREFIX)/include
-    SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+    # On old OSX and macOS, MacPort and HomeBrew both used to install openssl
+    # into this directory. On newer machines, homebrew installs into its own
+    # opt/homebrew/ install prefix.
+    IS_OLD_PATH=$(shell sh -c 'test -d /usr/local/opt/openssl')
+
+    ifeq ($(IS_OLD_PATH),1)
+      OPENSSL_PREFIX?=/usr/local/opt/openssl
+      CFLAGS+=-I$(OPENSSL_PREFIX)/include
+      SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+    else
+      OPENSSL_PREFIX?=/opt/homebrew/opt/openssl
+      CFLAGS+=-I$(OPENSSL_PREFIX)/include
+      SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+    endif
   endif
 endif
 
