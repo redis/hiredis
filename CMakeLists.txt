@@ -154,6 +154,8 @@ else()
 endif()
 SET(INCLUDE_INSTALL_DIR include)
 include(CMakePackageConfigHelpers)
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/hiredis-config-version.cmake"
+                                 COMPATIBILITY SameMajorVersion)
 configure_package_config_file(hiredis-config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
                               INSTALL_DESTINATION ${CMAKE_CONF_INSTALL_DIR}
                               PATH_VARS INCLUDE_INSTALL_DIR)
@@ -164,6 +166,7 @@ INSTALL(EXPORT hiredis-targets
         DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/hiredis-config-version.cmake
         DESTINATION ${CMAKE_CONF_INSTALL_DIR})
 
 
