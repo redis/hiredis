@@ -92,18 +92,25 @@ ifeq ($(TEST_ASYNC),1)
 endif
 
 ifeq ($(USE_SSL),1)
-  ifeq ($(uname_S),Linux)
-    ifdef OPENSSL_PREFIX
-      CFLAGS+=-I$(OPENSSL_PREFIX)/include
-      SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
-    else
-      SSL_LDFLAGS=-lssl -lcrypto
+  ifndef OPENSSL_PREFIX
+    ifeq ($(uname_S),Darwin)
+      SEARCH_PATH1=/opt/homebrew/opt/openssl
+      SEARCH_PATH2=/usr/local/opt/openssl
+
+      ifneq ($(wildcard $(SEARCH_PATH1)),)
+        OPENSSL_PREFIX=$(SEARCH_PATH1)
+      else ifneq($(wildcard $(SEARCH_PATH2)),)
+        OPENSSL_PREFIX=$(SEARCH_PATH2)
+      endif
     endif
-  else
-    OPENSSL_PREFIX?=/usr/local/opt/openssl
-    CFLAGS+=-I$(OPENSSL_PREFIX)/include
-    SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
   endif
+
+  ifdef OPENSSL_PREFIX
+    CFLAGS+=-I$(OPENSSL_PREFIX)/include
+    SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib
+  endif
+
+  SSL_LDFLAGS+=-lssl -lcrypto
 endif
 
 ifeq ($(uname_S),FreeBSD)
