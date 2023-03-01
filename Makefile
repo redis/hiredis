@@ -92,29 +92,25 @@ ifeq ($(TEST_ASYNC),1)
 endif
 
 ifeq ($(USE_SSL),1)
-  ifeq ($(uname_S),Linux)
-    ifdef OPENSSL_PREFIX
-      CFLAGS+=-I$(OPENSSL_PREFIX)/include
-      SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
-    else
-      SSL_LDFLAGS=-lssl -lcrypto
-    endif
-  else
-    # On old OSX and macOS, MacPort and HomeBrew both used to install openssl
-    # into this directory. On newer machines, homebrew installs into its own
-    # opt/homebrew/ install prefix.
-    IS_OLD_PATH=$(shell sh -c 'test -d /usr/local/opt/openssl')
+  ifndef OPENSSL_PREFIX
+    ifeq ($(uname_S),Darwin)
+      SEARCH_PATH1=/opt/homebrew/opt/openssl
+      SEARCH_PATH2=/usr/local/opt/openssl
 
-    ifeq ($(IS_OLD_PATH),1)
-      OPENSSL_PREFIX?=/usr/local/opt/openssl
-      CFLAGS+=-I$(OPENSSL_PREFIX)/include
-      SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
-    else
-      OPENSSL_PREFIX?=/opt/homebrew/opt/openssl
-      CFLAGS+=-I$(OPENSSL_PREFIX)/include
-      SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+      ifneq ($(wildcard $(SEARCH_PATH1)),)
+        OPENSSL_PREFIX=$(SEARCH_PATH1)
+      else ifneq($(wildcard $(SEARCH_PATH2)),)
+        OPENSSL_PREFIX=$(SEARCH_PATH2)
+      endif
     endif
   endif
+
+  ifdef OPENSSL_PREFIX
+    CFLAGS+=-I$(OPENSSL_PREFIX)/include
+    SSL_LDFLAGS+=-L$(OPENSSL_PREFIX)/lib
+  endif
+
+  SSL_LDFLAGS+=-lssl -lcrypto
 endif
 
 ifeq ($(uname_S),FreeBSD)
