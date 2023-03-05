@@ -328,6 +328,7 @@ int redisReconnect(redisContext *c);
 redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn);
 int redisSetTimeout(redisContext *c, const struct timeval tv);
 int redisEnableKeepAlive(redisContext *c);
+int redisEnableKeepAliveWithInterval(redisContext *c, int interval);
 void redisFree(redisContext *c);
 redisFD redisFreeKeepFd(redisContext *c);
 int redisBufferRead(redisContext *c);
