@@ -942,11 +942,13 @@ int redisSetTimeout(redisContext *c, const struct timeval tv) {
     return REDIS_ERR;
 }
 
+int redisEnableKeepAliveWithInterval(redisContext *c, int interval) {
+    return redisKeepAlive(c, interval);
+}
+
 /* Enable connection KeepAlive. */
 int redisEnableKeepAlive(redisContext *c) {
-    if (redisKeepAlive(c, REDIS_KEEPALIVE_INTERVAL) != REDIS_OK)
-        return REDIS_ERR;
-    return REDIS_OK;
+    return redisKeepAlive(c, REDIS_KEEPALIVE_INTERVAL);
 }
 
 /* Set a user provided RESP3 PUSH handler and return any old one set. */
