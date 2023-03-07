@@ -45,6 +45,8 @@ ENDIF()
 
 ADD_LIBRARY(hiredis ${hiredis_sources})
 ADD_LIBRARY(hiredis::hiredis ALIAS hiredis)
+set(hiredis_export_name hiredis CACHE STRING "Name of the exported target")
+set_target_properties(hiredis PROPERTIES EXPORT_NAME ${hiredis_export_name})
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
