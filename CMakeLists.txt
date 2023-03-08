@@ -4,6 +4,7 @@ OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
 OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
+OPTION(ENABLE_EXAMPLES "Enable building hiredis examples" OFF)
 OPTION(ENABLE_ASYNC_TESTS "Should we run all asynchronous API tests" OFF)
 
 MACRO(getVersionBit name)
@@ -25,10 +26,7 @@ INCLUDE(GNUInstallDirs)
 
 # Hiredis requires C99
 SET(CMAKE_C_STANDARD 99)
-SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
 SET(CMAKE_DEBUG_POSTFIX d)
-
-SET(ENABLE_EXAMPLES OFF CACHE BOOL "Enable building hiredis examples")
 
 SET(hiredis_sources
     alloc.c
@@ -45,50 +43,27 @@ IF(WIN32)
     ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
 ENDIF()
 
-ADD_LIBRARY(hiredis_static STATIC ${hiredis_sources})
-ADD_LIBRARY(hiredis::hiredis_static ALIAS hiredis_static)
-SET(HIREDIS_DEFAULT_LIBRARY hiredis_static)
-SET(HIREDIS_TARGETS hiredis_static)
+ADD_LIBRARY(hiredis ${hiredis_sources})
+ADD_LIBRARY(hiredis::hiredis ALIAS hiredis)
+set(hiredis_export_name hiredis CACHE STRING "Name of the exported target")
+set_target_properties(hiredis PROPERTIES EXPORT_NAME ${hiredis_export_name})
 
-IF(NOT MSVC)
-    SET_TARGET_PROPERTIES(hiredis_static
-        PROPERTIES OUTPUT_NAME hiredis)
-ENDIF()
-
-IF(BUILD_SHARED_LIBS)
-    ADD_LIBRARY(hiredis SHARED ${hiredis_sources})
-    ADD_LIBRARY(hiredis::hiredis ALIAS hiredis)
-    SET(HIREDIS_DEFAULT_LIBRARY hiredis)
-    SET(HIREDIS_TARGETS ${HIREDIS_TARGETS} hiredis)
-    SET_TARGET_PROPERTIES(hiredis
-        PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        VERSION "${HIREDIS_SONAME}")
-ENDIF()
+SET_TARGET_PROPERTIES(hiredis
+    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+    VERSION "${HIREDIS_SONAME}")
 IF(MSVC)
-    SET_TARGET_PROPERTIES(hiredis_static
+    SET_TARGET_PROPERTIES(hiredis
         PROPERTIES COMPILE_FLAGS /Z7)
 ENDIF()
-IF(WIN32 OR MINGW)
-    IF(BUILD_SHARED_LIBS)
-        TARGET_LINK_LIBRARIES(hiredis PUBLIC ws2_32 crypt32)
-    ENDIF()
-    TARGET_LINK_LIBRARIES(hiredis_static PUBLIC ws2_32 crypt32)
+IF(WIN32)
+    TARGET_LINK_LIBRARIES(hiredis PUBLIC ws2_32 crypt32)
 ELSEIF(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-    IF(BUILD_SHARED_LIBS)
-        TARGET_LINK_LIBRARIES(hiredis PUBLIC m)
-    ENDIF()
-    TARGET_LINK_LIBRARIES(hiredis_static PUBLIC m)
+    TARGET_LINK_LIBRARIES(hiredis PUBLIC m)
 ELSEIF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
-    IF(BUILD_SHARED_LIBS)
-        TARGET_LINK_LIBRARIES(hiredis PUBLIC socket)
-    ENDIF()
-    TARGET_LINK_LIBRARIES(hiredis_static PUBLIC socket)
+    TARGET_LINK_LIBRARIES(hiredis PUBLIC socket)
 ENDIF()
 
-IF(BUILD_SHARED_LIBS)
-    TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
-ENDIF()
-TARGET_INCLUDE_DIRECTORIES(hiredis_static PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
@@ -118,7 +93,7 @@ set(CPACK_RPM_PACKAGE_AUTOREQPROV ON)
 
 include(CPack)
 
-INSTALL(TARGETS ${HIREDIS_TARGETS}
+INSTALL(TARGETS hiredis
     EXPORT hiredis-targets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -179,52 +154,28 @@ IF(ENABLE_SSL)
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(hiredis_ssl_sources
         ssl.c)
-
-    ADD_LIBRARY(hiredis_ssl_static STATIC
-            ${hiredis_ssl_sources})
-    SET(HIREDIS_SSL_DEFAULT_LIBRARY hiredis_ssl_static)
-    SET(HIREDIS_SSL_TARGETS hiredis_ssl_static)
-    IF(BUILD_SHARED_LIBS)
-        ADD_LIBRARY(hiredis_ssl SHARED
-            ${hiredis_ssl_sources})
-        SET(HIREDIS_SSL_DEFAULT_LIBRARY hiredis_ssl)
-        SET(HIREDIS_SSL_TARGETS ${HIREDIS_SSL_TARGETS} hiredis_ssl)
-    ENDIF()
-    IF(NOT MSVC)
-        SET_TARGET_PROPERTIES(hiredis_ssl_static
-            PROPERTIES OUTPUT_NAME hiredis_ssl)
-    ENDIF()
+    ADD_LIBRARY(hiredis_ssl ${hiredis_ssl_sources})
+    ADD_LIBRARY(hiredis::hiredis_ssl ALIAS hiredis_ssl)
 
     IF (APPLE AND BUILD_SHARED_LIBS)
         SET_PROPERTY(TARGET hiredis_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
     ENDIF()
 
-    IF(BUILD_SHARED_LIBS)
-        SET_TARGET_PROPERTIES(hiredis_ssl
-            PROPERTIES
-            WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-            VERSION "${HIREDIS_SONAME}")
-    ENDIF()
+    SET_TARGET_PROPERTIES(hiredis_ssl
+        PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+        VERSION "${HIREDIS_SONAME}")
     IF(MSVC)
-        SET_TARGET_PROPERTIES(hiredis_ssl_static
+        SET_TARGET_PROPERTIES(hiredis_ssl
             PROPERTIES COMPILE_FLAGS /Z7)
     ENDIF()
-
-    TARGET_INCLUDE_DIRECTORIES(hiredis_ssl_static PRIVATE "${OPENSSL_INCLUDE_DIR}")
-    IF(BUILD_SHARED_LIBS)
-        TARGET_INCLUDE_DIRECTORIES(hiredis_ssl PRIVATE "${OPENSSL_INCLUDE_DIR}")
-        TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE ${OPENSSL_LIBRARIES})
-    ENDIF()
-
-    IF (WIN32 OR MINGW)
-        IF (BUILD_SHARED_LIBS)
-            TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE hiredis)
-        ENDIF()
-        TARGET_LINK_LIBRARIES(hiredis_ssl_static PUBLIC hiredis_static)
+    TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE OpenSSL::SSL)
+    IF(WIN32)
+        TARGET_LINK_LIBRARIES(hiredis_ssl PRIVATE hiredis)
     ENDIF()
     CONFIGURE_FILE(hiredis_ssl.pc.in hiredis_ssl.pc @ONLY)
 
-    INSTALL(TARGETS ${HIREDIS_SSL_TARGETS}
+    INSTALL(TARGETS hiredis_ssl
         EXPORT hiredis_ssl-targets
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -267,10 +218,10 @@ ENDIF()
 IF(NOT DISABLE_TESTS)
     ENABLE_TESTING()
     ADD_EXECUTABLE(hiredis-test test.c)
-    TARGET_LINK_LIBRARIES(hiredis-test ${HIREDIS_DEFAULT_LIBRARY})
+    TARGET_LINK_LIBRARIES(hiredis-test hiredis)
     IF(ENABLE_SSL_TESTS)
         ADD_DEFINITIONS(-DHIREDIS_TEST_SSL=1)
-        TARGET_LINK_LIBRARIES(hiredis-test ${HIREDIS_SSL_DEFAULT_LIBRARY})
+        TARGET_LINK_LIBRARIES(hiredis-test hiredis_ssl)
     ENDIF()
     IF(ENABLE_ASYNC_TESTS)
         ADD_DEFINITIONS(-DHIREDIS_TEST_ASYNC=1)
@@ -282,5 +233,5 @@ ENDIF()
 
 # Add examples
 IF(ENABLE_EXAMPLES)
-  ADD_SUBDIRECTORY(examples)
+    ADD_SUBDIRECTORY(examples)
 ENDIF(ENABLE_EXAMPLES)
