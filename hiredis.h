@@ -154,23 +154,17 @@ struct redisSsl;
 
 #define REDIS_OPT_NONBLOCK 0x01
 #define REDIS_OPT_REUSEADDR 0x02
-#define REDIS_OPT_PREFER_IPV4 0x04
-#define REDIS_OPT_PREFER_IPV6 0x08
+#define REDIS_OPT_NOAUTOFREE 0x04        /* Don't automatically free the async
+                                          * object on a connection failure, or
+                                          * other implicit conditions. Only free
+                                          * on an explicit call to disconnect()
+                                          * or free() */
+#define REDIS_OPT_NO_PUSH_AUTOFREE 0x08  /* Don't automatically intercept and
+                                          * free RESP3 PUSH replies. */
+#define REDIS_OPT_NOAUTOFREEREPLIES 0x10 /* Don't automatically free replies. */
+#define REDIS_OPT_PREFER_IPV4 0x20       /* Prefer IPv4 in DNS lookups. */
+#define REDIS_OPT_PREFER_IPV6 0x40       /* Prefer IPv6 in DNS lookups. */
 #define REDIS_OPT_PREFER_IP_UNSPEC (REDIS_OPT_PREFER_IPV4 | REDIS_OPT_PREFER_IPV6)
-
-/**
- * Don't automatically free the async object on a connection failure,
- * or other implicit conditions. Only free on an explicit call to disconnect() or free()
- */
-#define REDIS_OPT_NOAUTOFREE 0x04
-
-/* Don't automatically intercept and free RESP3 PUSH replies. */
-#define REDIS_OPT_NO_PUSH_AUTOFREE 0x08
-
-/**
- * Don't automatically free replies
- */
-#define REDIS_OPT_NOAUTOFREEREPLIES 0x10
 
 /* In Unix systems a file descriptor is a regular signed int, with -1
  * representing an invalid descriptor. In Windows it is a SOCKET
