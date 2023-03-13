@@ -254,6 +254,9 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
         goto error;
     }
 
+    SSL_CTX_set_cipher_list( ctx->ssl_ctx, "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384");
+    SSL_CTX_set1_curves_list( ctx->ssl_ctx, "P-521:P-384");
+    SSL_CTX_set1_sigalgs_list( ctx->ssl_ctx, "ECDSA+SHA256:RSA+SHA256:ECDSA+SHA512:RSA+SHA512:ECDSA+SHA384");
     SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
     SSL_CTX_set_verify(ctx->ssl_ctx, options->verify_mode, NULL);
 
