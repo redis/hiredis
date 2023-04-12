@@ -43,9 +43,7 @@
 #include "sds.h"
 #include "async.h"
 #include "win32.h"
-
-extern int redisContextUpdateConnectTimeout(redisContext *c, const struct timeval *timeout);
-extern int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
+#include "private.h"
 
 static redisContextFuncs redisContextDefaultFuncs = {
     .close = redisNetClose,

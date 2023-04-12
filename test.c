@@ -106,7 +106,7 @@ static long long usec(void) {
 
 /* Helper to extract Redis version information.  Aborts on any failure. */
 #define REDIS_VERSION_FIELD "redis_version:"
-void get_redis_version(redisContext *c, int *majorptr, int *minorptr) {
+static void get_redis_version(redisContext *c, int *majorptr, int *minorptr) {
     redisReply *reply;
     char *eptr, *s, *e;
     int major, minor;
@@ -914,7 +914,7 @@ static void test_blocking_connection_errors(void) {
 }
 
 /* Test push handler */
-void push_handler(void *privdata, void *r) {
+static void push_handler(void *privdata, void *r) {
     struct pushCounters *pcounts = privdata;
     redisReply *reply = r, *payload;
 
@@ -935,7 +935,7 @@ void push_handler(void *privdata, void *r) {
 }
 
 /* Dummy function just to test setting a callback with redisOptions */
-void push_handler_async(redisAsyncContext *ac, void *reply) {
+static void push_handler_async(redisAsyncContext *ac, void *reply) {
     (void)ac;
     (void)reply;
 }
@@ -1014,7 +1014,7 @@ static void test_resp3_push_handler(redisContext *c) {
     send_hello(c, 2);
 }
 
-redisOptions get_redis_tcp_options(struct config config) {
+static redisOptions get_redis_tcp_options(struct config config) {
     redisOptions options = {0};
     REDIS_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
     return options;
@@ -1059,7 +1059,7 @@ static void test_resp3_push_options(struct config config) {
     redisAsyncFree(ac);
 }
 
-void free_privdata(void *privdata) {
+static void free_privdata(void *privdata) {
     struct privdata *data = privdata;
     data->dtor_counter++;
 }
@@ -1344,7 +1344,7 @@ static void test_invalid_timeout_errors(struct config config) {
 
 /* Wrap malloc to abort on failure so OOM checks don't make the test logic
  * harder to follow. */
-void *hi_malloc_safe(size_t size) {
+static void *hi_malloc_safe(size_t size) {
     void *ptr = hi_malloc(size);
     if (ptr == NULL) {
         fprintf(stderr, "Error:  Out of memory\n");
