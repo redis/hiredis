@@ -860,7 +860,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
         return NULL;
     }
 
-    if (options->command_timeout != NULL && (c->flags & REDIS_BLOCK) && c->fd != REDIS_INVALID_FD) {
+    if (c->err == 0 && c->fd != REDIS_INVALID_FD &&
+        options->command_timeout != NULL && (c->flags & REDIS_BLOCK))
+    {
         redisContextSetTimeout(c, *options->command_timeout);
     }
 
