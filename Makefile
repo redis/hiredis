@@ -99,7 +99,7 @@ ifeq ($(USE_SSL),1)
 
       ifneq ($(wildcard $(SEARCH_PATH1)),)
         OPENSSL_PREFIX=$(SEARCH_PATH1)
-      else ifneq($(wildcard $(SEARCH_PATH2)),)
+      else ifneq ($(wildcard $(SEARCH_PATH2)),)
         OPENSSL_PREFIX=$(SEARCH_PATH2)
       endif
     endif
