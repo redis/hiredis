@@ -684,6 +684,16 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("Correctly parses RESP3 double -Nan: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, ",-nan\r\n", 7);
+    ret = redisReaderGetReply(reader, &reply);
+    test_cond(ret == REDIS_OK &&
+              ((redisReply*)reply)->type == REDIS_REPLY_DOUBLE &&
+              isnan(((redisReply*)reply)->dval));
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
     test("Can parse RESP3 nil: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, "_\r\n",3);
