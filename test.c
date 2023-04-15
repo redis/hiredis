@@ -881,9 +881,9 @@ static void test_allocator_injection(void) {
 
 #define HIREDIS_BAD_DOMAIN "idontexist-noreally.com"
 static void test_blocking_connection_errors(void) {
-    redisContext *c;
     struct addrinfo hints = {.ai_family = AF_INET};
     struct addrinfo *ai_tmp = NULL;
+    redisContext *c;
 
     int rv = getaddrinfo(HIREDIS_BAD_DOMAIN, "6379", &hints, &ai_tmp);
     if (rv != 0) {
@@ -910,10 +910,24 @@ static void test_blocking_connection_errors(void) {
     }
 
 #ifndef _WIN32
+    redisOptions opt = {0};
+    struct timeval tv;
+
     test("Returns error when the port is not open: ");
     c = redisConnect((char*)"localhost", 1);
     test_cond(c->err == REDIS_ERR_IO &&
         strcmp(c->errstr,"Connection refused") == 0);
+    redisFree(c);
+
+
+    /* Verify we don't regress from the fix in PR #1180 */
+    test("We don't clobber connection exception with setsockopt error: ");
+    tv = (struct timeval){.tv_sec = 0, .tv_usec = 500000};
+    opt.command_timeout = opt.connect_timeout = &tv;
+    REDIS_OPTIONS_SET_TCP(&opt, "localhost", 10337);
+    c = redisConnectWithOptions(&opt);
+    test_cond(c->err == REDIS_ERR_IO &&
+              strcmp(c->errstr, "Connection refused") == 0);
     redisFree(c);
 
     test("Returns error when the unix_sock socket path doesn't accept connections: ");
