@@ -7,6 +7,18 @@
 #include <async.h>
 #include <adapters/redismoduleapi.h>
 
+void debugCallback(redisAsyncContext *c, void *r, void *privdata) {
+    (void)privdata; //unused
+    redisReply *reply = r;
+    if (reply == NULL) {
+        /* The DEBUG SLEEP command will almost always fail, because we have set a 1 second timeout */
+        printf("`DEBUG SLEEP` error: %s\n", c->errstr ? c->errstr : "unknown error");
+        return;
+    }
+    /* Disconnect after receiving the reply of DEBUG SLEEP (which will not)*/
+    redisAsyncDisconnect(c);
+}
+
 void getCallback(redisAsyncContext *c, void *r, void *privdata) {
     redisReply *reply = r;
     if (reply == NULL) {
@@ -17,8 +29,8 @@ void getCallback(redisAsyncContext *c, void *r, void *privdata) {
     }
     printf("argv[%s]: %s\n", (char*)privdata, reply->str);
 
-    /* Disconnect after receiving the reply to GET */
-    redisAsyncDisconnect(c);
+    /* start another request that demonstrate timeout */
+    redisAsyncCommand(c, debugCallback, NULL, "DEBUG SLEEP %f", 1.5);
 }
 
 void connectCallback(const redisAsyncContext *c, int status) {
@@ -55,8 +67,7 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
         return REDISMODULE_ERR;
     }
 
-    if (!RedisModule_GetServerVersion ||
-        RedisModule_GetServerVersion() < 0x00070000) {
+    if (redisModuleCompatibilityCheck() != REDIS_OK) {
         printf("Redis 7.0 or above is required! \n");
         return REDISMODULE_ERR;
     }
@@ -71,9 +82,19 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
     size_t len;
     const char *val = RedisModule_StringPtrLen(argv[argc-1], &len);
 
-    redisModuleAttach(c);
+    RedisModuleCtx *module_ctx = RedisModule_GetDetachedThreadSafeContext(ctx);
+    redisModuleAttach(c, module_ctx);
     redisAsyncSetConnectCallback(c,connectCallback);
     redisAsyncSetDisconnectCallback(c,disconnectCallback);
+    redisAsyncSetTimeout(c, (struct timeval){ .tv_sec = 1, .tv_usec = 0});
+
+    /*
+    In this demo, we first `set key`, then `get key` to demonstrate the basic usage of the adapter.
+    Then in `getCallback`, we start a `debug sleep` command to create 1.5 second long request.
+    Because we have set a 1 second timeout to the connection, the command will always fail with a
+    timeout error, which is shown in the `debugCallback`.
+    */
+
     redisAsyncCommand(c, NULL, NULL, "SET key %b", val, len);
     redisAsyncCommand(c, getCallback, (char*)"end-1", "GET key");
     return 0;
