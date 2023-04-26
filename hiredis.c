@@ -363,12 +363,12 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
             newarg = curarg;
 
             switch(c[1]) {
-            case 's':
-                arg = va_arg(ap,char*);
-                size = strlen(arg);
-                if (size > 0)
-                    newarg = sdscatlen(curarg,arg,size);
-                break;
+            // case 's':
+            //     arg = va_arg(ap,char*);
+            //     size = strlen(arg);
+            //     if (size > 0)
+            //         newarg = sdscatlen(curarg,arg,size);
+            //     break;
             case 'b':
                 arg = va_arg(ap,char*);
                 size = va_arg(ap,size_t);
@@ -392,12 +392,12 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                     while (*_p != '\0' && strchr(flags,*_p) != NULL) _p++;
 
                     /* Field width */
-                    while (*_p != '\0' && isdigit(*_p)) _p++;
+                    while (*_p != '\0' && (isdigit(*_p) || *_p == '*')) _p++;
 
                     /* Precision */
                     if (*_p == '.') {
                         _p++;
-                        while (*_p != '\0' && isdigit(*_p)) _p++;
+                        while (*_p != '\0' && (isdigit(*_p) || *_p == '*')) _p++;
                     }
 
                     /* Copy va_list before consuming with va_arg */
@@ -407,6 +407,18 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                      * '\0' as an integer specifier. This is checked after above
                      * va_copy() to avoid UB in fmt_invalid's call to va_end(). */
                     if (*_p == '\0') goto fmt_invalid;
+
+                    /* Char conversion (without modifiers) */
+                    if (strchr("c",*_p) != NULL) {
+                        va_arg(ap,int);
+                        goto fmt_check_flag;
+                    }
+
+                    /* String conversion (without modifiers) */
+                    if (strchr("s",*_p) != NULL) {
+                        va_arg(ap,char*);
+                        goto fmt_check_flag;
+                    }
 
                     /* Integer conversion (without modifiers) */
                     if (strchr(intfmts,*_p) != NULL) {
@@ -459,6 +471,12 @@ int redisvFormatCommand(char **target, const char *format, va_list ap) {
                         }
                         goto fmt_invalid;
                     }
+                
+                fmt_check_flag:
+                    if (strchr(flags,c[1]) == NULL)
+                        goto fmt_valid;
+                    else
+                        goto fmt_invalid;
 
                 fmt_invalid:
                     va_end(_cpy);
