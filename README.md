@@ -123,6 +123,8 @@ REDIS_OPTIONS_SET_PRIVDATA(&opt, myPrivData, myPrivDataDtor);
 opt->options |= REDIS_OPT_PREFER_IPV4;
 ```
 
+If a connection is lost, `int redisReconnect(redisContext *c)` can be used to restore the connection using the same endpoint and options as the given context.
+
 ### Configurable redisOptions flags
 
 There are several flags you may set in the `redisOptions` struct to change default behavior.  You can specify the flags via the `redisOptions->options` member.
@@ -137,6 +139,36 @@ There are several flags you may set in the `redisOptions` struct to change defau
 | REDIS\_OPT\_NOAUTOFREE | **ASYNC**: Tells hiredis not to automatically free the `redisAsyncContext` on connection/communication failure, but only if the user makes an explicit call to `redisAsyncDisconnect` or `redisAsyncFree` |
 
 *Note: A `redisContext` is not thread-safe.*
+
+### Other configuration using socket options
+
+The following socket options are applied directly to the underlying socket.
+The values are not stored in the `redisContext`, so they are not automatically applied when reconnecting using `redisReconnect()`.
+These functions return `REDIS_OK` on success.
+On failure, `REDIS_ERR` is returned and the underlying connection is closed.
+
+To configure these for an asyncronous context (see *Asynchronous API* below), use `ac->c` to get the redisContext out of an asyncRedisContext.
+
+```C
+int redisEnableKeepAlive(redisContext *c);
+int redisEnableKeepAliveWithInterval(redisContext *c, int interval);
+```
+
+Enables TCP keepalive by setting the following socket options (with some variations depending on OS):
+
+* `SO_KEEPALIVE`;
+* `TCP_KEEPALIVE` or `TCP_KEEPIDLE`, value configurable using the `interval` parameter, default 15 seconds;
+* `TCP_KEEPINTVL` set to 1/3 of `interval`;
+* `TCP_KEEPCNT` set to 3.
+
+```C
+int redisSetTcpUserTimeout(redisContext *c, unsigned int timeout);
+```
+
+Set the `TCP_USER_TIMEOUT` Linux-specific socket option which is as described in the `tcp` man page:
+
+> When the value is greater than 0, it specifies the maximum amount of time in milliseconds that trans mitted data may remain unacknowledged before TCP will forcibly close the corresponding connection and return ETIMEDOUT to the application.
+> If the option value is specified as 0, TCP will use the system default.
 
 ### Sending commands
 
@@ -450,7 +482,6 @@ void appOnDisconnect(redisAsyncContext *c, int status)
     }
 }
 ```
-
 
 ### Sending commands and their callbacks
 
