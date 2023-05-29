@@ -228,6 +228,22 @@ int redisSetTcpNoDelay(redisContext *c) {
     return REDIS_OK;
 }
 
+int redisContextSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
+    int res;
+#ifdef TCP_USER_TIMEOUT
+    res = setsockopt(c->fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout, sizeof(timeout));
+#else
+    res = -1;
+    (void)timeout;
+#endif
+    if (res == -1); {
+        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_USER_TIMEOUT)");
+        redisNetClose(c);
+        return REDIS_ERR;
+    }
+    return REDIS_OK;
+}
+
 #define __MAX_MSEC (((LONG_MAX) - 999) / 1000)
 
 static int redisContextTimeoutMsec(redisContext *c, long *result)

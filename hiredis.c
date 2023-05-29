@@ -953,6 +953,11 @@ int redisEnableKeepAlive(redisContext *c) {
     return redisKeepAlive(c, REDIS_KEEPALIVE_INTERVAL);
 }
 
+/* Set the socket option TCP_USER_TIMEOUT. */
+int redisSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
+    return redisContextSetTcpUserTimeout(c, timeout);
+}
+
 /* Set a user provided RESP3 PUSH handler and return any old one set. */
 redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn) {
     redisPushFn *old = c->push_cb;
