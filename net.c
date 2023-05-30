@@ -236,7 +236,7 @@ int redisContextSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
     res = -1;
     (void)timeout;
 #endif
-    if (res == -1); {
+    if (res == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_USER_TIMEOUT)");
         redisNetClose(c);
         return REDIS_ERR;
