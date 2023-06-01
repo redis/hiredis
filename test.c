@@ -1567,6 +1567,9 @@ static void test_throughput(struct config config) {
 // }
 
 #ifdef HIREDIS_TEST_ASYNC
+
+#pragma GCC diagnostic ignored "-Woverlength-strings"   /* required on gcc 4.8.x due to assert statements */
+
 struct event_base *base;
 
 typedef struct TestState {
