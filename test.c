@@ -409,10 +409,19 @@ static void test_tcp_options(struct config cfg) {
     redisContext *c;
 
     c = do_connect(cfg);
+
     test("We can enable TCP_KEEPALIVE: ");
     test_cond(redisEnableKeepAlive(c) == REDIS_OK);
 
-    disconnect(c, 0);
+#ifdef TCP_USER_TIMEOUT
+    test("We can set TCP_USER_TIMEOUT: ");
+    test_cond(redisSetTcpUserTimeout(c, 100) == REDIS_OK);
+#else
+    test("Setting TCP_USER_TIMEOUT errors when unsupported: ");
+    test_cond(redisSetTcpUserTimeout(c, 100) == REDIS_ERR && c->err == REDIS_ERR_IO);
+#endif
+
+    redisFree(c);
 }
 
 static void test_reply_reader(void) {
