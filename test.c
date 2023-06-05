@@ -78,7 +78,7 @@ static int tests = 0, fails = 0, skips = 0;
 
 static void millisleep(int ms)
 {
-#if _MSC_VER
+#ifdef _MSC_VER
     Sleep(ms);
 #else
     usleep(ms*1000);
