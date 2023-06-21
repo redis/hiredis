@@ -306,11 +306,11 @@ static int redisContextWaitReady(redisContext *c, long msec) {
 
 int redisCheckConnectDone(redisContext *c, int *completed) {
     int rc = connect(c->fd, (const struct sockaddr *)c->saddr, c->addrlen);
+    int error = errno;
     if (rc == 0) {
         *completed = 1;
         return REDIS_OK;
     }
-    int error = errno;
     if (error == EINPROGRESS) {
         /* must check error to see if connect failed.  Get the socket error */
         int fail, so_error;
