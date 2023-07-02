@@ -48,7 +48,7 @@ typedef long long ssize_t;
 #define HIREDIS_MAJOR 1
 #define HIREDIS_MINOR 1
 #define HIREDIS_PATCH 1
-#define HIREDIS_SONAME 1.1.1-dev
+#define HIREDIS_SONAME 1.2.0
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
