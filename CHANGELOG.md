@@ -1,4 +1,4 @@
-## [1.2.0](https://github.com/redis/hiredis/tree/v1.1.0) - (2022-11-15)
+## [1.2.0](https://github.com/redis/hiredis/tree/v1.2.0) - (2023-06-04)
 
 Announcing Hiredis v1.2.0 with with new adapters, and a great many bug fixes.
 
