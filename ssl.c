@@ -59,6 +59,8 @@
 #include "async_private.h"
 #include "hiredis_ssl.h"
 
+#define OPENSSL_1_1_0 0x10100000L
+
 void __redisSetError(redisContext *c, int type, const char *str);
 
 struct redisSSLContext {
@@ -100,7 +102,7 @@ redisContextFuncs redisContextSSLFuncs;
  * Note that this is only required for OpenSSL < 1.1.0.
  */
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < OPENSSL_1_1_0
 #define HIREDIS_USE_CRYPTO_LOCKS
 #endif
 
@@ -257,7 +259,7 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
         goto error;
 
     const SSL_METHOD *ssl_method;
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_1_1_0
     ssl_method = TLS_client_method();
 #else
     ssl_method = SSLv23_client_method();
@@ -269,7 +271,7 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
         goto error;
     }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_1_1_0
     SSL_CTX_set_min_proto_version(ctx->ssl_ctx, TLS1_2_VERSION);
 #else
     SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
