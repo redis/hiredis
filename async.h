@@ -45,9 +45,11 @@ typedef void (redisCallbackFn)(struct redisAsyncContext*, void*, void*);
 typedef struct redisCallback {
     struct redisCallback *next; /* simple singly linked list */
     redisCallbackFn *fn;
-    int pending_subs;
-    int unsubscribe_sent;
     void *privdata;
+    unsigned int refcount;      /* Reference counter used when callback is used
+                                 * for multiple pubsub channels. */
+    int pending_replies;        /* Number of replies expected; -1 means
+                                 * unsubscribe all. */
 } redisCallback;
 
 /* List of callbacks for either regular replies or pub/sub */
@@ -96,7 +98,7 @@ typedef struct redisAsyncContext {
     redisConnectCallback *onConnect;
     redisConnectCallbackNC *onConnectNC;
 
-    /* Regular command callbacks */
+    /* Callback queue for pending replies */
     redisCallbackList replies;
 
     /* Address used for connect() */
@@ -105,10 +107,10 @@ typedef struct redisAsyncContext {
 
     /* Subscription callbacks */
     struct {
-        redisCallbackList replies;
         struct dict *channels;
         struct dict *patterns;
-        int pending_unsubs;
+        struct dict *shard_channels;
+        int pending_commands; /* Count pending [P|S][UN]SUBSCRIBE */
     } sub;
 
     /* Any configured RESP3 PUSH handler */
