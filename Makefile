@@ -267,7 +267,7 @@ check: hiredis-test
 	TEST_SSL=$(USE_SSL) ./test.sh
 
 .c.o:
-	$(CC) -std=c99 -c $(REAL_CFLAGS) $<
+	$(CC) -c $(REAL_CFLAGS) $<
 
 clean:
 	rm -rf $(DYLIBNAME) $(STLIBNAME) $(SSL_DYLIBNAME) $(SSL_STLIBNAME) $(TESTS) $(PKGCONFNAME) examples/hiredis-example* *.o *.gcda *.gcno *.gcov
