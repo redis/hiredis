@@ -1340,7 +1340,7 @@ static void test_blocking_io_errors(struct config config) {
 }
 
 static void test_invalid_timeout_errors(struct config config) {
-    redisContext *c;
+    redisContext *c = NULL;
 
     test("Set error when an invalid timeout usec value is used during connect: ");
 
@@ -1355,7 +1355,7 @@ static void test_invalid_timeout_errors(struct config config) {
         assert(NULL);
     }
 
-    test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+    test_cond(c != NULL && c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
     redisFree(c);
 
     test("Set error when an invalid timeout sec value is used during connect: ");
@@ -1371,7 +1371,7 @@ static void test_invalid_timeout_errors(struct config config) {
         assert(NULL);
     }
 
-    test_cond(c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
+    test_cond(c != NULL && c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
     redisFree(c);
 }
 
