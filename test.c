@@ -104,6 +104,13 @@ static long long usec(void) {
 #define assert(e) (void)(e)
 #endif
 
+#define redisTestPanic(msg) \
+    do { \
+        fprintf(stderr, "PANIC: %s (In function \"%s\", file \"%s\", line %d)\n", \
+                msg, __func__, __FILE__, __LINE__); \
+        exit(1); \
+    } while (1)
+
 /* Helper to extract Redis version information.  Aborts on any failure. */
 #define REDIS_VERSION_FIELD "redis_version:"
 void get_redis_version(redisContext *c, int *majorptr, int *minorptr) {
@@ -232,7 +239,7 @@ static redisContext *do_connect(struct config config) {
             c = redisConnectFd(fd);
         }
     } else {
-        assert(NULL);
+        redisTestPanic("Unknown connection type!");
     }
 
     if (c == NULL) {
@@ -1352,7 +1359,7 @@ static void test_invalid_timeout_errors(struct config config) {
     } else if(config.type == CONN_UNIX) {
         c = redisConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
     } else {
-        assert(NULL);
+        redisTestPanic("Unknown connection type!");
     }
 
     test_cond(c != NULL && c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
@@ -1368,7 +1375,7 @@ static void test_invalid_timeout_errors(struct config config) {
     } else if(config.type == CONN_UNIX) {
         c = redisConnectUnixWithTimeout(config.unix_sock.path, config.connect_timeout);
     } else {
-        assert(NULL);
+        redisTestPanic("Unknown connection type!");
     }
 
     test_cond(c != NULL && c->err == REDIS_ERR_IO && strcmp(c->errstr, "Invalid timeout specified") == 0);
