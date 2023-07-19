@@ -1682,6 +1682,12 @@ void null_cb(redisAsyncContext *ac, void *r, void *privdata) {
     state->checkpoint++;
 }
 
+void finalizer_cb(redisAsyncContext *ac, void *privdata) {
+    TestState *state = privdata;
+    (void)ac;
+    state->checkpoint++;
+}
+
 static void test_pubsub_handling(struct config config) {
     test("Subscribe, handle published message and unsubscribe: ");
     /* Setup event dispatcher with a testcase timeout */
@@ -1701,10 +1707,10 @@ static void test_pubsub_handling(struct config config) {
 
     /* Start subscribe */
     TestState state = {.options = &options};
-    redisAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
+    redisAsyncCommandWithFinalizer(ac,subscribe_cb,finalizer_cb,&state,"subscribe mychannel");
 
     /* Make sure non-subscribe commands are handled */
-    redisAsyncCommand(ac,array_cb,&state,"PING");
+    redisAsyncCommandWithFinalizer(ac,array_cb,finalizer_cb,&state,"PING");
 
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
@@ -1712,7 +1718,7 @@ static void test_pubsub_handling(struct config config) {
     event_base_free(base);
 
     /* Verify test checkpoints */
-    assert(state.checkpoint == 3);
+    assert(state.checkpoint == 5);
 }
 
 /* Unexpected push message, will trigger a failure */
@@ -1930,8 +1936,8 @@ static void test_pubsub_multiple_channels(struct config config) {
 
     /* Start subscribing to two channels */
     TestState state = {.options = &options};
-    redisAsyncCommand(ac,subscribe_channel_a_cb,&state,"subscribe A");
-    redisAsyncCommand(ac,subscribe_channel_b_cb,&state,"subscribe B");
+    redisAsyncCommandWithFinalizer(ac,subscribe_channel_a_cb,finalizer_cb,&state,"subscribe A");
+    redisAsyncCommandWithFinalizer(ac,subscribe_channel_b_cb,finalizer_cb,&state,"subscribe B");
 
     /* Start event dispatching loop */
     assert(event_base_dispatch(base) == 0);
@@ -1939,7 +1945,7 @@ static void test_pubsub_multiple_channels(struct config config) {
     event_base_free(base);
 
     /* Verify test checkpoints */
-    test_cond(state.checkpoint == 6);
+    test_cond(state.checkpoint == 8);
 }
 
 /* Command callback for test_monitor() */

@@ -66,12 +66,19 @@ int __redisAppendCommand(redisContext *c, const char *cmd, size_t len);
 void __redisSetError(redisContext *c, int type, const char *str);
 
 /* Reference counting for callback struct. */
-static void callbackIncrRefCount(redisCallback *cb) {
+static void callbackIncrRefCount(redisAsyncContext *ac, redisCallback *cb) {
+    (void)ac;
     cb->refcount++;
 }
-static void callbackDecrRefCount(redisCallback *cb) {
+static void callbackDecrRefCount(redisAsyncContext *ac, redisCallback *cb) {
     cb->refcount--;
     if (cb->refcount == 0) {
+        if (cb->finalizer != NULL) {
+            redisContext *c = &(ac->c);
+            c->flags |= REDIS_IN_CALLBACK;
+            cb->finalizer(ac, cb->privdata);
+            c->flags &= ~REDIS_IN_CALLBACK;
+        }
         hi_free(cb);
     }
 }
@@ -98,14 +105,12 @@ static void callbackKeyDestructor(void *privdata, void *key) {
 }
 
 static void *callbackValDup(void *privdata, const void *val) {
-    (void)privdata;
-    callbackIncrRefCount((redisCallback *)val);
+    callbackIncrRefCount((redisAsyncContext *)privdata, (redisCallback *)val);
     return (void *)val;
 }
 
 static void callbackValDestructor(void *privdata, void *val) {
-    (void)privdata;
-    callbackDecrRefCount((redisCallback *)val);
+    callbackDecrRefCount((redisAsyncContext *)privdata, (redisCallback *)val);
 }
 
 static dictType callbackDict = {
@@ -121,20 +126,20 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     redisAsyncContext *ac;
     dict *channels = NULL, *patterns = NULL, *shard_channels = NULL;
 
-    channels = dictCreate(&callbackDict,NULL);
+    ac = hi_realloc(c,sizeof(redisAsyncContext));
+    if (ac == NULL)
+        goto oom;
+
+    channels = dictCreate(&callbackDict, ac);
     if (channels == NULL)
         goto oom;
 
-    patterns = dictCreate(&callbackDict,NULL);
+    patterns = dictCreate(&callbackDict, ac);
     if (patterns == NULL)
         goto oom;
 
-    shard_channels = dictCreate(&callbackDict,NULL);
+    shard_channels = dictCreate(&callbackDict, ac);
     if (shard_channels == NULL)
-        goto oom;
-
-    ac = hi_realloc(c,sizeof(redisAsyncContext));
-    if (ac == NULL)
         goto oom;
 
     c = &(ac->c);
@@ -173,6 +178,7 @@ oom:
     if (channels) dictRelease(channels);
     if (patterns) dictRelease(patterns);
     if (shard_channels) dictRelease(shard_channels);
+    if (ac) hi_free(ac);
     return NULL;
 }
 
@@ -386,7 +392,7 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
     /* Execute pending callbacks with NULL reply. */
     while (__redisShiftCallback(&ac->replies,&cb) == REDIS_OK) {
         __redisRunCallback(ac,cb,NULL);
-        callbackDecrRefCount(cb);
+        callbackDecrRefCount(ac, cb);
     }
 
     /* Run subscription callbacks with NULL reply */
@@ -700,7 +706,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
                 /* The command needs more repies. Put it first in queue. */
                 __redisUnshiftCallback(&ac->replies, cb);
             } else {
-                callbackDecrRefCount(cb);
+                callbackDecrRefCount(ac, cb);
             }
         }
 
@@ -858,7 +864,7 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
 
     while (__redisShiftCallback(&ac->replies, &cb) == REDIS_OK) {
         __redisRunCallback(ac, cb, NULL);
-        callbackDecrRefCount(cb);
+        callbackDecrRefCount(ac, cb);
     }
 
     /**
@@ -899,7 +905,9 @@ static int isPubsubCommand(const char *cmd, size_t len) {
 /* Helper function for the redisAsyncCommand* family of functions. Writes a
  * formatted command to the output buffer and registers the provided callback
  * function with the context. */
-static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
+static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn,
+                               redisFinalizerCallback *finalizer, void *privdata,
+                               const char *cmd, size_t len) {
     redisContext *c = &(ac->c);
     redisCallback *cb;
     const char *cstr, *astr;
@@ -914,6 +922,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     if (cb == NULL)
         goto oom;
     cb->fn = fn;
+    cb->finalizer = finalizer;
     cb->privdata = privdata;
     cb->refcount = 1;
     cb->pending_replies = 1; /* Most commands have exactly 1 reply. */
@@ -953,11 +962,16 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
 oom:
     __redisSetError(&(ac->c), REDIS_ERR_OOM, "Out of memory");
     __redisAsyncCopyError(ac);
-    callbackDecrRefCount(cb);
+    callbackDecrRefCount(ac, cb);
     return REDIS_ERR;
 }
 
 int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, va_list ap) {
+    return redisvAsyncCommandWithFinalizer(ac, fn, NULL, privdata, format, ap);
+}
+
+int redisvAsyncCommandWithFinalizer(redisAsyncContext *ac, redisCallbackFn *fn, redisFinalizerCallback *finalizer,
+                                    void *privdata, const char *format, va_list ap) {
     char *cmd;
     int len;
     int status;
@@ -967,7 +981,7 @@ int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdat
     if (len < 0)
         return REDIS_ERR;
 
-    status = __redisAsyncCommand(ac,fn,privdata,cmd,len);
+    status = __redisAsyncCommand(ac,fn,finalizer,privdata,cmd,len);
     hi_free(cmd);
     return status;
 }
@@ -981,20 +995,41 @@ int redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata
     return status;
 }
 
+int redisAsyncCommandWithFinalizer(redisAsyncContext *ac, redisCallbackFn *fn, redisFinalizerCallback *finalizer,
+                                   void *privdata, const char *format, ...) {
+    va_list ap;
+    int status;
+    va_start(ap,format);
+    status = redisvAsyncCommandWithFinalizer(ac,fn,finalizer,privdata,format,ap);
+    va_end(ap);
+    return status;
+}
+
 int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen) {
+    return redisAsyncCommandArgvWithFinalizer(ac, fn, NULL, privdata, argc, argv, argvlen);
+}
+
+int redisAsyncCommandArgvWithFinalizer(redisAsyncContext *ac, redisCallbackFn *fn, redisFinalizerCallback *finalizer,
+                                       void *privdata, int argc, const char **argv, const size_t *argvlen) {
     sds cmd;
     long long len;
     int status;
     len = redisFormatSdsCommandArgv(&cmd,argc,argv,argvlen);
     if (len < 0)
         return REDIS_ERR;
-    status = __redisAsyncCommand(ac,fn,privdata,cmd,len);
+    status = __redisAsyncCommand(ac,fn,finalizer,privdata,cmd,len);
     sdsfree(cmd);
     return status;
 }
 
 int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
-    int status = __redisAsyncCommand(ac,fn,privdata,cmd,len);
+    int status = __redisAsyncCommand(ac,fn,NULL,privdata,cmd,len);
+    return status;
+}
+
+int redisAsyncFormattedCommandWithFinalizer(redisAsyncContext *ac, redisCallbackFn *fn, redisFinalizerCallback *finalizer,
+                                            void *privdata, const char *cmd, size_t len) {
+    int status = __redisAsyncCommand(ac,fn,finalizer,privdata,cmd,len);
     return status;
 }
 
