@@ -61,6 +61,11 @@
 #define PUBSUB_REPLY_PATTERN 16
 #define PUBSUB_REPLY_SHARDED 32
 
+/* Special negative values for a callback's `pending_replies` fields. */
+#define PENDING_REPLY_UNSUBSCRIBE_ALL -1
+#define PENDING_REPLY_MONITOR -2
+#define PENDING_REPLY_RESET -3
+
 /* Forward declarations of hiredis.c functions */
 int __redisAppendCommand(redisContext *c, const char *cmd, size_t len);
 void __redisSetError(redisContext *c, int type, const char *str);
@@ -172,6 +177,7 @@ static redisAsyncContext *redisAsyncInitialize(redisContext *c) {
     ac->sub.patterns = patterns;
     ac->sub.shard_channels = shard_channels;
     ac->sub.pending_commands = 0;
+    ac->monitor_cb = NULL;
 
     return ac;
 oom:
@@ -420,6 +426,10 @@ static void __redisAsyncFree(redisAsyncContext *ac) {
         dictRelease(ac->sub.shard_channels);
     }
 
+    if (ac->monitor_cb != NULL) {
+        callbackDecrRefCount(ac, ac->monitor_cb);
+    }
+
     /* Signal event lib to clean up */
     _EL_CLEANUP(ac);
 
@@ -584,7 +594,9 @@ static int handlePubsubReply(redisAsyncContext *ac, redisReply *reply,
         /* If we've unsubscribed to the last channel, the command is done. */
         /* Check if this was the last channel unsubscribed. */
         assert(reply->element[2]->type == REDIS_REPLY_INTEGER);
-        if (cb->pending_replies == -1 && reply->element[2]->integer == 0) {
+        if (cb->pending_replies == PENDING_REPLY_UNSUBSCRIBE_ALL &&
+            reply->element[2]->integer == 0)
+        {
             cb->pending_replies = 0;
         }
 
@@ -621,12 +633,28 @@ oom:
     return REDIS_ERR;
 }
 
+/* Handle the effects of the RESET command. */
+static void handleReset(redisAsyncContext *ac) {
+    /* Cancel monitoring mode */
+    ac->c.flags &= ~REDIS_MONITORING;
+    if (ac->monitor_cb != NULL) {
+        callbackDecrRefCount(ac, ac->monitor_cb);
+        ac->monitor_cb = NULL;
+    }
+
+    /* Cancel subscriptions (finalizers are called if any) */
+    ac->c.flags &= ~REDIS_SUBSCRIBED;
+    if (ac->sub.channels) dictEmpty(ac->sub.channels);
+    if (ac->sub.patterns) dictEmpty(ac->sub.patterns);
+    if (ac->sub.shard_channels) dictEmpty(ac->sub.shard_channels);
+}
+
 void redisProcessCallbacks(redisAsyncContext *ac) {
     redisContext *c = &(ac->c);
-    void *reply = NULL;
+    redisReply *reply = NULL;
     int status;
 
-    while((status = redisGetReply(c,&reply)) == REDIS_OK) {
+    while((status = redisGetReply(c, (void**)&reply)) == REDIS_OK) {
         if (reply == NULL) {
             /* When the connection is being disconnected and there are
              * no more replies, this is the cue to really disconnect. */
@@ -656,6 +684,15 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
         if (redisIsPushReply(reply) && !pubsub_reply_flags) {
             __redisRunPushCallback(ac, reply);
             c->reader->fn->freeObject(reply);
+            continue;
+        }
+
+        /* Send monitored command to monitor callback */
+        if ((c->flags & REDIS_MONITORING) &&
+            reply->type == REDIS_REPLY_STATUS && reply->len > 0 &&
+            reply->str[0] >= '0' && reply->str[0] <= '9')
+        {
+            __redisRunCallback(ac, ac->monitor_cb, reply);
             continue;
         }
 
@@ -694,15 +731,33 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
             handlePubsubReply(ac, reply, pubsub_reply_flags, cb);
         } else {
             /* Regular reply. This includes ERR reply for subscribe commands. */
+
+            /* Handle special effects of the command's reply, if any. */
+            if (cb->pending_replies == PENDING_REPLY_RESET &&
+                reply->type == REDIS_REPLY_STATUS &&
+                strncmp(reply->str, "RESET", reply->len) == 0)
+            {
+                handleReset(ac);
+            } else if (cb->pending_replies == PENDING_REPLY_MONITOR &&
+                       reply->type == REDIS_REPLY_STATUS &&
+                       strncmp(reply->str, "OK", reply->len) == 0)
+            {
+                /* Set monitor flag and callback, freeing any old callback. */
+                c->flags |= REDIS_MONITORING;
+                if (ac->monitor_cb != NULL) {
+                    callbackDecrRefCount(ac, ac->monitor_cb);
+                }
+                ac->monitor_cb = cb;
+                callbackIncrRefCount(ac, cb);
+            }
+
+            /* Invoke callback */
             __redisRunCallback(ac, cb, reply);
             cb->pending_replies = 0;
         }
 
         if (cb != NULL) {
-            /* If in monitor mode, repush the callback */
-            if ((c->flags & REDIS_MONITORING) && !(c->flags & REDIS_FREEING)) {
-                __redisPushCallback(&ac->replies, cb);
-            } else if (cb->pending_replies != 0) {
+            if (cb->pending_replies != 0) {
                 /* The command needs more repies. Put it first in queue. */
                 __redisUnshiftCallback(&ac->replies, cb);
             } else {
@@ -939,15 +994,17 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn,
             cb->pending_replies++;
         }
         if (cb->pending_replies == 0) {
-            /* No channels specified. This is unsubscribe 'all' or an error. */
-            cb->pending_replies = -1;
+            /* No channels specified means unsubscribe all. (This can happens
+             * for SUBSCRIBE, but it is an error and then the value of pending
+             * replies doesn't matter.) */
+            cb->pending_replies = PENDING_REPLY_UNSUBSCRIBE_ALL;
         }
         c->flags |= REDIS_SUBSCRIBED;
         ac->sub.pending_commands++;
-    } else if (strncasecmp(cstr,"monitor\r\n",9) == 0) {
-        /* Set monitor flag */
-        c->flags |= REDIS_MONITORING;
-        cb->pending_replies = -1;
+    } else if (strncasecmp(cstr, "monitor", clen) == 0) {
+        cb->pending_replies = PENDING_REPLY_MONITOR;
+    } else if (strncasecmp(cstr, "reset", clen) == 0) {
+        cb->pending_replies = PENDING_REPLY_RESET;
     }
 
     if (__redisPushCallback(&ac->replies, cb) != REDIS_OK)

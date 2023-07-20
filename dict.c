@@ -246,6 +246,11 @@ static int _dictClear(dict *ht) {
     return DICT_OK; /* never fails */
 }
 
+/* Delete all the keys and values */
+static void dictEmpty(dict *ht) {
+    _dictClear(ht);
+}
+
 /* Clear & Release the hash table */
 static void dictRelease(dict *ht) {
     _dictClear(ht);

@@ -50,8 +50,8 @@ typedef struct redisCallback {
     void *privdata;
     unsigned int refcount;      /* Reference counter used when callback is used
                                  * for multiple pubsub channels. */
-    int pending_replies;        /* Number of replies expected; -1 means
-                                 * unsubscribe all. */
+    int pending_replies;        /* Number of replies expected; negative values
+                                 * are special. */
 } redisCallback;
 
 /* List of callbacks for either regular replies or pub/sub */
@@ -117,6 +117,9 @@ typedef struct redisAsyncContext {
 
     /* Any configured RESP3 PUSH handler */
     redisAsyncPushFn *push_cb;
+
+    /* Monitor, only when MONITOR has been called. */
+    redisCallback *monitor_cb;
 } redisAsyncContext;
 
 /* Functions that proxy to hiredis */
