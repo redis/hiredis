@@ -2028,10 +2028,8 @@ static void test_monitor(struct config config) {
 static void reset_reset_cb(redisAsyncContext *ac, void *r, void *privdata) {
     redisReply *reply = r;
     TestState *state = privdata;
-    assert(reply != NULL && reply->elements == 2);
-    char *str = reply->element[0]->str;
-    size_t len = reply->element[0]->len;
-    assert(strncmp(str, "RESET", len) == 0);
+    assert(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    assert(strncmp(reply->str, "RESET", reply->len) == 0);
     state->checkpoint++;
     /* Check that when the RESET callback is called, the context has already
      * been reset. Monitor and pubsub have been cancelled. */
@@ -2044,12 +2042,13 @@ static void reset_reset_cb(redisAsyncContext *ac, void *r, void *privdata) {
 static void reset_ping_cb(redisAsyncContext *ac, void *r, void *privdata) {
     redisReply *reply = r;
     TestState *state = privdata;
+    /* Ping returns an array in subscribed mode. */
     assert(reply != NULL && reply->elements == 2);
     char *str = reply->element[0]->str;
     size_t len = reply->element[0]->len;
     assert(strncmp(str, "pong", len) == 0);
     state->checkpoint++;
-    redisAsyncCommandWithFinalizer(ac, reset_reset_cb, finalizer_cb, &state,
+    redisAsyncCommandWithFinalizer(ac, reset_reset_cb, finalizer_cb, state,
                                    "reset");
 }
 
@@ -2064,8 +2063,8 @@ static void reset_subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
     size_t len = reply->element[0]->len;
     assert(strncmp(str, "subscribe", len) == 0);
     state->checkpoint++;
-    redisAsyncCommandWithFinalizer(ac, reset_ping_cb, finalizer_cb,
-                                   &state, "ping");
+    redisAsyncCommandWithFinalizer(ac, reset_ping_cb, finalizer_cb, state,
+                                   "ping");
 }
 
 /* Monitor callback for test_reset(). */
@@ -2076,7 +2075,7 @@ static void reset_monitor_cb(redisAsyncContext *ac, void *r, void *privdata) {
     state->checkpoint++;
     if (strncmp(reply->str, "OK", reply->len) == 0) {
         /* Reply to the MONITOR command */
-        redisAsyncCommandWithFinalizer(ac, reset_subscribe_cb, finalizer_cb, &state,
+        redisAsyncCommandWithFinalizer(ac, reset_subscribe_cb, finalizer_cb, state,
                                        "subscribe %s", "ch");
     } else {
         /* A monitored command starts with a numeric timestamp, e.g.
@@ -2438,7 +2437,6 @@ int main(int argc, char **argv) {
     /* Unix sockets don't exist in Windows */
     test_unix_socket = 0;
 #endif
-
     test_allocator_injection();
 
     test_format_commands();

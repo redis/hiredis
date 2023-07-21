@@ -1019,7 +1019,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn,
 oom:
     __redisSetError(&(ac->c), REDIS_ERR_OOM, "Out of memory");
     __redisAsyncCopyError(ac);
-    callbackDecrRefCount(ac, cb);
+    if (cb) callbackDecrRefCount(ac, cb);
     return REDIS_ERR;
 }
 
