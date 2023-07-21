@@ -1594,6 +1594,14 @@ void async_disconnect(redisAsyncContext *ac) {
     event_base_loopbreak(base);
 }
 
+/* Use as disconnect callback e.g. when calling QUIT */
+void disconnectCbExpectServerClose(const struct redisAsyncContext *ac, int status) {
+    assert(status == REDIS_ERR);
+    assert(ac->err == REDIS_ERR_EOF);
+    assert(strcmp(ac->errstr, "Server closed the connection") == 0);
+    event_base_loopbreak(base);
+}
+
 /* Testcase timeout, will trigger a failure */
 void timeout_cb(int fd, short event, void *arg) {
     (void) fd; (void) event; (void) arg;
@@ -1982,6 +1990,9 @@ void monitor_cb(redisAsyncContext *ac, void *r, void *privdata) {
     } else if (state->checkpoint == 3) {
         /* Response for monitored command 'SET second 2' */
         assert(strstr(reply->str,"second") != NULL);
+        /* To exit the event loop on server disconnect, we need to do so in a
+         * disconnect callback. */
+        redisAsyncSetDisconnectCallback(ac, disconnectCbExpectServerClose);
         /* Send QUIT to disconnect */
         redisAsyncCommand(ac,NULL,NULL,"QUIT");
     }
