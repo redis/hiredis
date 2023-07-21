@@ -103,10 +103,6 @@ typedef struct redisAsyncContext {
     /* Callback queue for pending replies */
     redisCallbackList replies;
 
-    /* Address used for connect() */
-    struct sockaddr *saddr;
-    size_t addrlen;
-
     /* Subscription callbacks */
     struct {
         struct dict *channels;
