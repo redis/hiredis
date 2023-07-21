@@ -2046,7 +2046,7 @@ static void reset_reset_cb(redisAsyncContext *ac, void *r, void *privdata) {
      * been reset. Monitor and pubsub have been cancelled. */
     assert(!(ac->c.flags & REDIS_SUBSCRIBED));
     assert(!(ac->c.flags & REDIS_MONITORING));
-    event_base_loopbreak(base);
+    async_disconnect(ac);
 }
 
 /* Ping callback for test_reset() */
