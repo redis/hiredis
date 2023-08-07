@@ -6,6 +6,7 @@ allocators
 antirez
 api
 APIs
+ASYNC
 asyncRedisContext
 asyncronous
 AUTOFREE
@@ -16,6 +17,7 @@ Autoloading
 backend
 backends
 behaviour
+boolean
 CAS
 Changelog
 customizable
@@ -31,6 +33,9 @@ getaddrinfo
 gmail
 grunder
 Grunder
+hiredis
+Hiredis
+HIREDIS
 hostname
 IANA
 IPv
