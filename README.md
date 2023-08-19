@@ -28,11 +28,11 @@ The library comes with multiple APIs. There is the
 * After v1.2.0 we modified how we invoke `poll(2)` to wait for connections to complete, such that we will now retry
   the call if it is interrupted by a signal until:
 
-  a) The connection succeeds or fails.  
+  a) The connection succeeds or fails.
   b) The overall connection timeout is reached.
 
-  In previous versions, an interrupted `poll(2)` call would cause the connection to fail 
-  with `c->err` set to `REDIS_ERR_IO` and `c->errstr` set to `poll(2): Interrupted system call`.  
+  In previous versions, an interrupted `poll(2)` call would cause the connection to fail
+  with `c->err` set to `REDIS_ERR_IO` and `c->errstr` set to `poll(2): Interrupted system call`.
 
 ## Upgrading to `1.1.0`
 
@@ -302,7 +302,7 @@ void redisFree(redisContext *c);
 This function immediately closes the socket and then frees the allocations done in
 creating the context.
 
-### Sending commands (cont'd)
+### Sending commands (continued)
 
 Together with `redisCommand`, the function `redisCommandArgv` can be used to issue commands.
 It has the following prototype:
