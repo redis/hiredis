@@ -173,6 +173,10 @@ int redisKeepAlive(redisContext *c, int interval) {
     int val = 1;
     redisFD fd = c->fd;
 
+    /* TCP_KEEPALIVE makes no sense with AF_UNIX connections */
+    if (c->connection_type == REDIS_CONN_UNIX)
+        return REDIS_ERR;
+
 #ifndef _WIN32
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) == -1){
         __redisSetError(c,REDIS_ERR_OTHER,strerror(errno));

@@ -431,6 +431,24 @@ static void test_tcp_options(struct config cfg) {
     redisFree(c);
 }
 
+static void test_unix_keepalive(struct config cfg) {
+    redisContext *c;
+    redisReply *r;
+
+    c = do_connect(cfg);
+
+    test("Setting TCP_KEEPALIVE on a unix socket returns an error: ");
+    test_cond(redisEnableKeepAlive(c) == REDIS_ERR && c->err == 0);
+
+    test("Setting TCP_KEEPALIVE on a unix socket doesn't break the connection: ");
+    r = redisCommand(c, "PING");
+    test_cond(r != NULL && r->type == REDIS_REPLY_STATUS && r->len == 4 &&
+              !memcmp(r->str, "PONG", 4));
+    freeReplyObject(r);
+
+    redisFree(c);
+}
+
 static void test_reply_reader(void) {
     redisReader *reader;
     void *reply, *root;
@@ -2363,6 +2381,7 @@ int main(int argc, char **argv) {
         test_blocking_connection_timeouts(cfg);
         test_blocking_io_errors(cfg);
         test_invalid_timeout_errors(cfg);
+        test_unix_keepalive(cfg);
         if (throughput) test_throughput(cfg);
     } else {
         test_skipped();
