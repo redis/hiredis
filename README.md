@@ -549,12 +549,12 @@ Even if the context object id disconnected or deleted, every pending callback
 will be called with a `NULL` reply.
 
 For every command issued, with the exception of the **`[S|P][UN]SUBSCRIBE`**
-commands, the callback is called exactly once. For **SUBSCRIBE**, **PSUBSCRIBE**
-and **SSUBSCRIBE**, the callbacks are called repeatedly for each message
-arriving on the channel or pattern, until an `unsubscribe` message arrives for
-each subscribed channel or pattern. This will be the last invocation of the
-callback. In case of error, the callbacks may receive a final `NULL` reply
-instead.
+commands, the callback is called exactly once. For **`SUBSCRIBE`**,
+**`PSUBSCRIBE`** and **`SSUBSCRIBE`**, the callbacks are called repeatedly for
+each message arriving on the channel or pattern, until an `unsubscribe` message
+arrives for each subscribed channel or pattern. This will be the last invocation
+of the callback. In case of error, the callbacks may receive a final `NULL`
+reply instead.
 
 The callback for the **`[S|P]UNSUBSCRIBE`** commands are never called, except
 if the command returns an error. Instead, on successful unsubscribe, the
