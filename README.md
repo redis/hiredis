@@ -496,15 +496,35 @@ The `privdata` argument can be used to curry arbitrary data to the callback from
 the command is initially queued for execution.
 
 The functions that can be used to issue commands in an asynchronous context are:
+
 ```c
-int redisAsyncCommand(
-  redisAsyncContext *ac, redisCallbackFn *fn, void *privdata,
-  const char *format, ...);
-int redisAsyncCommandArgv(
-  redisAsyncContext *ac, redisCallbackFn *fn, void *privdata,
-  int argc, const char **argv, const size_t *argvlen);
+int redisAsyncCommand(redisAsyncContext *ac,
+                      redisCallbackFn *fn,
+                      void *privdata,
+                      const char *format,
+                      ...);
+
+int redisvAsyncCommand(redisAsyncContext *ac,
+                       redisCallbackFn *fn,
+                       void *privdata,
+                       const char *format,
+                       va_list ap);
+
+int redisAsyncCommandArgv(redisAsyncContext *ac,
+                          redisCallbackFn *fn,
+                          void *privdata,
+                          int argc,
+                          const char **argv,
+                          const size_t *argvlen);
+
+int redisAsyncFormattedCommand(redisAsyncContext *ac,
+                               redisCallbackFn *fn,
+                               void *privdata,
+                               const char *cmd,
+                               size_t len);
 ```
-Both functions work like their blocking counterparts. The return value is `REDIS_OK` when the command
+
+These functions work like their blocking counterparts. The return value is `REDIS_OK` when the command
 was successfully added to the output buffer and `REDIS_ERR` otherwise. Example: when the connection
 is being disconnected per user-request, no new commands may be added to the output buffer and `REDIS_ERR` is
 returned on calls to the `redisAsyncCommand` family.
@@ -514,14 +534,64 @@ for a command is non-`NULL`, the memory is freed immediately following the callb
 valid for the duration of the callback.
 
 All pending callbacks are called with a `NULL` reply when the context encountered an error.
-
-For every command issued, with the exception of **SUBSCRIBE** and **PSUBSCRIBE**, the callback is
-called exactly once.  Even if the context object id disconnected or deleted, every pending callback
+Even if the context object id disconnected or deleted, every pending callback
 will be called with a `NULL` reply.
 
-For **SUBSCRIBE** and **PSUBSCRIBE**, the callbacks may be called repeatedly until an `unsubscribe`
-message arrives.  This will be the last invocation of the callback. In case of error, the callbacks
-may receive a final `NULL` reply instead.
+For every command issued, with the exception of the **`[S|P][UN]SUBSCRIBE`**
+commands, the callback is called exactly once. For **SUBSCRIBE**, **PSUBSCRIBE**
+and **SSUBSCRIBE**, the callbacks are called repeatedly for each message
+arriving on the channel or pattern, until an `unsubscribe` message arrives for
+each subscribed channel or pattern. This will be the last invocation of the
+callback. In case of error, the callbacks may receive a final `NULL` reply
+instead.
+
+The callback for the **`[S|P]UNSUBSCRIBE`** commands are never called, except
+if the command returns an error. Instead, on successful unsubscribe, the
+unsubscribe replies are delivered to the callback provided to the
+**`[S|P]SUBSCRIBE`** when the channel or pattern was subscribed.
+
+#### Sending commands with callback and finalizer
+
+Most commands get exactly one reply and for these, the callback is called
+exactly once. The exception is the **`[S|P][UN]SUBSCRIBE`** functions, as
+described above. To be able to free the privdata associated with the callback, a
+finalizer can be supplied. The finalizer is called exactly once for each call to
+the following functions, after the callback function has been called for the
+last time for the command to which it was provided. A finalizer has the
+prototype `void(struct redisAsyncContext *ac, void *privdata)`. Apart from the
+finalizer, these `WithFinalizer` functions behave exactly like their
+counterparts without finalizer.
+
+```c
+int redisAsyncCommandWithFinalizer(redisAsyncContext *ac,
+                                   redisCallbackFn *fn,
+                                   redisFinalizerCallback *finalizer,
+                                   void *privdata,
+                                   const char *format,
+                                   ...);
+
+int redisvAsyncCommandWithFinalizer(redisAsyncContext *ac,
+                                    redisCallbackFn *fn,
+                                    redisFinalizerCallback *finalizer,
+                                    void *privdata,
+                                    const char *format,
+                                    va_list ap);
+
+int redisAsyncCommandArgvWithFinalizer(redisAsyncContext *ac,
+                                       redisCallbackFn *fn,
+                                       redisFinalizerCallback *finalizer,
+                                       void *privdata,
+                                       int argc,
+                                       const char **argv,
+                                       const size_t *argvlen);
+
+int redisAsyncFormattedCommandWithFinalizer(redisAsyncContext *ac,
+                                            redisCallbackFn *fn,
+                                            redisFinalizerCallback *finalizer,
+                                            void *privdata,
+                                            const char *cmd,
+                                            size_t len);
+```
 
 ### Disconnecting
 
