@@ -565,9 +565,9 @@ unsubscribe replies are delivered to the callback provided to the
 
 Most commands get exactly one reply and for these, the callback is called
 exactly once. The exception is the **`[S|P][UN]SUBSCRIBE`** functions, as
-described above. To be able to free the privdata associated with the callback, a
-finalizer can be supplied. The finalizer is called exactly once for each call to
-the following functions, after the callback function has been called for the
+described above. To be able to free the `privdata` associated with the callback,
+a finalizer can be supplied. The finalizer is called exactly once for each call
+to the following functions, after the callback function has been called for the
 last time for the command to which it was provided. A finalizer has the
 prototype `void(struct redisAsyncContext *ac, void *privdata)`. Apart from the
 finalizer, these `WithFinalizer` functions behave exactly like their
