@@ -6,6 +6,9 @@ OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
 OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
 OPTION(ENABLE_EXAMPLES "Enable building hiredis examples" OFF)
 OPTION(ENABLE_ASYNC_TESTS "Should we run all asynchronous API tests" OFF)
+# Historically, the NuGet file was always install; default
+# to ON for those who rely on that historical behaviour.
+OPTION(ENABLE_NUGET "Install NuGET packaging details" ON)
 
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
@@ -105,9 +108,11 @@ if (MSVC AND BUILD_SHARED_LIBS)
         CONFIGURATIONS Debug RelWithDebInfo)
 endif()
 
-# For NuGet packages
-INSTALL(FILES hiredis.targets
-    DESTINATION build/native)
+if (ENABLE_NUGET)
+    # For NuGet packages
+    INSTALL(FILES hiredis.targets
+        DESTINATION build/native)
+endif()
 
 INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h sockcompat.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
