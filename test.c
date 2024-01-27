@@ -795,6 +795,26 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("Can parse RESP3 attribute: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "|2\r\n+foo\r\n:123\r\n+bar\r\n#t\r\n",26);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK &&
+        ((redisReply*)reply)->type == REDIS_REPLY_ATTR &&
+        ((redisReply*)reply)->elements == 4 &&
+        ((redisReply*)reply)->element[0]->type == REDIS_REPLY_STATUS &&
+        ((redisReply*)reply)->element[0]->len == 3 &&
+        !strcmp(((redisReply*)reply)->element[0]->str,"foo") &&
+        ((redisReply*)reply)->element[1]->type == REDIS_REPLY_INTEGER &&
+        ((redisReply*)reply)->element[1]->integer == 123 &&
+        ((redisReply*)reply)->element[2]->type == REDIS_REPLY_STATUS &&
+        ((redisReply*)reply)->element[2]->len == 3 &&
+        !strcmp(((redisReply*)reply)->element[2]->str,"bar") &&
+        ((redisReply*)reply)->element[3]->type == REDIS_REPLY_BOOL &&
+        ((redisReply*)reply)->element[3]->integer);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
     test("Can parse RESP3 set: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, "~5\r\n+orange\r\n$5\r\napple\r\n#f\r\n:100\r\n:999\r\n",40);
