@@ -217,7 +217,6 @@ static void *createIntegerObject(const redisReadTask *task, long long value) {
                parent->type == REDIS_REPLY_MAP ||
                parent->type == REDIS_REPLY_ATTR ||
                parent->type == REDIS_REPLY_SET ||
-               parent->type == REDIS_REPLY_SET ||
                parent->type == REDIS_REPLY_PUSH);
         parent->element[task->idx] = r;
     }
