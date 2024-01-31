@@ -646,7 +646,7 @@ static int processItem(redisReader *r) {
         return processBulkItem(r);
     case REDIS_REPLY_ARRAY:
     case REDIS_REPLY_MAP:
-	case REDIS_REPLY_ATTR:
+    case REDIS_REPLY_ATTR:
     case REDIS_REPLY_SET:
     case REDIS_REPLY_PUSH:
         return processAggregateItem(r);
