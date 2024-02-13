@@ -1,5 +1,10 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 
+SET(VERSION_REGEX "^#define ${name} (.+)$")
+FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/hiredis.h" PROJECT_VERSION REGEX ${VERSION_REGEX})
+
+PROJECT(hiredis LANGUAGES "C" VERSION "${PROJECT_VERSION}")
+
 OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
 OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
 OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
@@ -10,21 +15,8 @@ OPTION(ENABLE_ASYNC_TESTS "Should we run all asynchronous API tests" OFF)
 # to ON for those who rely on that historical behaviour.
 OPTION(ENABLE_NUGET "Install NuGET packaging details" ON)
 
-MACRO(getVersionBit name)
-  SET(VERSION_REGEX "^#define ${name} (.+)$")
-  FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/hiredis.h"
-    VERSION_BIT REGEX ${VERSION_REGEX})
-  STRING(REGEX REPLACE ${VERSION_REGEX} "\\1" ${name} "${VERSION_BIT}")
-ENDMACRO(getVersionBit)
+MESSAGE("Detected version: ${hiredis_VERSION}")
 
-getVersionBit(HIREDIS_MAJOR)
-getVersionBit(HIREDIS_MINOR)
-getVersionBit(HIREDIS_PATCH)
-getVersionBit(HIREDIS_SONAME)
-SET(VERSION "${HIREDIS_MAJOR}.${HIREDIS_MINOR}.${HIREDIS_PATCH}")
-MESSAGE("Detected version: ${VERSION}")
-
-PROJECT(hiredis LANGUAGES "C" VERSION "${VERSION}")
 INCLUDE(GNUInstallDirs)
 
 # Hiredis requires C99
@@ -53,7 +45,7 @@ set_target_properties(hiredis PROPERTIES EXPORT_NAME ${hiredis_export_name})
 
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-    VERSION "${HIREDIS_SONAME}")
+    VERSION "${hiredis_VERSION_TWEAK}")
 IF(MSVC)
     SET_TARGET_PROPERTIES(hiredis
         PROPERTIES COMPILE_FLAGS /Z7)
@@ -169,7 +161,7 @@ IF(ENABLE_SSL)
     SET_TARGET_PROPERTIES(hiredis_ssl
         PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        VERSION "${HIREDIS_SONAME}")
+        VERSION "${hiredis_VERSION_TWEAK}")
     IF(MSVC)
         SET_TARGET_PROPERTIES(hiredis_ssl
             PROPERTIES COMPILE_FLAGS /Z7)
