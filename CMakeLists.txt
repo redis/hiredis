@@ -1,15 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
 
-OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
-OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
-OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
-OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
-OPTION(ENABLE_EXAMPLES "Enable building hiredis examples" OFF)
-OPTION(ENABLE_ASYNC_TESTS "Should we run all asynchronous API tests" OFF)
-# Historically, the NuGet file was always install; default
-# to ON for those who rely on that historical behaviour.
-OPTION(ENABLE_NUGET "Install NuGET packaging details" ON)
-
 MACRO(getVersionBit name)
   SET(VERSION_REGEX "^#define ${name} (.+)$")
   FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/hiredis.h"
@@ -26,6 +16,16 @@ MESSAGE("Detected version: ${VERSION}")
 
 PROJECT(hiredis LANGUAGES "C" VERSION "${VERSION}")
 INCLUDE(GNUInstallDirs)
+
+OPTION(BUILD_SHARED_LIBS "Build shared libraries" ON)
+OPTION(ENABLE_SSL "Build hiredis_ssl for SSL support" OFF)
+OPTION(DISABLE_TESTS "If tests should be compiled or not" OFF)
+OPTION(ENABLE_SSL_TESTS "Should we test SSL connections" OFF)
+OPTION(ENABLE_EXAMPLES "Enable building hiredis examples" OFF)
+OPTION(ENABLE_ASYNC_TESTS "Should we run all asynchronous API tests" OFF)
+# Historically, the NuGet file was always install; default
+# to ON for those who rely on that historical behaviour.
+OPTION(ENABLE_NUGET "Install NuGET packaging details" ON)
 
 # Hiredis requires C99
 SET(CMAKE_C_STANDARD 99)
