@@ -7,8 +7,5 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Check Spelling
-        uses: rojopolis/spellcheck-github-actions@0.33.1
-        with:
-          config_path: .github/spellcheck-settings.yml
-          task_name: Markdown
+      - name: Search for misspellings
+        uses: crate-ci/typos@master
