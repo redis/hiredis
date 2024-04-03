@@ -1,0 +1,14 @@
+[files]
+extend-exclude = [
+    ".git/"
+]
+ignore-hidden = false
+
+[default]
+extend-ignore-re = [
+    '"fo\\0"',
+    "/bin/sh -ue",
+]
+
+[default.extend-words]
+"clen" = "clen"
