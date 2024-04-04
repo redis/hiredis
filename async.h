@@ -108,6 +108,7 @@ typedef struct redisAsyncContext {
         redisCallbackList replies;
         struct dict *channels;
         struct dict *patterns;
+        struct dict *schannels;
         int pending_unsubs;
     } sub;
 
