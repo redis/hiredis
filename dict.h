@@ -117,6 +117,7 @@ static int dictExpand(dict *ht, unsigned long size);
 static int dictAdd(dict *ht, void *key, void *val);
 static int dictReplace(dict *ht, void *key, void *val);
 static int dictDelete(dict *ht, const void *key);
+static void dictEmpty(dict *ht);
 static void dictRelease(dict *ht);
 static dictEntry * dictFind(dict *ht, const void *key);
 static void dictInitIterator(dictIterator *iter, dict *ht);
