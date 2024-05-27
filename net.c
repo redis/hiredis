@@ -668,7 +668,11 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
     sa->sun_family = AF_UNIX;
     strncpy(sa->sun_path, path, sizeof(sa->sun_path) - 1);
     if (connect(c->fd, (struct sockaddr*)sa, sizeof(*sa)) == -1) {
+#if defined(__APPLE__) && defined(__MACH__)
+        if (errno == EINPROGRESS && !blocking) {
+#else
         if ((errno == EAGAIN || errno == EINPROGRESS) && !blocking) {
+#endif
             /* This is ok. */
         } else {
             if (redisContextWaitReady(c,timeout_msec) != REDIS_OK)
