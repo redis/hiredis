@@ -133,7 +133,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install openssl redis@7.2
+          brew install openssl@3 redis@7.2
           brew link redis@7.2 --force
 
       - name: Build hiredis
