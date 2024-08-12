@@ -1276,15 +1276,13 @@ static void test_blocking_connection_timeouts(struct config config) {
     redisContext *c;
     redisReply *reply;
     ssize_t s;
-    const char *sleep_cmd = "DEBUG SLEEP 3\r\n";
-    struct timeval tv;
+    const char *sleep_cmd = "DEBUG SLEEP 1\r\n";
+    struct timeval tv = {.tv_sec = 0, .tv_usec = 10000};
 
     c = do_connect(config);
     test("Successfully completes a command when the timeout is not exceeded: ");
     reply = redisCommand(c,"SET foo fast");
     freeReplyObject(reply);
-    tv.tv_sec = 0;
-    tv.tv_usec = 10000;
     redisSetTimeout(c, tv);
     reply = redisCommand(c, "GET foo");
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STRING && memcmp(reply->str, "fast", 4) == 0);
@@ -1302,8 +1300,6 @@ static void test_blocking_connection_timeouts(struct config config) {
         sdsfree(c->obuf);
         c->obuf = sdsempty();
 
-        tv.tv_sec = 0;
-        tv.tv_usec = 10000;
         redisSetTimeout(c, tv);
         reply = redisCommand(c, "GET foo");
 #ifndef _WIN32
@@ -1316,7 +1312,7 @@ static void test_blocking_connection_timeouts(struct config config) {
         freeReplyObject(reply);
 
         // wait for the DEBUG SLEEP to complete so that Redis server is unblocked for the following tests
-        millisleep(3000);
+        millisleep(1100);
     } else {
         test_skipped();
     }
