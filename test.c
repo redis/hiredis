@@ -1861,7 +1861,7 @@ static void test_command_timeout_during_pubsub(struct config config) {
     assert(ac != NULL && ac->err == 0);
     redisLibeventAttach(ac,base);
 
-    /* Configure a command timout */
+    /* Configure a command timeout */
     struct timeval command_timeout = {.tv_sec = 2};
     redisAsyncSetTimeout(ac,command_timeout);
 
