@@ -42,12 +42,16 @@ struct dict; /* dictionary header is included in async.c */
 
 /* Reply callback prototype and container */
 typedef void (redisCallbackFn)(struct redisAsyncContext*, void*, void*);
+typedef void (redisFinalizerCallback)(struct redisAsyncContext *ac, void *privdata);
 typedef struct redisCallback {
     struct redisCallback *next; /* simple singly linked list */
     redisCallbackFn *fn;
-    int pending_subs;
-    int unsubscribe_sent;
+    redisFinalizerCallback *finalizer;
     void *privdata;
+    unsigned int refcount;      /* Reference counter used when callback is used
+                                 * for multiple pubsub channels. */
+    int pending_replies;        /* Number of replies expected; negative values
+                                 * are special. */
 } redisCallback;
 
 /* List of callbacks for either regular replies or pub/sub */
@@ -96,23 +100,22 @@ typedef struct redisAsyncContext {
     redisConnectCallback *onConnect;
     redisConnectCallbackNC *onConnectNC;
 
-    /* Regular command callbacks */
+    /* Callback queue for pending replies */
     redisCallbackList replies;
-
-    /* Address used for connect() */
-    struct sockaddr *saddr;
-    size_t addrlen;
 
     /* Subscription callbacks */
     struct {
-        redisCallbackList replies;
         struct dict *channels;
         struct dict *patterns;
-        int pending_unsubs;
+        struct dict *shard_channels;
+        int pending_commands; /* Count pending [P|S][UN]SUBSCRIBE */
     } sub;
 
     /* Any configured RESP3 PUSH handler */
     redisAsyncPushFn *push_cb;
+
+    /* Monitor, only when MONITOR has been called. */
+    redisCallback *monitor_cb;
 } redisAsyncContext;
 
 /* Functions that proxy to hiredis */
@@ -144,6 +147,11 @@ int redisvAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdat
 int redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *format, ...);
 int redisAsyncCommandArgv(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, int argc, const char **argv, const size_t *argvlen);
 int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len);
+
+int redisvAsyncCommandWithFinalizer(redisAsyncContext *ac, redisCallbackFn *fn, redisFinalizerCallback *finalizer, void *privdata, const char *format, va_list ap);
+int redisAsyncCommandWithFinalizer(redisAsyncContext *ac, redisCallbackFn *fn, redisFinalizerCallback *finalizer, void *privdata, const char *format, ...);
+int redisAsyncCommandArgvWithFinalizer(redisAsyncContext *ac, redisCallbackFn *fn, redisFinalizerCallback *finalizer, void *privdata, int argc, const char **argv, const size_t *argvlen);
+int redisAsyncFormattedCommandWithFinalizer(redisAsyncContext *ac, redisCallbackFn *fn, redisFinalizerCallback *finalizer, void *privdata, const char *cmd, size_t len);
 
 #ifdef __cplusplus
 }

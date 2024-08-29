@@ -1635,6 +1635,14 @@ void async_disconnect(redisAsyncContext *ac) {
     event_base_loopbreak(base);
 }
 
+/* Use as disconnect callback e.g. when calling QUIT */
+void disconnectCbExpectServerClose(const struct redisAsyncContext *ac, int status) {
+    assert(status == REDIS_ERR);
+    assert(ac->err == REDIS_ERR_EOF);
+    assert(strcmp(ac->errstr, "Server closed the connection") == 0);
+    event_base_loopbreak(base);
+}
+
 /* Testcase timeout, will trigger a failure */
 void timeout_cb(int fd, short event, void *arg) {
     (void) fd; (void) event; (void) arg;
@@ -1723,6 +1731,12 @@ void null_cb(redisAsyncContext *ac, void *r, void *privdata) {
     state->checkpoint++;
 }
 
+void finalizer_cb(redisAsyncContext *ac, void *privdata) {
+    TestState *state = privdata;
+    (void)ac;
+    state->checkpoint++;
+}
+
 static void test_pubsub_handling(struct config config) {
     test("Subscribe, handle published message and unsubscribe: ");
     /* Setup event dispatcher with a testcase timeout */
@@ -1742,10 +1756,10 @@ static void test_pubsub_handling(struct config config) {
 
     /* Start subscribe */
     TestState state = {.options = &options};
-    redisAsyncCommand(ac,subscribe_cb,&state,"subscribe mychannel");
+    redisAsyncCommandWithFinalizer(ac,subscribe_cb,finalizer_cb,&state,"subscribe mychannel");
 
     /* Make sure non-subscribe commands are handled */
-    redisAsyncCommand(ac,array_cb,&state,"PING");
+    redisAsyncCommandWithFinalizer(ac,array_cb,finalizer_cb,&state,"PING");
 
     /* Start event dispatching loop */
     test_cond(event_base_dispatch(base) == 0);
@@ -1753,7 +1767,7 @@ static void test_pubsub_handling(struct config config) {
     event_base_free(base);
 
     /* Verify test checkpoints */
-    assert(state.checkpoint == 3);
+    assert(state.checkpoint == 5);
 }
 
 /* Unexpected push message, will trigger a failure */
@@ -1971,8 +1985,8 @@ static void test_pubsub_multiple_channels(struct config config) {
 
     /* Start subscribing to two channels */
     TestState state = {.options = &options};
-    redisAsyncCommand(ac,subscribe_channel_a_cb,&state,"subscribe A");
-    redisAsyncCommand(ac,subscribe_channel_b_cb,&state,"subscribe B");
+    redisAsyncCommandWithFinalizer(ac,subscribe_channel_a_cb,finalizer_cb,&state,"subscribe A");
+    redisAsyncCommandWithFinalizer(ac,subscribe_channel_b_cb,finalizer_cb,&state,"subscribe B");
 
     /* Start event dispatching loop */
     assert(event_base_dispatch(base) == 0);
@@ -1980,7 +1994,7 @@ static void test_pubsub_multiple_channels(struct config config) {
     event_base_free(base);
 
     /* Verify test checkpoints */
-    test_cond(state.checkpoint == 6);
+    test_cond(state.checkpoint == 8);
 }
 
 /* Command callback for test_monitor() */
@@ -2017,6 +2031,9 @@ void monitor_cb(redisAsyncContext *ac, void *r, void *privdata) {
     } else if (state->checkpoint == 3) {
         /* Response for monitored command 'SET second 2' */
         assert(strstr(reply->str,"second") != NULL);
+        /* To exit the event loop on server disconnect, we need to do so in a
+         * disconnect callback. */
+        redisAsyncSetDisconnectCallback(ac, disconnectCbExpectServerClose);
         /* Send QUIT to disconnect */
         redisAsyncCommand(ac,NULL,NULL,"QUIT");
     }
@@ -2058,6 +2075,107 @@ static void test_monitor(struct config config) {
     /* Verify test checkpoints */
     assert(state.checkpoint == 3);
 }
+
+/* Reset callback for test_reset() */
+static void reset_reset_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+    assert(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    assert(strncmp(reply->str, "RESET", reply->len) == 0);
+    state->checkpoint++;
+    /* Check that when the RESET callback is called, the context has already
+     * been reset. Monitor and pubsub have been cancelled. */
+    assert(!(ac->c.flags & REDIS_SUBSCRIBED));
+    assert(!(ac->c.flags & REDIS_MONITORING));
+    async_disconnect(ac);
+}
+
+/* Ping callback for test_reset() */
+static void reset_ping_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+    /* Ping returns an array in subscribed mode. */
+    assert(reply != NULL && reply->elements == 2);
+    char *str = reply->element[0]->str;
+    size_t len = reply->element[0]->len;
+    assert(strncmp(str, "pong", len) == 0);
+    state->checkpoint++;
+    redisAsyncCommandWithFinalizer(ac, reset_reset_cb, finalizer_cb, state,
+                                   "reset");
+}
+
+/* Subscribe callback for test_reset() */
+static void reset_subscribe_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+    assert(reply != NULL &&
+           reply->type == REDIS_REPLY_ARRAY &&
+           reply->elements > 0);
+    char *str = reply->element[0]->str;
+    size_t len = reply->element[0]->len;
+    assert(strncmp(str, "subscribe", len) == 0);
+    state->checkpoint++;
+    redisAsyncCommandWithFinalizer(ac, reset_ping_cb, finalizer_cb, state,
+                                   "ping");
+}
+
+/* Monitor callback for test_reset(). */
+static void reset_monitor_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+    assert(reply != NULL && reply->type == REDIS_REPLY_STATUS);
+    state->checkpoint++;
+    if (strncmp(reply->str, "OK", reply->len) == 0) {
+        /* Reply to the MONITOR command */
+        redisAsyncCommandWithFinalizer(ac, reset_subscribe_cb, finalizer_cb, state,
+                                       "subscribe %s", "ch");
+    } else {
+        /* A monitored command starts with a numeric timestamp, e.g.
+         * +1689801837.986559 [0 127.0.0.1:44308] "ping" */
+        assert(reply->str[0] >= '0' && reply->str[0] <= '9');
+    }
+}
+
+/* Check that RESET cancels all subscriptions and monitoring (Redis >= 6.2) */
+static void test_reset(struct config config) {
+    test("RESET cancels monitoring and pubsub: ");
+    /* Setup event dispatcher with a testcase timeout */
+    base = event_base_new();
+    struct event *timeout = evtimer_new(base, timeout_cb, NULL);
+    assert(timeout != NULL);
+
+    evtimer_assign(timeout,base,timeout_cb,NULL);
+    struct timeval timeout_tv = {.tv_sec = 10};
+    evtimer_add(timeout, &timeout_tv);
+
+    /* Connect */
+    redisOptions options = get_redis_tcp_options(config);
+    redisAsyncContext *ac = redisAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    redisLibeventAttach(ac,base);
+
+    /* Not expecting any push messages in this test */
+    redisAsyncSetPushCallback(ac,unexpected_push_cb);
+
+    /* Start monitor */
+    TestState state = {.options = &options};
+    redisAsyncCommandWithFinalizer(ac, reset_monitor_cb, finalizer_cb, &state,
+                                   "monitor");
+
+    /* Start event dispatching loop */
+    test_cond(event_base_dispatch(base) == 0);
+    event_free(timeout);
+    event_base_free(base);
+
+    /* Verify test checkpoint sum.
+     *
+     * Replies for monitor, subscribe, ping and reset = 4
+     * Monitored subscribe and ping = 2
+     * Finalizer for monitor, subscribe, ping, reset = 4
+     * Sum: 4 + 2 + 4 = 10 */
+    assert(state.checkpoint == 10);
+}
+
 #endif /* HIREDIS_TEST_ASYNC */
 
 /* tests for async api using polling adapter, requires no extra libraries*/
@@ -2371,7 +2489,6 @@ int main(int argc, char **argv) {
     /* Unix sockets don't exist in Windows */
     test_unix_socket = 0;
 #endif
-
     test_allocator_injection();
 
     test_format_commands();
@@ -2430,9 +2547,9 @@ int main(int argc, char **argv) {
     printf("\nTesting asynchronous API against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     cfg.type = CONN_TCP;
 
-    int major;
+    int major, minor;
     redisContext *c = do_connect(cfg);
-    get_redis_version(c, &major, NULL);
+    get_redis_version(c, &major, &minor);
     disconnect(c, 0);
 
     test_pubsub_handling(cfg);
@@ -2441,6 +2558,9 @@ int main(int argc, char **argv) {
     if (major >= 6) {
         test_pubsub_handling_resp3(cfg);
         test_command_timeout_during_pubsub(cfg);
+    }
+    if (major > 6 || (major == 6 && minor >= 2)) {
+        test_reset(cfg);
     }
 #endif /* HIREDIS_TEST_ASYNC */
 

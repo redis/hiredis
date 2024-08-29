@@ -28,6 +28,7 @@ de
 deallocation
 ElastiCache
 extensibility
+finalizer
 FPM
 getaddrinfo
 gmail
