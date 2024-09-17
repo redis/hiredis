@@ -54,6 +54,7 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/x509v3.h>
 
 #include "win32.h"
 #include "async_private.h"
@@ -96,6 +97,14 @@ typedef struct redisSSL {
 
 /* Forward declaration */
 redisContextFuncs redisContextSSLFuncs;
+
+/**
+ * OpenSSL hostname validation for OpenSSL >= 1.1.0
+ * Reference: https://wiki.openssl.org/index.php/Hostname_validation
+ */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#define HIREDIS_CHECK_SSL_SERVER_NAME
+#endif
 
 /**
  * OpenSSL global initialization and locking handling callbacks.
@@ -437,9 +446,18 @@ int redisInitiateSSLWithContext(redisContext *c, redisSSLContext *redis_ssl_ctx)
 
     if (redis_ssl_ctx->server_name) {
         if (!SSL_set_tlsext_host_name(ssl, redis_ssl_ctx->server_name)) {
-            __redisSetError(c, REDIS_ERR_OTHER, "Failed to set server_name/SNI");
+            __redisSetError(c, REDIS_ERR_OTHER,
+                "Failed to set server name for SNI");
             goto error;
         }
+#ifdef HIREDIS_CHECK_SSL_SERVER_NAME
+        SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+        if (!SSL_set1_host(ssl, redis_ssl_ctx->server_name)) {
+            __redisSetError(c, REDIS_ERR_OTHER,
+                "Failed to set server name for certificate validation");
+            goto error;
+        }
+#endif
     }
 
     if (redisSSLConnect(c, ssl) != REDIS_OK) {
