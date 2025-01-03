@@ -8,3 +8,4 @@
 *.dSYM
 tags
 compile_commands.json
+build
