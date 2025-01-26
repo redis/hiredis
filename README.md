@@ -653,6 +653,13 @@ When enabled, SSL/TLS support is built into extra `libhiredis_ssl.a` and
 `libhiredis_ssl.so` static/dynamic libraries. This leaves the original libraries
 unaffected so no additional dependencies are introduced.
 
+Run the following commands to build and install hiredis_ssl: 
+```
+$ cmake . -DENABLE_SSL=ON
+$ make USE_SSL=1
+$ sudo make install
+```
+
 ### Using it
 
 First, you'll need to make sure you include the SSL header file:
