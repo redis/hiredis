@@ -167,8 +167,8 @@ static int initOpensslLocks(void) {
 
 int redisInitOpenSSL(void)
 {
-    SSL_library_init();
 #ifdef HIREDIS_USE_CRYPTO_LOCKS
+    SSL_library_init();
     initOpensslLocks();
 #endif
 
