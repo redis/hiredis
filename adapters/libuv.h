@@ -130,6 +130,9 @@ static void redisLibuvSetTimeout(void *privdata, struct timeval tv) {
 static void redisLibuvCleanup(void *privdata) {
     redisLibuvEvents* p = (redisLibuvEvents*)privdata;
 
+    if (p == NULL)
+        return;
+    
     p->context = NULL; // indicate that context might no longer exist
     if (p->timer.data) {
         uv_close((uv_handle_t*)&p->timer, on_timer_close);
