@@ -139,3 +139,29 @@ jobs:
           HIREDIS_PATH: ${{ github.workspace }}
         run: |
           make clean && make
+
+  test-cmake-version:
+    name: Test build with CMake ${{ matrix.cmake-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cmake-version: [
+          '3.7.0', # Minimum version
+          '3.22.0', # Ubuntu 22.04 LTS
+          '3.28.0', # Ubuntu 24.04 LTS
+          '4.0.0' # Latest version
+        ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: ${{ matrix.cmake-version }}
+      - name: Install hiredis dependencies
+        run: |          
+          sudo apt-get install -y libssl-dev libevent-dev
+      - name: Build
+        run: |
+          mkdir build && cd build
+          cmake -DENABLE_SSL=ON -DENABLE_SSL_TESTS=ON -DENABLE_ASYNC_TESTS=ON -DENABLE_EXAMPLES=ON ..
+          make
