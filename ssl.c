@@ -288,27 +288,32 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
     if (capath || cacert_filename) {
 #ifdef _WIN32
         if (0 == strcmp(cacert_filename, "wincert")) {
-            win_store = CertOpenSystemStore(NULL, "Root");
-            if (!win_store) {
-                if (error) *error = REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED;
-                goto error;
-            }
-            X509_STORE* store = SSL_CTX_get_cert_store(ctx->ssl_ctx);
-            while (win_ctx = CertEnumCertificatesInStore(win_store, win_ctx)) {
-                X509* x509 = NULL;
-                x509 = d2i_X509(NULL, (const unsigned char**)&win_ctx->pbCertEncoded, win_ctx->cbCertEncoded);
-                if (x509) {
-                    if ((1 != X509_STORE_add_cert(store, x509)) ||
-                        (1 != SSL_CTX_add_client_CA(ctx->ssl_ctx, x509)))
-                    {
-                        if (error) *error = REDIS_SSL_CTX_OS_CERT_ADD_FAILED;
-                        goto error;
-                    }
-                    X509_free(x509);
+            char const* const subsystems[2] = { "Root", "CA" };
+            for (int i=0; i<2; ++i)
+            {
+                char const * const subsys = subsystems[i];
+                win_store = CertOpenSystemStore(0, subsys);
+                if (!win_store) {
+                    if (error) *error = REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED;
+                    goto error;
                 }
+                X509_STORE* store = SSL_CTX_get_cert_store(ctx->ssl_ctx);
+                while (0 != (win_ctx = CertEnumCertificatesInStore(win_store, win_ctx))) {
+                    X509* x509 = NULL;
+                    x509 = d2i_X509(NULL, (const unsigned char**)&win_ctx->pbCertEncoded, win_ctx->cbCertEncoded);
+                    if (x509) {
+                        if ((1 != X509_STORE_add_cert(store, x509)) ||
+                            (1 != SSL_CTX_add_client_CA(ctx->ssl_ctx, x509)))
+                        {
+                            if (error) *error = REDIS_SSL_CTX_OS_CERT_ADD_FAILED;
+                            goto error;
+                        }
+                        X509_free(x509);
+                    }
+                }
+                CertFreeCertificateContext(win_ctx);
+                CertCloseStore(win_store, 0);
             }
-            CertFreeCertificateContext(win_ctx);
-            CertCloseStore(win_store, 0);
         } else
 #endif
         if (!SSL_CTX_load_verify_locations(ctx->ssl_ctx, cacert_filename, capath)) {
