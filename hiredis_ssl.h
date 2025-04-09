@@ -112,8 +112,9 @@ int redisInitOpenSSL(void);
  * certificate and private key files to use for authentication. They need to
  * be both specified or omitted.
  *
- * server_name is an optional and will be used as a server name indication
- * (SNI) TLS extension.
+ * server_name is optional and will be used as a server name indication (SNI)
+ * TLS extension and to validate the hostname of the server's certificate
+ * (this requires OpenSSL 1.1.0 or newer).
  *
  * If error is non-null, it will be populated in case the context creation fails
  * (returning a NULL).
