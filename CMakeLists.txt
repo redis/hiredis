@@ -51,9 +51,13 @@ ADD_LIBRARY(hiredis::hiredis ALIAS hiredis)
 set(hiredis_export_name hiredis CACHE STRING "Name of the exported target")
 set_target_properties(hiredis PROPERTIES EXPORT_NAME ${hiredis_export_name})
 
+# Extract the first part of the HIREDIS_SONAME (major version) and use it for SOVERSION
+STRING(REGEX REPLACE "^([0-9]+)\\..*" "\\1" HIREDIS_SONAME_MAJOR "${HIREDIS_SONAME}")
+
 SET_TARGET_PROPERTIES(hiredis
     PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-    VERSION "${HIREDIS_SONAME}")
+    VERSION "${VERSION}"
+    SOVERSION "${HIREDIS_SONAME_MAJOR}")
 IF(MSVC)
     SET_TARGET_PROPERTIES(hiredis
         PROPERTIES COMPILE_FLAGS /Z7)
@@ -169,7 +173,8 @@ IF(ENABLE_SSL)
     SET_TARGET_PROPERTIES(hiredis_ssl
         PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS TRUE
-        VERSION "${HIREDIS_SONAME}")
+        VERSION "${VERSION}"
+        SOVERSION "${HIREDIS_SONAME_MAJOR}")
     IF(MSVC)
         SET_TARGET_PROPERTIES(hiredis_ssl
             PROPERTIES COMPILE_FLAGS /Z7)
