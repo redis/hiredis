@@ -34,6 +34,9 @@
 #include "async.h"
 #include "net.h"
 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
@@ -51,9 +54,6 @@
 #else
 #include <pthread.h>
 #endif
-
-#include <openssl/ssl.h>
-#include <openssl/err.h>
 
 #include "win32.h"
 #include "async_private.h"
