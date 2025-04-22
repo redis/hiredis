@@ -53,7 +53,7 @@
 #include <mstcpip.h>
 
 #ifdef _MSC_VER
-typedef long long ssize_t;
+typedef intptr_t ssize_t;
 #endif
 
 /* Emulate the parts of the BSD socket API that we need (override the winsock signatures). */
