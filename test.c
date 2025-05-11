@@ -850,7 +850,7 @@ static void test_reply_reader(void) {
 
     test("Can parse RESP3 doubles in an array: ");
     reader = redisReaderCreate();
-    redisReaderFeed(reader, "*1\r\n,3.14159265358979323846\r\n",31);
+    redisReaderFeed(reader, "*1\r\n,3.14159265358979323846\r\n",29);
     ret = redisReaderGetReply(reader,&reply);
     test_cond(ret == REDIS_OK &&
         ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
