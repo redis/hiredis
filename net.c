@@ -127,6 +127,14 @@ static int redisCreateSocket(redisContext *c, int type) {
         return REDIS_ERR;
     }
     c->fd = s;
+
+    /* Prevent file descriptor from leaking to child processes */
+    if (fcntl(s, F_SETFD, FD_CLOEXEC) == -1) {
+        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(FD_CLOEXEC)");
+        redisNetClose(c);
+        return REDIS_ERR;
+    }
+
     if (type == AF_INET) {
         if (redisSetReuseAddr(c) == REDIS_ERR) {
             return REDIS_ERR;
@@ -517,6 +525,16 @@ addrretry:
             continue;
 
         c->fd = s;
+
+#ifndef _WIN32
+        /* Prevent file descriptor from leaking to child processes */
+        if (fcntl(s, F_SETFD, FD_CLOEXEC) == -1) {
+            __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(FD_CLOEXEC)");
+            redisNetClose(c);
+            goto error;
+        }
+#endif
+
         if (redisSetBlocking(c,0) != REDIS_OK)
             goto error;
         if (c->tcp.source_addr) {
