@@ -122,18 +122,22 @@ static int redisSetReuseAddr(redisContext *c) {
 
 static int redisCreateSocket(redisContext *c, int type) {
     redisFD s;
+#ifdef SOCK_CLOEXEC
+    int flags = SOCK_STREAM;
+    if (c->flags & REDIS_OPT_SET_SOCK_CLOEXEC) {
+        flags |= SOCK_CLOEXEC;
+    }
+    if ((s = socket(type, flags, 0)) == REDIS_INVALID_FD) {
+        __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
+        return REDIS_ERR;
+    }
+#else
     if ((s = socket(type, SOCK_STREAM, 0)) == REDIS_INVALID_FD) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
+        __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
         return REDIS_ERR;
     }
+#endif /* SOCK_CLOEXEC */
     c->fd = s;
-
-    /* Prevent file descriptor from leaking to child processes */
-    if (fcntl(s, F_SETFD, FD_CLOEXEC) == -1) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(FD_CLOEXEC)");
-        redisNetClose(c);
-        return REDIS_ERR;
-    }
 
     if (type == AF_INET) {
         if (redisSetReuseAddr(c) == REDIS_ERR) {
@@ -520,20 +524,21 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
         return REDIS_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
-addrretry:
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == REDIS_INVALID_FD)
+addrretry: {
+#ifdef SOCK_CLOEXEC
+        int sock_type = p->ai_socktype;
+        if (c->flags & REDIS_OPT_SET_SOCK_CLOEXEC) {
+            sock_type |= SOCK_CLOEXEC;
+        }
+        if ((s = socket(p->ai_family, sock_type, p->ai_protocol)) == REDIS_INVALID_FD)
             continue;
+#else
+        if ((s = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == REDIS_INVALID_FD)
+            continue;
+#endif /* SOCK_CLOEXEC */
+}
 
         c->fd = s;
-
-#ifndef _WIN32
-        /* Prevent file descriptor from leaking to child processes */
-        if (fcntl(s, F_SETFD, FD_CLOEXEC) == -1) {
-            __redisSetErrorFromErrno(c,REDIS_ERR_IO,"fcntl(FD_CLOEXEC)");
-            redisNetClose(c);
-            goto error;
-        }
-#endif
 
         if (redisSetBlocking(c,0) != REDIS_OK)
             goto error;
