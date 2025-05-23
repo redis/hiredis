@@ -528,7 +528,7 @@ addrretry: {
         if (c->flags & REDIS_OPT_SET_SOCK_CLOEXEC) {
             sock_type |= SOCK_CLOEXEC;
         }
-#endif /* SOCK_CLOEXEC */
+#endif
 
         if ((s = socket(p->ai_family, sock_type, p->ai_protocol)) == REDIS_INVALID_FD)
             continue;
