@@ -128,7 +128,7 @@ static int redisCreateSocket(redisContext *c, int type) {
     if (c->flags & REDIS_OPT_SET_SOCK_CLOEXEC) {
         flags |= SOCK_CLOEXEC;
     }
-#endif /* SOCK_CLOEXEC */
+#endif
 
     if ((s = socket(type, flags, 0)) == REDIS_INVALID_FD) {
         __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
