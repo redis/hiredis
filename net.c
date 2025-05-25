@@ -122,11 +122,20 @@ static int redisSetReuseAddr(redisContext *c) {
 
 static int redisCreateSocket(redisContext *c, int type) {
     redisFD s;
-    if ((s = socket(type, SOCK_STREAM, 0)) == REDIS_INVALID_FD) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
+    int flags = SOCK_STREAM;
+
+#ifdef SOCK_CLOEXEC
+    if (c->flags & REDIS_OPT_SET_SOCK_CLOEXEC) {
+        flags |= SOCK_CLOEXEC;
+    }
+#endif
+
+    if ((s = socket(type, flags, 0)) == REDIS_INVALID_FD) {
+        __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
         return REDIS_ERR;
     }
     c->fd = s;
+
     if (type == AF_INET) {
         if (redisSetReuseAddr(c) == REDIS_ERR) {
             return REDIS_ERR;
@@ -512,11 +521,21 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
         return REDIS_ERR;
     }
     for (p = servinfo; p != NULL; p = p->ai_next) {
-addrretry:
-        if ((s = socket(p->ai_family,p->ai_socktype,p->ai_protocol)) == REDIS_INVALID_FD)
+addrretry: {
+        int sock_type = p->ai_socktype;
+
+#ifdef SOCK_CLOEXEC
+        if (c->flags & REDIS_OPT_SET_SOCK_CLOEXEC) {
+            sock_type |= SOCK_CLOEXEC;
+        }
+#endif
+
+        if ((s = socket(p->ai_family, sock_type, p->ai_protocol)) == REDIS_INVALID_FD)
             continue;
+}
 
         c->fd = s;
+
         if (redisSetBlocking(c,0) != REDIS_OK)
             goto error;
         if (c->tcp.source_addr) {

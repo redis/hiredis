@@ -835,6 +835,9 @@ redisContext *redisConnectWithOptions(const redisOptions *options) {
     if (options->options & REDIS_OPT_PREFER_IPV6) {
         c->flags |= REDIS_PREFER_IPV6;
     }
+    if (options->options & REDIS_OPT_SET_SOCK_CLOEXEC) {
+        c->flags |= REDIS_OPT_SET_SOCK_CLOEXEC;
+    }
 
     /* Set any user supplied RESP3 PUSH handler or use freeReplyObject
      * as a default unless specifically flagged that we don't want one. */
