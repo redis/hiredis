@@ -43,6 +43,7 @@ typedef intptr_t ssize_t;
 #endif
 
 #include <sys/types.h>
+
 #include <stdarg.h>
 #include <stdint.h>
 
@@ -91,7 +92,7 @@ struct __attribute__ ((__packed__)) sdshdr64 {
 #define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS)
 
 static inline size_t sdslen(const sds s) {
-    unsigned char flags = s[-1];
+    unsigned char flags = (unsigned char)s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
             return SDS_TYPE_5_LEN(flags);
@@ -108,7 +109,7 @@ static inline size_t sdslen(const sds s) {
 }
 
 static inline size_t sdsavail(const sds s) {
-    unsigned char flags = s[-1];
+    unsigned char flags = (unsigned char)s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5: {
             return 0;
@@ -134,7 +135,7 @@ static inline size_t sdsavail(const sds s) {
 }
 
 static inline void sdssetlen(sds s, size_t newlen) {
-    unsigned char flags = s[-1];
+    unsigned char flags = (unsigned char)s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
             {
@@ -158,7 +159,7 @@ static inline void sdssetlen(sds s, size_t newlen) {
 }
 
 static inline void sdsinclen(sds s, size_t inc) {
-    unsigned char flags = s[-1];
+    unsigned char flags = (unsigned char)s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
             {
@@ -184,7 +185,7 @@ static inline void sdsinclen(sds s, size_t inc) {
 
 /* sdsalloc() = sdsavail() + sdslen() */
 static inline size_t sdsalloc(const sds s) {
-    unsigned char flags = s[-1];
+    unsigned char flags = (unsigned char)s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
             return SDS_TYPE_5_LEN(flags);
@@ -201,7 +202,7 @@ static inline size_t sdsalloc(const sds s) {
 }
 
 static inline void sdssetalloc(sds s, size_t newlen) {
-    unsigned char flags = s[-1];
+    unsigned char flags = (unsigned char)s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
             /* Nothing to do, this type has no total allocation info. */
