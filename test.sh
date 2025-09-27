@@ -11,7 +11,14 @@ SKIPS_ARG=${SKIPS_ARG:-}
 REDIS_DOCKER=${REDIS_DOCKER:-}
 
 # We need to enable the DEBUG command for redis-server >= 7.0.0
-REDIS_MAJOR_VERSION="$(${REDIS_SERVER} --version|awk -F'[^0-9]+' '{ print $2 }')"
+if [ -n "${REDIS_DOCKER}" ]; then
+    REDIS_VERSION="$(docker run --rm ${REDIS_DOCKER} ${REDIS_SERVER} --version)"
+else
+    REDIS_VERSION="$(${REDIS_SERVER} --version)"
+fi
+
+# Enable debug command for redis >= 7.0.0
+REDIS_MAJOR_VERSION="$(echo ${REDIS_VERSION} | awk -F'[^0-9]+' '{ print $2 }')"
 if [ "$REDIS_MAJOR_VERSION" -gt "6" ]; then
     ENABLE_DEBUG_CMD="enable-debug-command local"
 fi
@@ -57,7 +64,11 @@ cleanup() {
     set +e
     kill $(cat ${PID_FILE})
   fi
-  rm -rf ${tmpdir}
+
+  # Make failure to remove the temp dir non-fatal
+  rm -rf -- "${tmpdir}" 2>/dev/null || {
+    echo "warning: failed to remove temp dir: ${tmpdir}" >&2
+  }
 }
 trap cleanup INT TERM EXIT
 

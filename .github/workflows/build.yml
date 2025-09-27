@@ -97,8 +97,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install openssl redis@8.0
-          brew link redis@8.0 --force
+          brew install openssl redis
+          brew link redis --force
 
       - name: Build hiredis
         run: USE_SSL=1 make
@@ -158,7 +158,7 @@ jobs:
         with:
           cmake-version: ${{ matrix.cmake-version }}
       - name: Install hiredis dependencies
-        run: |          
+        run: |
           sudo apt-get install -y libssl-dev libevent-dev
       - name: Build
         run: |
