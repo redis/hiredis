@@ -29,7 +29,9 @@ OPTION(ENABLE_NUGET "Install NuGET packaging details" ON)
 
 # Hiredis requires C99
 SET(CMAKE_C_STANDARD 99)
-SET(CMAKE_DEBUG_POSTFIX d)
+IF(NOT DEFINED CMAKE_DEBUG_POSTFIX)
+    SET(CMAKE_DEBUG_POSTFIX d)
+ENDIF()
 
 SET(hiredis_sources
     alloc.c
