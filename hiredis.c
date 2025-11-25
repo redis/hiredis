@@ -772,7 +772,7 @@ int redisReconnect(redisContext *c) {
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
-    if (c->privctx && c->funcs->free_privctx) {
+    if (c->privctx && c->funcs && c->funcs->free_privctx) {
         c->funcs->free_privctx(c->privctx);
         c->privctx = NULL;
     }
