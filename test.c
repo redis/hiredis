@@ -1884,6 +1884,91 @@ static void test_command_timeout_during_pubsub(struct config config) {
     test_cond(state.checkpoint == 5);
 }
 
+/* Callbacks for test_disconnect_during_pubsub (Issue #1320):
+ * - on subscribe response, schedule PING + redisAsyncDisconnect outside
+ *   of the hiredis callback
+ * - verifies that PING reply is delivered before disconnect */
+void disconnect_during_pubsub_cb(redisAsyncContext *ac, void *r, void *privdata);
+
+static void disconnect_during_pubsub_timer_cb(int fd, short event, void *arg) {
+    (void)fd; (void)event;
+    redisAsyncContext *ac = arg;
+    TestState *state = (TestState *)ac->data;
+    assert(state != NULL);
+
+    /* NOTE: issue #1320 reproduces when disconnect is called outside
+     * of a hiredis callback. Schedule PING+disconnect from the event loop. */
+    redisAsyncCommand(ac, disconnect_during_pubsub_cb, state, "ping");
+    redisAsyncDisconnect(ac);
+}
+
+void disconnect_during_pubsub_cb(redisAsyncContext *ac, void *r, void *privdata) {
+    redisReply *reply = r;
+    TestState *state = privdata;
+
+    /* The non-clean disconnect should trigger the callback with a NULL reply. */
+    if (reply == NULL) {
+        event_base_loopbreak(base);
+        return;
+    }
+
+    int is_subscribe_reply = reply->type == REDIS_REPLY_PUSH &&
+        reply->elements == 3 &&
+        strcmp(reply->element[0]->str, "subscribe") == 0;
+    int is_ping_reply = reply->type == REDIS_REPLY_STATUS &&
+        strcmp(reply->str, "PONG") == 0;
+
+    /* checkpoint 1: SUBSCRIBE response */
+    if (is_subscribe_reply) {
+        state->checkpoint = 1;
+
+        /* Send PING and disconnect from outside the hiredis callback */
+        struct timeval tv = {0, 0};
+        event_base_once(base, -1, EV_TIMEOUT, disconnect_during_pubsub_timer_cb, ac, &tv);
+
+        return;
+    }
+
+    /* checkpoint 2: PING response */
+    if (is_ping_reply) {
+        state->checkpoint = 2;
+        event_base_loopbreak(base);
+        return;
+    }
+
+    printf("Unexpected pubsub command: %s\n", reply->str);
+    exit(1);
+}
+
+static void test_disconnect_during_pubsub(struct config config) {
+    test("Disconnect during pubsub waits for pending replies: ");
+
+    /* Setup event dispatcher */
+    base = event_base_new();
+    redisOptions options = get_redis_tcp_options(config);
+    redisAsyncContext *ac = redisAsyncConnectWithOptions(&options);
+    assert(ac != NULL && ac->err == 0);
+    redisLibeventAttach(ac, base);
+
+    /* Precondition 1: Switch to RESP3 */
+    redisAsyncCommand(ac, NULL, NULL, "HELLO 3");
+
+    /* Precondition 2: Subscribe to a channel */
+    TestState state = {.options = &options, .checkpoint = 0, .resp3 = 1};
+    ac->data = &state;
+    redisAsyncCommand(ac, disconnect_during_pubsub_cb, &state, "subscribe mychannel");
+
+    /* Start event dispatching loop */
+    assert(event_base_dispatch(base) == 0);
+    event_base_free(base);
+
+    /* Verify test checkpoints:
+     * checkpoint==1: SUBSCRIBE response
+     * checkpoint==2: PING response
+     */
+    test_cond(state.checkpoint == 2);
+}
+
 /* Subscribe callback for test_pubsub_multiple_channels */
 void subscribe_channel_a_cb(redisAsyncContext *ac, void *r, void *privdata) {
     redisReply *reply = r;
@@ -2441,6 +2526,7 @@ int main(int argc, char **argv) {
     if (major >= 6) {
         test_pubsub_handling_resp3(cfg);
         test_command_timeout_during_pubsub(cfg);
+        test_disconnect_during_pubsub(cfg);
     }
 #endif /* HIREDIS_TEST_ASYNC */
 
