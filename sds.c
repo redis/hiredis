@@ -874,6 +874,7 @@ void sdsfreesplitres(sds *tokens, int count) {
  * references must be substituted with the new pointer returned by the call. */
 sds sdscatrepr(sds s, const char *p, size_t len) {
     s = sdscatlen(s,"\"",1);
+    if (s == NULL) return NULL;
     while(len--) {
         switch(*p) {
         case '\\':
@@ -892,6 +893,7 @@ sds sdscatrepr(sds s, const char *p, size_t len) {
                 s = sdscatprintf(s,"\\x%02x",(unsigned char)*p);
             break;
         }
+        if (s == NULL) return NULL;
         p++;
     }
     return sdscatlen(s,"\"",1);
