@@ -38,6 +38,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -261,10 +262,10 @@ int redisContextSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
 
 #define __MAX_MSEC (((LONG_MAX) - 999) / 1000)
 
-static int redisContextTimeoutMsec(redisContext *c, long *result)
+static int redisContextTimeoutMsec(redisContext *c, int_least64_t *result)
 {
     const struct timeval *timeout = c->connect_timeout;
-    long msec = -1;
+    int_least64_t msec = -1;
 
     /* Only use timeout when not NULL. */
     if (timeout != NULL) {
@@ -274,7 +275,7 @@ static int redisContextTimeoutMsec(redisContext *c, long *result)
             return REDIS_ERR;
         }
 
-        msec = (timeout->tv_sec * 1000) + ((timeout->tv_usec + 999) / 1000);
+        msec = (timeout->tv_sec * INT64_C(1000)) + ((timeout->tv_usec + 999) / 1000);
 
         if (msec < 0 || msec > INT_MAX) {
             msec = INT_MAX;
@@ -285,45 +286,63 @@ static int redisContextTimeoutMsec(redisContext *c, long *result)
     return REDIS_OK;
 }
 
-static long redisPollMillis(void) {
+static int_least64_t redisPollMillis(void) {
 #ifndef _MSC_VER
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    return (now.tv_sec * 1000) + now.tv_nsec / 1000000;
+    return (now.tv_sec * INT64_C(1000)) + now.tv_nsec / 1000000;
 #else
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
-    return (((long long)ft.dwHighDateTime << 32) | ft.dwLowDateTime) / 10;
+    return (((int_least64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime) / 10;
 #endif
 }
 
-static int redisContextWaitReady(redisContext *c, long msec) {
-    struct pollfd wfd;
-    long end;
-    int res;
-
+static int redisContextWaitReady(redisContext *c, int_least64_t msec) {
     if (errno != EINPROGRESS) {
-        __redisSetErrorFromErrno(c,REDIS_ERR_IO,NULL);
+        __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
         redisNetClose(c);
         return REDIS_ERR;
     }
 
-    wfd.fd = c->fd;
-    wfd.events = POLLOUT;
-    end = msec >= 0 ? redisPollMillis() + msec : 0;
+    int res;
+    struct pollfd wfd = {
+        .fd = c->fd,
+        .events = POLLOUT
+    };
+    int_least64_t end = msec >= 0 ? redisPollMillis() + msec : 0;
+    int poll_timeout = msec > INT_MAX ? INT_MAX : (msec < 0 ? -1 : (int)msec);
 
-    while ((res = poll(&wfd, 1, msec)) <= 0) {
-        if (res < 0 && errno != EINTR) {
-            __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
-            redisNetClose(c);
-            return REDIS_ERR;
-        } else if (res == 0 || (msec >= 0 && redisPollMillis() >= end)) {
+    for (;;) {
+        res = poll(&wfd, 1, poll_timeout);
+        if (res > 0) {
+            /* success */
+            break;
+        }
+        int err = errno;
+        int_least64_t now = redisPollMillis();
+        if (poll_timeout != -1 && now >= end) {
+            /* timeout (res==0) or theoretical interrupted non-inifinite poll returning
+             * after it should have returned 0 (timeout) or a theoretical error returned
+             * after it should have returned 0 */
             errno = ETIMEDOUT;
             __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
             redisNetClose(c);
             return REDIS_ERR;
-        } else {
-            /* res < 0 && errno == EINTR, try again */
+        } else if(res < 0) {
+            /* error */
+            if (err != EINTR) {
+                errno = err;
+                __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
+                redisNetClose(c);
+                return REDIS_ERR;
+            }
+            /* EINTR, try again */
+        }
+        if (poll_timeout != -1) {
+            /* recalculate the time to poll if it wasn't an infinite poll that got EINTR */
+            msec = end - now;
+            poll_timeout = msec > INT_MAX ? INT_MAX : (int)msec;
         }
     }
 
@@ -454,7 +473,7 @@ static int _redisContextConnectTcp(redisContext *c, const char *addr, int port,
     int blocking = (c->flags & REDIS_BLOCK);
     int reuseaddr = (c->flags & REDIS_REUSEADDR);
     int reuses = 0;
-    long timeout_msec = -1;
+    int_least64_t timeout_msec = -1;
 
     servinfo = NULL;
     c->connection_type = REDIS_CONN_TCP;
@@ -649,7 +668,7 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
 #ifndef _WIN32
     int blocking = (c->flags & REDIS_BLOCK);
     struct sockaddr_un *sa;
-    long timeout_msec = -1;
+    int_least64_t timeout_msec = -1;
 
     if (redisCreateSocket(c,AF_UNIX) < 0)
         return REDIS_ERR;
