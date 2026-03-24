@@ -535,7 +535,21 @@ static int processAggregateItem(redisReader *r) {
 
             moveToNextTask(r);
         } else {
-            if (cur->type == REDIS_REPLY_MAP || cur->type == REDIS_REPLY_ATTR) elements *= 2;
+            if (cur->type == REDIS_REPLY_MAP || cur->type == REDIS_REPLY_ATTR) {
+                long long maxelements = LLONG_MAX / 2;
+                if (LLONG_MAX > SIZE_MAX &&
+                    maxelements > (long long)(SIZE_MAX / 2)) {
+                    maxelements = (long long)(SIZE_MAX / 2);
+                }
+
+                if (elements > maxelements) {
+                    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                            "Multi-bulk length out of range");
+                    return REDIS_ERR;
+                }
+
+                elements *= 2;
+            }
 
             if (r->fn && r->fn->createArray)
                 obj = r->fn->createArray(cur,elements);
