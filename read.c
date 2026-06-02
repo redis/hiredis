@@ -47,6 +47,26 @@
 #include "sds.h"
 #include "win32.h"
 
+#ifndef HIREDIS_FLOAT_STRTOD
+/* RESP3 doubles are parsed with ffc (pure-C99 single header) by default: it is
+ * several times faster than strtod(), locale-independent (strtod honours
+ * LC_NUMERIC, which misparses the always-'.'-separated RESP3 doubles in a
+ * non-'.' locale), and parses a [start,end) range directly so no NUL-terminated
+ * copy is needed. Define HIREDIS_FLOAT_STRTOD to fall back to strtod(). */
+#define FFC_IMPL   /* emit ffc's implementation in this (sole) translation unit */
+#include "ffc.h"
+/* Length-bounded, case-insensitive compare so the RESP3 inf/nan tokens can be
+ * recognised in the reader buffer without copying + NUL-terminating first.
+ * `tok` is a lowercase ASCII literal. */
+static int hiTokCaseEq(const char *p, const char *tok, size_t n) {
+    size_t i;
+    for (i = 0; i < n; i++) {
+        if (tolower((unsigned char)p[i]) != (unsigned char)tok[i]) return 0;
+    }
+    return 1;
+}
+#endif
+
 /* Initial size of our nested reply stack and how much we grow it when needd */
 #define REDIS_READER_STACK_SIZE 9
 
@@ -288,14 +308,51 @@ static int processLineItem(redisReader *r) {
                 obj = (void*)REDIS_REPLY_INTEGER;
             }
         } else if (cur->type == REDIS_REPLY_DOUBLE) {
-            char buf[326], *eptr;
             double d;
 
-            if ((size_t)len >= sizeof(buf)) {
+            /* Cap kept identical to the strtod path (buf[326]) so the
+             * "Double value is too large" boundary is unchanged. */
+            if ((size_t)len >= 326) {
                 __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                         "Double value is too large");
                 return REDIS_ERR;
             }
+
+#ifndef HIREDIS_FLOAT_STRTOD
+            /* RESP3 only allows "inf", "-inf", "nan", "-nan" and finite values.
+             * Recognise the special tokens strictly here (directly in the reader
+             * buffer, no copy), and tell ffc to reject inf/nan (NO_INFNAN) so it
+             * only ever yields finite values on the numeric path. */
+            if (len == 3 && hiTokCaseEq(p,"inf",3)) {
+                d = INFINITY; /* Positive infinite. */
+            } else if (len == 4 && hiTokCaseEq(p,"-inf",4)) {
+                d = -INFINITY; /* Negative infinite. */
+            } else if ((len == 3 && hiTokCaseEq(p,"nan",3)) ||
+                       (len == 4 && hiTokCaseEq(p,"-nan",4))) {
+                d = NAN; /* nan. */
+            } else {
+                ffc_parse_options o = ffc_parse_options_default();
+                o.format |= FFC_FORMAT_FLAG_NO_INFNAN;
+                ffc_result res = ffc_from_chars_double_options(p, p + len, &d, o);
+                /* Require the whole token to be consumed and the result finite,
+                 * matching the strtod path's eptr/isfinite checks exactly. */
+                if (res.outcome != FFC_OUTCOME_OK || res.ptr != p + len ||
+                    !isfinite(d)) {
+                    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                            "Bad double value");
+                    return REDIS_ERR;
+                }
+            }
+
+            if (r->fn && r->fn->createDouble) {
+                /* createDouble copies the textual form itself; hand it the
+                 * reader buffer directly (no intermediate copy). */
+                obj = r->fn->createDouble(cur,d,p,len);
+            } else {
+                obj = (void*)REDIS_REPLY_DOUBLE;
+            }
+#else
+            char buf[326], *eptr;
 
             memcpy(buf,p,len);
             buf[len] = '\0';
@@ -325,6 +382,7 @@ static int processLineItem(redisReader *r) {
             } else {
                 obj = (void*)REDIS_REPLY_DOUBLE;
             }
+#endif
         } else if (cur->type == REDIS_REPLY_NIL) {
             if (len != 0) {
                 __redisReaderSetError(r,REDIS_ERR_PROTOCOL,

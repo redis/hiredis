@@ -728,6 +728,44 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("Parses RESP3 double edge magnitudes bit-exactly: ");
+    {
+        static const struct { const char *resp; double val; } dcases[] = {
+            {",0\r\n", 0.0}, {",-0\r\n", -0.0}, {",1.5\r\n", 1.5},
+            {",-2.25\r\n", -2.25}, {",1e308\r\n", 1e308}, {",5e-324\r\n", 5e-324},
+            {",2.2250738585072014e-308\r\n", 2.2250738585072014e-308},
+            {",1.7976931348623157e308\r\n", 1.7976931348623157e308},
+        };
+        size_t i; int ok = 1;
+        for (i = 0; i < sizeof(dcases)/sizeof(dcases[0]); i++) {
+            reader = redisReaderCreate();
+            redisReaderFeed(reader, dcases[i].resp, strlen(dcases[i].resp));
+            if (redisReaderGetReply(reader,&reply) != REDIS_OK || reply == NULL ||
+                ((redisReply*)reply)->type != REDIS_REPLY_DOUBLE ||
+                ((redisReply*)reply)->dval != dcases[i].val) ok = 0;
+            freeReplyObject(reply);
+            redisReaderFree(reader);
+        }
+        test_cond(ok);
+    }
+
+    test("Rejects malformed RESP3 doubles: ");
+    {
+        static const char *bad[] = {
+            ",\r\n", ",1.2.3\r\n", ",1e\r\n", ",+\r\n", ",.\r\n",
+            ",1,5\r\n", ",abc\r\n", ",3.14x\r\n",
+        };
+        size_t i; int ok = 1;
+        for (i = 0; i < sizeof(bad)/sizeof(bad[0]); i++) {
+            reader = redisReaderCreate();
+            redisReaderFeed(reader, bad[i], strlen(bad[i]));
+            if (redisReaderGetReply(reader,&reply) != REDIS_ERR) ok = 0;
+            freeReplyObject(reply);
+            redisReaderFree(reader);
+        }
+        test_cond(ok);
+    }
+
     test("Can parse RESP3 nil: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, "_\r\n",3);
