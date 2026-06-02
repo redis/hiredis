@@ -742,7 +742,10 @@ static void test_reply_reader(void) {
             redisReaderFeed(reader, dcases[i].resp, strlen(dcases[i].resp));
             if (redisReaderGetReply(reader,&reply) != REDIS_OK || reply == NULL ||
                 ((redisReply*)reply)->type != REDIS_REPLY_DOUBLE ||
-                ((redisReply*)reply)->dval != dcases[i].val) ok = 0;
+                ((redisReply*)reply)->dval != dcases[i].val ||
+                /* also compare the sign bit, so "-0" must parse to -0.0 and not
+                 * +0.0 (which == would otherwise accept) */
+                signbit(((redisReply*)reply)->dval) != signbit(dcases[i].val)) ok = 0;
             freeReplyObject(reply);
             redisReaderFree(reader);
         }
