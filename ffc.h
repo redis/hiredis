@@ -2822,7 +2822,7 @@ ffc_adjusted_mantissa ffc_negative_digit_comp(
   ffc_adjusted_mantissa am_b = am;
   ffc_round_down(&am_b, vk);
   ffc_value b;
-  ffc_am_to_float(false, am_b, &b, FFC_VALUE_KIND_DOUBLE);
+  ffc_am_to_float(false, am_b, &b, vk);
 
   ffc_adjusted_mantissa theor = ffc_to_extended_halfway(b, vk);
   ffc_bigint theor_digits = ffc_bigint_make(theor.mantissa);
