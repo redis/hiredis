@@ -146,7 +146,7 @@ jobs:
     strategy:
       matrix:
         cmake-version: [
-          '3.7.0', # Minimum version
+          '3.15.0', # Minimum version
           '3.22.0', # Ubuntu 22.04 LTS
           '3.28.0', # Ubuntu 24.04 LTS
           '4.0.0' # Latest version
