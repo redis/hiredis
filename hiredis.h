@@ -46,9 +46,9 @@ typedef intptr_t ssize_t;
 #include "alloc.h" /* for allocation wrappers */
 
 #define HIREDIS_MAJOR 1
-#define HIREDIS_MINOR 3
+#define HIREDIS_MINOR 4
 #define HIREDIS_PATCH 0
-#define HIREDIS_SONAME 1.3.0
+#define HIREDIS_SONAME 1.4.0
 
 /* Connection type can be blocking or non-blocking and is set in the
  * least significant bit of the flags field in redisContext. */
