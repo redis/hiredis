@@ -6,7 +6,7 @@ jobs:
     name: Ubuntu
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     container: rockylinux:8
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -79,10 +79,10 @@ jobs:
     runs-on: ubuntu-latest
     name:  FreeBSD
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Build in FreeBSD
-        uses: vmactions/freebsd-vm@v1.0.5
+        uses: vmactions/freebsd-vm@v1
         with:
           prepare: pkg install -y gmake cmake
           run: |
@@ -93,7 +93,7 @@ jobs:
     name: macOS
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -112,7 +112,7 @@ jobs:
     name: Windows
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -152,7 +152,7 @@ jobs:
           '4.0.0' # Latest version
         ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
