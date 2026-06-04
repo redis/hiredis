@@ -527,14 +527,18 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
                 /* Move ongoing regular command callbacks. */
                 redisCallback cb;
                 while (__redisShiftCallback(&ac->sub.replies,&cb) == REDIS_OK) {
-                    __redisPushCallback(&ac->replies,&cb);
+                    if (__redisPushCallback(&ac->replies,&cb) != REDIS_OK) {
+                        goto oom;
+                    }
                 }
             }
         }
         sdsfree(sname);
     } else {
         /* Shift callback for pending command in subscribed context. */
-        __redisShiftCallback(&ac->sub.replies,dstcb);
+        if (__redisShiftCallback(&ac->sub.replies,dstcb) != REDIS_OK) {
+            goto oom;
+        }   
     }
     return REDIS_OK;
 oom:
