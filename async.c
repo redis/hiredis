@@ -463,7 +463,7 @@ void redisAsyncDisconnect(redisAsyncContext *ac) {
 
     /** unset the auto-free flag here, because disconnect undoes this */
     c->flags &= ~REDIS_NO_AUTO_FREE;
-    if (!(c->flags & REDIS_IN_CALLBACK) && ac->replies.head == NULL)
+    if (!(c->flags & REDIS_IN_CALLBACK) && ac->replies.head == NULL && ac->sub.replies.head == NULL)
         __redisAsyncDisconnect(ac);
 }
 
@@ -577,7 +577,7 @@ void redisProcessCallbacks(redisAsyncContext *ac) {
             /* When the connection is being disconnected and there are
              * no more replies, this is the cue to really disconnect. */
             if (c->flags & REDIS_DISCONNECTING && sdslen(c->obuf) == 0
-                && ac->replies.head == NULL) {
+                && ac->replies.head == NULL && ac->sub.replies.head == NULL) {
                 __redisAsyncDisconnect(ac);
                 return;
             }
