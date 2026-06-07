@@ -99,27 +99,27 @@ sds sdsnewlen(const void *init, size_t initlen) {
     fp = ((unsigned char*)s)-1;
     switch(type) {
         case SDS_TYPE_5: {
-            *fp = type | (initlen << SDS_TYPE_BITS);
+            *fp = type | ((char)initlen << SDS_TYPE_BITS);
             break;
         }
         case SDS_TYPE_8: {
             SDS_HDR_VAR(8,s);
-            sh->len = initlen;
-            sh->alloc = initlen;
+            sh->len = (uint8_t) initlen;
+            sh->alloc = (uint8_t) initlen;
             *fp = type;
             break;
         }
         case SDS_TYPE_16: {
             SDS_HDR_VAR(16,s);
-            sh->len = initlen;
-            sh->alloc = initlen;
+            sh->len = (uint16_t)initlen;
+            sh->alloc = (uint16_t)initlen;
             *fp = type;
             break;
         }
         case SDS_TYPE_32: {
             SDS_HDR_VAR(32,s);
-            sh->len = initlen;
-            sh->alloc = initlen;
+            sh->len = (uint32_t)initlen;
+            sh->alloc = (uint32_t)initlen;
             *fp = type;
             break;
         }
@@ -431,7 +431,7 @@ sds sdscpy(sds s, const char *t) {
  * The function returns the length of the null-terminated string
  * representation stored at 's'. */
 #define SDS_LLSTR_SIZE 21
-int sdsll2str(char *s, long long value) {
+size_t sdsll2str(char *s, long long value) {
     char *p, aux;
     unsigned long long v;
     size_t l;
@@ -463,7 +463,7 @@ int sdsll2str(char *s, long long value) {
 }
 
 /* Identical sdsll2str(), but for unsigned long long type. */
-int sdsull2str(char *s, unsigned long long v) {
+size_t sdsull2str(char *s, unsigned long long v) {
     char *p, aux;
     size_t l;
 
@@ -497,7 +497,7 @@ int sdsull2str(char *s, unsigned long long v) {
  */
 sds sdsfromlonglong(long long value) {
     char buf[SDS_LLSTR_SIZE];
-    int len = sdsll2str(buf,value);
+    size_t len = sdsll2str(buf,value);
 
     return sdsnewlen(buf,len);
 }
@@ -583,7 +583,7 @@ sds sdscatprintf(sds s, const char *fmt, ...) {
  */
 sds sdscatfmt(sds s, char const *fmt, ...) {
     const char *f = fmt;
-    long i;
+    size_t i;
     va_list ap;
 
     va_start(ap,fmt);
@@ -789,7 +789,7 @@ int sdscmp(const sds s1, const sds s2) {
     l2 = sdslen(s2);
     minlen = (l1 < l2) ? l1 : l2;
     cmp = memcmp(s1,s2,minlen);
-    if (cmp == 0) return l1-l2;
+    if (cmp == 0) return l1 < l2 ? -1 : 1;
     return cmp;
 }
 
