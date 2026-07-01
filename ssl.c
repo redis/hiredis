@@ -401,18 +401,16 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
 
     if (capath || cacert_filename) {
 #ifdef _WIN32
-        if (cacert_filename != NULL && 0 == strcmp(cacert_filename, "wincert")) {
+        if (cacert_filename != NULL &&
+            (0 == strcmp(cacert_filename, "wincert") ||
+             0 == strcmp(cacert_filename, "wincert_with_ca")))
+        {
             if (redisLoadWinCertStore(ctx->ssl_ctx, "Root", error) != REDIS_OK) {
                 goto error;
             }
-            /* Not every system has a CA store available. Loading it gives
-             * OpenSSL extra chain-building certificates, but failure to open
-             * it should not make wincert unusable. */
-            redisSSLContextError ca_error = REDIS_SSL_CTX_NONE;
-            if (redisLoadWinCertStore(ctx->ssl_ctx, "CA", &ca_error) != REDIS_OK &&
-                ca_error != REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED)
-            {
-                if (error) *error = ca_error;
+
+            if (0 == strcmp(cacert_filename, "wincert_with_ca") &&
+                redisLoadWinCertStore(ctx->ssl_ctx, "CA", error) != REDIS_OK) {
                 goto error;
             }
         } else
