@@ -557,6 +557,12 @@ static int processAggregateItem(redisReader *r) {
     long long elements;
     int root = 0, len;
 
+    if (r->maxdepth > 0 && r->ridx >= r->maxdepth) {
+        __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                "Max nesting depth exceeded");
+        return REDIS_ERR;
+    }
+
     if (r->ridx == r->tasks - 1) {
         if (redisReaderGrow(r) == REDIS_ERR)
             return REDIS_ERR;
@@ -751,6 +757,7 @@ redisReader *redisReaderCreateWithFunctions(redisReplyObjectFunctions *fn) {
     r->fn = fn;
     r->maxbuf = REDIS_READER_MAX_BUF;
     r->maxelements = REDIS_READER_MAX_ARRAY_ELEMENTS;
+    r->maxdepth = REDIS_READER_MAX_REPLY_DEPTH;
     r->ridx = -1;
 
     return r;

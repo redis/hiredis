@@ -497,6 +497,46 @@ static void test_reply_reader(void) {
     freeReplyObject(root);
     redisReaderFree(reader);
 
+    test("Reader sets a default maximum nesting depth: ");
+    reader = redisReaderCreate();
+    test_cond(reader->maxdepth == REDIS_READER_MAX_REPLY_DEPTH);
+    redisReaderFree(reader);
+
+    test("Can parse a reply at the maximum nesting depth: ");
+    reader = redisReaderCreate();
+    reader->fn = NULL;
+    for (i = 0; i < REDIS_READER_MAX_REPLY_DEPTH; i++) {
+        redisReaderFeed(reader,(char*)"*1\r\n",4);
+    }
+    redisReaderFeed(reader,(char*)"+OK\r\n",5);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK && reply == (void*)REDIS_REPLY_ARRAY);
+    redisReaderFree(reader);
+
+    test("Set error when nesting depth exceeds the configured maximum: ");
+    reader = redisReaderCreate();
+    for (i = 0; i <= REDIS_READER_MAX_REPLY_DEPTH; i++) {
+        redisReaderFeed(reader,(char*)"*1\r\n",4);
+    }
+    redisReaderFeed(reader,(char*)"+OK\r\n",5);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Max nesting depth exceeded") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
+    test("Can disable the maximum nesting depth: ");
+    reader = redisReaderCreate();
+    reader->maxdepth = 0;
+    reader->fn = NULL;
+    for (i = 0; i <= REDIS_READER_MAX_REPLY_DEPTH; i++) {
+        redisReaderFeed(reader,(char*)"*1\r\n",4);
+    }
+    redisReaderFeed(reader,(char*)"+OK\r\n",5);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK && reply == (void*)REDIS_REPLY_ARRAY);
+    redisReaderFree(reader);
+
     test("Correctly parses LLONG_MAX: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, ":9223372036854775807\r\n",22);
