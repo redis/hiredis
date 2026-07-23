@@ -457,22 +457,28 @@ static int processBulkItem(redisReader *r) {
     void *obj = NULL;
     char *p, *s;
     long long len;
-    unsigned long bytelen;
+    size_t hdrlen;
+    size_t itemlen = 0;
     int success = 0;
 
     p = r->buf+r->pos;
     s = seekNewline(p,r->len-r->pos);
     if (s != NULL) {
         p = r->buf+r->pos;
-        bytelen = s-(r->buf+r->pos)+2; /* include \r\n */
+        /* Header line including trailing CRLF. Use size_t so LLP64 (Windows
+         * x64) cannot truncate when the bulk payload length is large. */
+        hdrlen = (size_t)(s-(r->buf+r->pos)+2); /* include \r\n */
 
-        if (string2ll(p, bytelen - 2, &len) == REDIS_ERR) {
+        if (string2ll(p, hdrlen - 2, &len) == REDIS_ERR) {
             __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                     "Bad bulk string length");
             return REDIS_ERR;
         }
 
-        if (len < -1 || (LLONG_MAX > SIZE_MAX && len > (long long)SIZE_MAX)) {
+        /* Reject negative (except nil) and lengths that cannot fit in size_t.
+         * The old LLONG_MAX > SIZE_MAX guard is false on 64-bit size_t hosts,
+         * so large lengths must still be range-checked explicitly. */
+        if (len < -1 || (len >= 0 && (unsigned long long)len > (unsigned long long)SIZE_MAX)) {
             __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                     "Bulk string length out of range");
             return REDIS_ERR;
@@ -484,11 +490,17 @@ static int processBulkItem(redisReader *r) {
                 obj = r->fn->createNil(cur);
             else
                 obj = (void*)REDIS_REPLY_NIL;
+            itemlen = hdrlen;
             success = 1;
         } else {
             /* Only continue when the buffer contains the entire bulk item. */
-            bytelen += len+2; /* include \r\n */
-            if (r->pos+bytelen <= r->len) {
+            if ((unsigned long long)len > (unsigned long long)SIZE_MAX - hdrlen - 2) {
+                __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                        "Bulk string length out of range");
+                return REDIS_ERR;
+            }
+            itemlen = hdrlen + (size_t)len + 2; /* payload + trailing CRLF */
+            if (r->pos <= SIZE_MAX - itemlen && r->pos + itemlen <= r->len) {
                 if ((cur->type == REDIS_REPLY_VERB && len < 4) ||
                     (cur->type == REDIS_REPLY_VERB && s[5] != ':'))
                 {
@@ -498,7 +510,7 @@ static int processBulkItem(redisReader *r) {
                     return REDIS_ERR;
                 }
                 if (r->fn && r->fn->createString)
-                    obj = r->fn->createString(cur,s+2,len);
+                    obj = r->fn->createString(cur,s+2,(size_t)len);
                 else
                     obj = (void*)(uintptr_t)cur->type;
                 success = 1;
@@ -512,7 +524,7 @@ static int processBulkItem(redisReader *r) {
                 return REDIS_ERR;
             }
 
-            r->pos += bytelen;
+            r->pos += itemlen;
 
             /* Set reply if this is the root object. */
             if (r->ridx == 0) r->reply = obj;
