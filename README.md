@@ -638,6 +638,11 @@ unlimited with:
 context->reader->maxelements = 0;
 ```
 
+### Reader max nesting depth
+
+The hiredis reply parser limits nested aggregate replies to a depth of 1024.
+Replies with deeper nesting are rejected with a protocol error.
+
 ## SSL/TLS Support
 
 ### Building
