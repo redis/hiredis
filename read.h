@@ -104,7 +104,6 @@ typedef struct redisReader {
     size_t len; /* Buffer length */
     size_t maxbuf; /* Max length of unused buffer */
     long long maxelements; /* Max multi-bulk elements */
-    int maxdepth; /* Max nested aggregate reply depth */
 
     redisReadTask **task;
     int tasks;
@@ -114,6 +113,8 @@ typedef struct redisReader {
 
     redisReplyObjectFunctions *fn;
     void *privdata;
+
+    int maxdepth; /* Max nested aggregate reply depth */
 } redisReader;
 
 /* Public API for the protocol parser. */
