@@ -131,6 +131,10 @@ jobs:
             section libhiredis_ssl "$SSL_VERDICT" "$SSL_SUMMARY" "$SSL_REPORT" abidiff-report-hiredis-ssl
             echo "_Baseline \`${BASE_SHA}\` vs head \`${HEAD_SHA}\`. Apply the \`ignore-abi-check\` label to skip this check for an intentional, SONAME-bumped ABI break._"
           } > abi-comment.md
+          # Publish the same report as the workflow run summary, so it is
+          # visible on the run overview even when the sticky comment cannot
+          # be posted (e.g. fork PRs with a read-only token)
+          cat abi-comment.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post combined sticky comment
         if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
