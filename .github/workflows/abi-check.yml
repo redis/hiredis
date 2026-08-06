@@ -1,0 +1,140 @@
+name: ABI check
+
+on:
+  pull_request:
+    # Default types plus labeled/unlabeled so toggling the
+    # ignore-abi-check escape-hatch label re-evaluates the job condition
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches:
+      - master
+      - 'release/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  abi-check:
+    name: ABI compatibility (libabigail)
+    runs-on: ubuntu-latest
+    # Escape hatch for intentional, SONAME-bumped ABI breaks
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'ignore-abi-check') }}
+    steps:
+      - name: Checkout head (PR merge ref)
+        uses: actions/checkout@v4
+        with:
+          path: head
+
+      - name: Checkout base (${{ github.base_ref }})
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+
+      - name: Get compiler version (for cache key)
+        id: cc
+        run: echo "version=$(cc -dumpfullversion -dumpversion)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache baseline libraries
+        id: cache-base
+        uses: actions/cache@v4
+        with:
+          path: base-libs
+          key: abi-base-libs-${{ runner.os }}-cc${{ steps.cc.outputs.version }}-${{ github.event.pull_request.base.sha }}
+
+      - name: Build base libraries
+        if: steps.cache-base.outputs.cache-hit != 'true'
+        run: |
+          make -C base dynamic USE_SSL=1
+          mkdir -p base-libs
+          cp base/libhiredis.so base/libhiredis_ssl.so base-libs/
+
+      - name: Build head libraries
+        run: make -C head dynamic USE_SSL=1
+
+      - name: ABI check libhiredis
+        id: abi-core
+        uses: fujitatomoya/libabigail-action@v0
+        with:
+          base-lib: base-libs/libhiredis.so
+          head-lib: head/libhiredis.so
+          headers-dir-base: base
+          headers-dir-head: head
+          fail-on: incompatible
+          comment-pr: false
+          label-break: abi-break
+          report-name: abidiff-report-hiredis
+
+      - name: ABI check libhiredis_ssl
+        id: abi-ssl
+        if: ${{ !cancelled() }}
+        uses: fujitatomoya/libabigail-action@v0
+        with:
+          base-lib: base-libs/libhiredis_ssl.so
+          head-lib: head/libhiredis_ssl.so
+          headers-dir-base: base
+          headers-dir-head: head
+          fail-on: incompatible
+          comment-pr: false
+          label-break: abi-break
+          report-name: abidiff-report-hiredis-ssl
+
+      - name: Compose combined ABI report
+        if: ${{ !cancelled() }}
+        env:
+          CORE_VERDICT: ${{ steps.abi-core.outputs.verdict }}
+          CORE_SUMMARY: ${{ steps.abi-core.outputs.summary }}
+          CORE_REPORT: ${{ steps.abi-core.outputs.report }}
+          SSL_VERDICT: ${{ steps.abi-ssl.outputs.verdict }}
+          SSL_SUMMARY: ${{ steps.abi-ssl.outputs.summary }}
+          SSL_REPORT: ${{ steps.abi-ssl.outputs.report }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # GitHub comments are capped at 65536 chars; leave room for two reports
+          REPORT_LIMIT=25000
+          emoji() {
+            case "$1" in
+              compatible|additions-only) echo "✅" ;;
+              incompatible) echo "❌" ;;
+              *) echo "⚠️" ;;
+            esac
+          }
+          section() { # <lib name> <verdict> <summary> <report path> <artifact name>
+            echo "### $(emoji "$2") \`$1\` — ${2:-error}"
+            echo ""
+            echo "${3:-No summary produced (check the job log).}"
+            echo ""
+            if [ -n "$4" ] && [ -f "$4" ] && [ -s "$4" ]; then
+              echo "<details><summary>Full abidiff report</summary>"
+              echo ""
+              echo '```'
+              head -c "$REPORT_LIMIT" "$4"
+              if [ "$(wc -c < "$4")" -gt "$REPORT_LIMIT" ]; then
+                echo ""
+                echo "... (truncated — full report in the \`$5\` artifact)"
+              fi
+              echo '```'
+              echo ""
+              echo "</details>"
+              echo ""
+            fi
+          }
+          {
+            echo "## ABI compatibility check"
+            echo ""
+            section libhiredis "$CORE_VERDICT" "$CORE_SUMMARY" "$CORE_REPORT" abidiff-report-hiredis
+            section libhiredis_ssl "$SSL_VERDICT" "$SSL_SUMMARY" "$SSL_REPORT" abidiff-report-hiredis-ssl
+            echo "_Baseline \`${BASE_SHA}\` vs head \`${HEAD_SHA}\`. Apply the \`ignore-abi-check\` label to skip this check for an intentional, SONAME-bumped ABI break._"
+          } > abi-comment.md
+
+      - name: Post combined sticky comment
+        if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: abi-check
+          path: abi-comment.md
