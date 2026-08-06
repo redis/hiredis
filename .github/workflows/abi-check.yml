@@ -1,0 +1,81 @@
+name: ABI check
+
+on:
+  pull_request:
+    branches:
+      - master
+      - 'release/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  abi-check:
+    name: ABI compatibility (libabigail)
+    runs-on: ubuntu-latest
+    # Escape hatch for intentional, SONAME-bumped ABI breaks
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'ignore-abi-check') }}
+    steps:
+      - name: Checkout head (PR merge ref)
+        uses: actions/checkout@v4
+        with:
+          path: head
+
+      - name: Checkout base (${{ github.base_ref }})
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+
+      - name: Get compiler version (for cache key)
+        id: cc
+        run: echo "version=$(cc -dumpfullversion -dumpversion)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache baseline libraries
+        id: cache-base
+        uses: actions/cache@v4
+        with:
+          path: base-libs
+          key: abi-base-libs-${{ runner.os }}-cc${{ steps.cc.outputs.version }}-${{ github.event.pull_request.base.sha }}
+
+      - name: Build base libraries
+        if: steps.cache-base.outputs.cache-hit != 'true'
+        run: |
+          make -C base dynamic USE_SSL=1
+          mkdir -p base-libs
+          cp base/libhiredis.so base/libhiredis_ssl.so base-libs/
+
+      - name: Build head libraries
+        run: make -C head dynamic USE_SSL=1
+
+      - name: ABI check libhiredis
+        uses: fujitatomoya/libabigail-action@v0
+        with:
+          base-lib: base-libs/libhiredis.so
+          head-lib: head/libhiredis.so
+          headers-dir-base: base
+          headers-dir-head: head
+          fail-on: incompatible
+          comment-pr: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          label-break: abi-break
+          report-name: abidiff-report-hiredis
+          marker-suffix: abi-check-hiredis
+
+      - name: ABI check libhiredis_ssl
+        if: ${{ !cancelled() }}
+        uses: fujitatomoya/libabigail-action@v0
+        with:
+          base-lib: base-libs/libhiredis_ssl.so
+          head-lib: head/libhiredis_ssl.so
+          headers-dir-base: base
+          headers-dir-head: head
+          fail-on: incompatible
+          comment-pr: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          label-break: abi-break
+          report-name: abidiff-report-hiredis-ssl
+          marker-suffix: abi-check-hiredis-ssl
