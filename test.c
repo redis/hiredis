@@ -793,6 +793,16 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("A RESP3 MAP can't overflow: ");
+    reader = redisReaderCreate();
+    reader->maxelements = 0; /* Don't rely on default limit */
+    redisReaderFeed(reader, "%4611686018427387904\r\n", 22);
+    ret = redisReaderGetReply(reader, &reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr, "Multi-bulk length out of range") == 0);
+    redisReaderFree(reader);
+
+
     test("Can parse RESP3 set: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, "~5\r\n+orange\r\n$5\r\napple\r\n#f\r\n:100\r\n:999\r\n",40);
