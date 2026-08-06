@@ -1,5 +1,10 @@
-name-template: '$NEXT_MAJOR_VERSION'
-tag-template: 'v$NEXT_MAJOR_VERSION'
+name-template: '$NEXT_PATCH_VERSION'
+tag-template: 'v$NEXT_PATCH_VERSION'
+commitish: release/v1.2.X
+# Only consider 1.2.x releases when resolving the previous release, the next
+# patch version, and the draft to update. This keeps this maintenance line
+# isolated from master and from the other release branches.
+filter-by-range: '1.2.x'
 autolabeler:
   - label: 'maintenance'
     files:
@@ -46,4 +51,3 @@ template: |
   We'd like to thank all the contributors who worked on this release!
 
   $CONTRIBUTORS
-
