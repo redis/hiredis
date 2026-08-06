@@ -1,0 +1,29 @@
+name: Release Drafter
+
+on:
+  push:
+    # draft a new patch release when changes land on this maintenance branch
+    branches:
+      - release/v1.0.X
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update_release_draft:
+    permissions:
+      # write permission is required to create a github release
+      contents: write
+      # required for the autolabeler
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      # Drafts the next patch release for the release/v1.0.X maintenance branch
+      - uses: release-drafter/release-drafter@v7
+        with:
+          # (Optional) specify config name to use, relative to .github/. Default: release-drafter.yml
+          config-name: release-drafter-config.yml
+          commitish: release/v1.0.X
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
