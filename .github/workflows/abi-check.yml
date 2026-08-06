@@ -2,6 +2,9 @@ name: ABI check
 
 on:
   pull_request:
+    # Default types plus labeled/unlabeled so toggling the
+    # ignore-abi-check escape-hatch label re-evaluates the job condition
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     branches:
       - master
       - 'release/**'
