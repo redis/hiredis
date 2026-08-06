@@ -406,7 +406,7 @@ static void test_reply_reader(void) {
     redisReaderFree(reader);
 
     reader = redisReaderCreate();
-    test("Can handle arbitrarily nested multi-bulks: ");
+    test("Can handle deeply nested multi-bulks: ");
     for (i = 0; i < 128; i++) {
         redisReaderFeed(reader,(char*)"*1\r\n", 4);
     }
@@ -417,7 +417,7 @@ static void test_reply_reader(void) {
         ((redisReply*)reply)->type == REDIS_REPLY_ARRAY &&
         ((redisReply*)reply)->elements == 1);
 
-    test("Can parse arbitrarily nested multi-bulks correctly: ");
+    test("Can parse deeply nested multi-bulks correctly: ");
     while(i--) {
         assert(reply != NULL && ((redisReply*)reply)->type == REDIS_REPLY_ARRAY);
         reply = ((redisReply*)reply)->element[0];
@@ -425,6 +425,29 @@ static void test_reply_reader(void) {
     test_cond(((redisReply*)reply)->type == REDIS_REPLY_STRING &&
         !memcmp(((redisReply*)reply)->str, "LOLWUT", 6));
     freeReplyObject(root);
+    redisReaderFree(reader);
+
+    test("Can parse a reply at the maximum nesting depth: ");
+    reader = redisReaderCreate();
+    reader->fn = NULL;
+    for (i = 0; i < 1024; i++) {
+        redisReaderFeed(reader,(char*)"*1\r\n",4);
+    }
+    redisReaderFeed(reader,(char*)"+OK\r\n",5);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_OK && reply == (void*)REDIS_REPLY_ARRAY);
+    redisReaderFree(reader);
+
+    test("Set error when nesting depth exceeds the maximum: ");
+    reader = redisReaderCreate();
+    for (i = 0; i <= 1024; i++) {
+        redisReaderFeed(reader,(char*)"*1\r\n",4);
+    }
+    redisReaderFeed(reader,(char*)"+OK\r\n",5);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Max nesting depth exceeded") == 0);
+    freeReplyObject(reply);
     redisReaderFree(reader);
 
     test("Correctly parses LLONG_MAX: ");

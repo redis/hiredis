@@ -50,6 +50,9 @@
 /* Initial size of our nested reply stack and how much we grow it when needd */
 #define REDIS_READER_STACK_SIZE 9
 
+/* Maximum depth of nested aggregate replies. */
+#define REDIS_READER_MAX_REPLY_DEPTH 1024
+
 static void __redisReaderSetError(redisReader *r, int type, const char *str) {
     size_t len;
 
@@ -453,7 +456,12 @@ static int processAggregateItem(redisReader *r) {
     long long elements;
     int root = 0, len;
 
-    /* Set error for nested multi bulks with depth > 7 */
+    if (r->ridx >= REDIS_READER_MAX_REPLY_DEPTH) {
+        __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                "Max nesting depth exceeded");
+        return REDIS_ERR;
+    }
+
     if (r->ridx == r->tasks - 1) {
         if (redisReaderGrow(r) == REDIS_ERR)
             return REDIS_ERR;
