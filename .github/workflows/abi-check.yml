@@ -69,6 +69,15 @@ jobs:
           label-break: abi-break
           report-name: abidiff-report-hiredis
 
+      # The action writes its report to a fixed path in RUNNER_TEMP, so the
+      # second invocation overwrites the first one's report — snapshot each
+      # report to a unique path right after the step that produced it
+      - name: Snapshot libhiredis report
+        if: ${{ !cancelled() }}
+        env:
+          REPORT: ${{ steps.abi-core.outputs.report }}
+        run: if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then cp -f "$REPORT" abidiff-hiredis.txt; fi
+
       - name: ABI check libhiredis_ssl
         id: abi-ssl
         if: ${{ !cancelled() }}
@@ -83,15 +92,21 @@ jobs:
           label-break: abi-break
           report-name: abidiff-report-hiredis-ssl
 
+      - name: Snapshot libhiredis_ssl report
+        if: ${{ !cancelled() }}
+        env:
+          REPORT: ${{ steps.abi-ssl.outputs.report }}
+        run: if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then cp -f "$REPORT" abidiff-hiredis-ssl.txt; fi
+
       - name: Compose combined ABI report
         if: ${{ !cancelled() }}
         env:
           CORE_VERDICT: ${{ steps.abi-core.outputs.verdict }}
           CORE_SUMMARY: ${{ steps.abi-core.outputs.summary }}
-          CORE_REPORT: ${{ steps.abi-core.outputs.report }}
+          CORE_REPORT: abidiff-hiredis.txt
           SSL_VERDICT: ${{ steps.abi-ssl.outputs.verdict }}
           SSL_SUMMARY: ${{ steps.abi-ssl.outputs.summary }}
-          SSL_REPORT: ${{ steps.abi-ssl.outputs.report }}
+          SSL_REPORT: abidiff-hiredis-ssl.txt
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -110,6 +125,10 @@ jobs:
             echo "${3:-No summary produced (check the job log).}"
             echo ""
             if [ -n "$4" ] && [ -f "$4" ] && [ -s "$4" ]; then
+              # Show abidiff's own change counts — the action's verdict text
+              # can mislabel layout changes as additions
+              grep -E '^(Functions|Variables) changes summary|^ELF SONAME changed' "$4" | sed 's/^/- /' || true
+              echo ""
               echo "<details><summary>Full abidiff report</summary>"
               echo ""
               echo '```'
