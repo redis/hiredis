@@ -69,6 +69,9 @@
 /* Default multi-bulk element limit */
 #define REDIS_READER_MAX_ARRAY_ELEMENTS ((1LL<<32) - 1)
 
+/* Default maximum depth of nested aggregate replies. */
+#define REDIS_READER_MAX_REPLY_DEPTH 1024
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -110,6 +113,8 @@ typedef struct redisReader {
 
     redisReplyObjectFunctions *fn;
     void *privdata;
+
+    int maxdepth; /* Max nested aggregate reply depth */
 } redisReader;
 
 /* Public API for the protocol parser. */
