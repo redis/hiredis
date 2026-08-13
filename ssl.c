@@ -36,6 +36,7 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/x509v3.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -60,6 +61,25 @@
 #include "hiredis_ssl.h"
 
 #define OPENSSL_1_1_0 0x10100000L
+#define OPENSSL_1_0_2 0x10002000L
+
+/* Peer certificate name verification (redisSSLOptions.verify_name) relies on
+ * the X509_VERIFY_PARAM host/IP API, available since OpenSSL 1.0.2. Building
+ * against an older OpenSSL is a hard error by default, so a build cannot
+ * silently lack the check. Defining HIREDIS_NO_PEER_NAME_VERIFICATION compiles
+ * the feature out: it is both the required opt-out for building against an
+ * older OpenSSL and a way to disable the feature on any OpenSSL version. When
+ * compiled out, requesting verify_name fails context creation (fail closed)
+ * rather than silently skipping the check. */
+#if defined(HIREDIS_NO_PEER_NAME_VERIFICATION)
+#define HIREDIS_SSL_SUPPORTS_VERIFY_NAME 0
+#elif OPENSSL_VERSION_NUMBER >= OPENSSL_1_0_2
+#define HIREDIS_SSL_SUPPORTS_VERIFY_NAME 1
+#else
+#error "redisSSLOptions.verify_name requires OpenSSL 1.0.2 or newer. Build against a \
+newer OpenSSL, or define HIREDIS_NO_PEER_NAME_VERIFICATION to build without peer \
+certificate name verification."
+#endif
 
 void __redisSetError(redisContext *c, int type, const char *str);
 
@@ -198,6 +218,8 @@ const char *redisSSLContextGetError(redisSSLContextError error)
             return "Failed to open system certificate store";
         case REDIS_SSL_CTX_OS_CERT_ADD_FAILED:
             return "Failed to add CA certificates obtained from system to the SSL context";
+        case REDIS_SSL_CTX_VERIFY_NAME_FAILED:
+            return "Failed to set the expected peer certificate name for verification";
         default:
             return "Unknown error code";
     }
@@ -242,6 +264,30 @@ redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *
     return redisCreateSSLContextWithOptions(&options, error);
 }
 
+#if HIREDIS_SSL_SUPPORTS_VERIFY_NAME
+/* Bind the SSL_CTX to an expected peer identity: every certificate accepted
+ * through this context must carry `name` (a DNS name matched against the SAN
+ * entries, with CN as a fallback per OpenSSL rules, or an IP address literal
+ * matched against IP SAN entries) in addition to chaining to a trusted CA.
+ * Returns 1 on success, 0 on failure. */
+static int redisSSLContextSetVerifyName(SSL_CTX *ssl_ctx, const char *name) {
+    X509_VERIFY_PARAM *param = SSL_CTX_get0_param(ssl_ctx);
+
+    /* Reject partial-label wildcards (e.g. "f*.example.com"); a full-label
+     * "*.example.com" still matches. */
+    X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+
+    /* An IP address literal must be matched against IP SAN entries, which
+     * X509_VERIFY_PARAM_set1_host() does not do. set1_ip_asc() doubles as the
+     * IP literal detector: it fails on anything that does not parse as an
+     * IPv4/IPv6 address, in which case `name` is treated as a DNS name. */
+    if (X509_VERIFY_PARAM_set1_ip_asc(param, name) == 1)
+        return 1;
+
+    return X509_VERIFY_PARAM_set1_host(param, name, 0);
+}
+#endif
+
 redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redisSSLContextError *error) {
     const char *cacert_filename = options->cacert_filename;
     const char *capath = options->capath;
@@ -278,6 +324,22 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
 #endif
 
     SSL_CTX_set_verify(ctx->ssl_ctx, options->verify_mode, NULL);
+
+    if (options->verify_name) {
+#if HIREDIS_SSL_SUPPORTS_VERIFY_NAME
+        if (!redisSSLContextSetVerifyName(ctx->ssl_ctx, options->verify_name)) {
+            if (error) *error = REDIS_SSL_CTX_VERIFY_NAME_FAILED;
+            goto error;
+        }
+#else
+        /* Peer name verification is compiled out
+         * (HIREDIS_NO_PEER_NAME_VERIFICATION): an explicit verification
+         * request that cannot be honored must fail, not silently degrade to
+         * CA-only validation. */
+        if (error) *error = REDIS_SSL_CTX_VERIFY_NAME_FAILED;
+        goto error;
+#endif
+    }
 
     if ((cert_filename != NULL && private_key_filename == NULL) ||
             (private_key_filename != NULL && cert_filename == NULL)) {
