@@ -271,6 +271,14 @@ redisSSLContext *redisCreateSSLContext(const char *cacert_filename, const char *
  * matched against IP SAN entries) in addition to chaining to a trusted CA.
  * Returns 1 on success, 0 on failure. */
 static int redisSSLContextSetVerifyName(SSL_CTX *ssl_ctx, const char *name) {
+    /* No certificate can carry an empty identity, and OpenSSL reads an empty
+     * name as "clear the expected hosts" and reports success, which would leave
+     * the context with CA-only validation while the caller believes an identity
+     * was bound. A verification request that cannot be honored must fail, as it
+     * does when the feature is compiled out; pass NULL to skip verification. */
+    if (name[0] == '\0')
+        return 0;
+
     X509_VERIFY_PARAM *param = SSL_CTX_get0_param(ssl_ctx);
 
     /* Reject partial-label wildcards (e.g. "f*.example.com"); a full-label

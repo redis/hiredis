@@ -2468,6 +2468,23 @@ static void test_ssl_verify_name(struct config config) {
     c = do_ssl_connect_with_verify_name(config, "10.99.99.99");
     test_cond(c->err != 0);
     redisFree(c);
+
+    /* An empty name is not a usable identity, and OpenSSL reads it as "clear
+     * the expected hosts" while reporting success. Context creation must reject
+     * it rather than hand back a context that silently validates only the CA
+     * chain; callers skip verification by passing NULL. */
+    test("SSL verify_name rejects an empty expected name: ");
+    redisSSLContextError ssl_error = REDIS_SSL_CTX_NONE;
+    redisSSLOptions options = {
+        .cacert_filename = config.ssl.ca_cert,
+        .cert_filename = config.ssl.cert,
+        .private_key_filename = config.ssl.key,
+        .verify_mode = REDIS_SSL_VERIFY_PEER,
+        .verify_name = "",
+    };
+    redisSSLContext *ssl_ctx = redisCreateSSLContextWithOptions(&options, &ssl_error);
+    test_cond(ssl_ctx == NULL && ssl_error == REDIS_SSL_CTX_VERIFY_NAME_FAILED);
+    redisFreeSSLContext(ssl_ctx);
 }
 #endif
 
