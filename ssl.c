@@ -284,7 +284,10 @@ static int redisSSLContextSetVerifyName(SSL_CTX *ssl_ctx, const char *name) {
     if (X509_VERIFY_PARAM_set1_ip_asc(param, name) == 1)
         return 1;
 
-    return X509_VERIFY_PARAM_set1_host(param, name, 0);
+    /* Pass the length explicitly rather than 0: OpenSSL reads 0 as "call
+     * strlen", but BoringSSL rejects a zero length outright, which would fail
+     * every DNS name. */
+    return X509_VERIFY_PARAM_set1_host(param, name, strlen(name));
 }
 #endif
 
