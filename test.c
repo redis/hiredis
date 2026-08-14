@@ -2485,6 +2485,18 @@ static void test_ssl_verify_name(struct config config) {
     redisSSLContext *ssl_ctx = redisCreateSSLContextWithOptions(&options, &ssl_error);
     test_cond(ssl_ctx == NULL && ssl_error == REDIS_SSL_CTX_VERIFY_NAME_FAILED);
     redisFreeSSLContext(ssl_ctx);
+
+    /* A name cannot be enforced while peer verification is disabled: OpenSSL
+     * completes the handshake regardless of the verification result, so a
+     * wrong-name certificate would be accepted. REDIS_SSL_VERIFY_NONE is 0, so
+     * this is also what a zero-initialized redisSSLOptions asks for. */
+    test("SSL verify_name is rejected when peer verification is disabled: ");
+    ssl_error = REDIS_SSL_CTX_NONE;
+    options.verify_mode = REDIS_SSL_VERIFY_NONE;
+    options.verify_name = config.ssl.verify_name;
+    ssl_ctx = redisCreateSSLContextWithOptions(&options, &ssl_error);
+    test_cond(ssl_ctx == NULL && ssl_error == REDIS_SSL_CTX_VERIFY_NAME_FAILED);
+    redisFreeSSLContext(ssl_ctx);
 }
 #endif
 

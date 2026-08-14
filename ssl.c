@@ -279,6 +279,16 @@ static int redisSSLContextSetVerifyName(SSL_CTX *ssl_ctx, const char *name) {
     if (name[0] == '\0')
         return 0;
 
+    /* A name can only be enforced if the peer certificate is verified at all.
+     * Under SSL_VERIFY_NONE OpenSSL still records a mismatch as the verify
+     * result but completes the handshake anyway, and this path never inspects
+     * that result, so a wrong-name certificate would be accepted while the
+     * caller believes the name is protecting them. Note REDIS_SSL_VERIFY_NONE
+     * is 0, so a zero-initialized redisSSLOptions lands here. Refuse rather
+     * than silently not enforce. */
+    if (!(SSL_CTX_get_verify_mode(ssl_ctx) & SSL_VERIFY_PEER))
+        return 0;
+
     X509_VERIFY_PARAM *param = SSL_CTX_get0_param(ssl_ctx);
 
     /* Reject partial-label wildcards (e.g. "f*.example.com"); a full-label

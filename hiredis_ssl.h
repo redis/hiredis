@@ -87,9 +87,13 @@ typedef struct {
      * certificate must carry, verified as part of the TLS handshake. When
      * NULL, only CA chain validation is performed and ANY certificate issued
      * by a trusted CA is accepted, regardless of the identity it carries.
-     * Use NULL, not an empty string, to skip verification: an empty name is
-     * rejected with REDIS_SSL_CTX_VERIFY_NAME_FAILED rather than silently
-     * accepting any identity.
+     * Requires verify_mode to include REDIS_SSL_VERIFY_PEER: without it the
+     * handshake completes regardless of the verification result, so a name
+     * could not be enforced. Use NULL, not an empty string, to skip
+     * verification. Anything that would leave the name unenforced -- an empty
+     * name, peer verification disabled, or a build without name verification
+     * support -- is rejected with REDIS_SSL_CTX_VERIFY_NAME_FAILED rather than
+     * silently accepting any identity.
      * Note that server_name is used for SNI routing only and does NOT verify
      * the peer's identity. */
     const char *verify_name;
