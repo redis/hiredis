@@ -2424,9 +2424,19 @@ static redisContext *do_ssl_connect_with_verify_name(struct config config, const
  * config.ssl.verify_name (a DNS name) and config.ssl.host (an IP address), so
  * a context bound to either must connect, while a context bound to a name the
  * certificate does not carry must fail its handshake even though the
- * certificate chains to the trusted CA. The last case is the impersonation
- * scenario this option exists to close: without verify_name, ANY certificate
- * from the trusted CA is accepted regardless of the identity it carries. */
+ * certificate chains to the trusted CA. The mismatch cases are the
+ * impersonation scenario this option exists to close: without verify_name, ANY
+ * certificate from the trusted CA is accepted regardless of the identity it
+ * carries.
+ *
+ * Both polarities are covered for each kind of name, because DNS names and IP
+ * addresses are matched by different OpenSSL machinery (X509_check_host()
+ * against DNS SANs versus X509_check_ip() against IP SANs). The positive IP
+ * case proves the IP path is taken at all -- an IP handed to
+ * X509_VERIFY_PARAM_set1_host() would be compared against DNS entries and
+ * fail -- while the negative IP case proves that path actually compares the
+ * address rather than merely accepting any certificate that happens to carry
+ * an IP SAN. */
 static void test_ssl_verify_name(struct config config) {
     redisContext *c;
     redisReply *reply;
@@ -2449,6 +2459,13 @@ static void test_ssl_verify_name(struct config config) {
 
     test("SSL verify_name rejects a trusted certificate lacking the expected name: ");
     c = do_ssl_connect_with_verify_name(config, "wrong.example.com");
+    test_cond(c->err != 0);
+    redisFree(c);
+
+    /* A well-formed address that the certificate does not carry: the IP SAN
+     * present in the certificate must not satisfy a different expected IP. */
+    test("SSL verify_name rejects a trusted certificate lacking the expected IP address: ");
+    c = do_ssl_connect_with_verify_name(config, "10.99.99.99");
     test_cond(c->err != 0);
     redisFree(c);
 }
