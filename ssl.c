@@ -477,8 +477,11 @@ static int redisSSLConnect(redisContext *c, SSL *ssl) {
             snprintf(err,sizeof(err)-1,"SSL_connect failed: %s",strerror(errno));
         else {
             unsigned long e = ERR_peek_last_error();
+            const char *reason = ERR_reason_error_string(e);
+            /* The error queue may be empty, e.g. when the handshake fails on
+             * a socket read that timed out; don't print "(null)". */
             snprintf(err,sizeof(err)-1,"SSL_connect failed: %s",
-                    ERR_reason_error_string(e));
+                    reason ? reason : "unknown error");
         }
         __redisSetError(c, REDIS_ERR_IO, err);
     }
