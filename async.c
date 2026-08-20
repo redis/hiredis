@@ -29,6 +29,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* turn of windows warnings for _strcmp etc. */
+#define _CRT_NONSTDC_NO_DEPRECATE
+
 #include "fmacros.h"
 #include "alloc.h"
 #include <stdlib.h>
@@ -75,7 +78,7 @@ static void *callbackValDup(void *privdata, const void *src) {
 }
 
 static int callbackKeyCompare(void *privdata, const void *key1, const void *key2) {
-    int l1, l2;
+    size_t l1, l2;
     ((void) privdata);
 
     l1 = sdslen((const sds)key1);

@@ -51,7 +51,7 @@ static int _dictInit(dict *ht, dictType *type, void *privDataPtr);
 
 /* Generic hash function (a popular one from Bernstein).
  * I tested a few and this was the best. */
-static unsigned int dictGenHashFunction(const unsigned char *buf, int len) {
+static unsigned int dictGenHashFunction(const unsigned char *buf, size_t len) {
     unsigned int hash = 5381;
 
     while (len--)
