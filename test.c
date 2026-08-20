@@ -1408,6 +1408,14 @@ static void test_blocking_connection_timeouts(struct config config) {
         test_skipped();
     }
 
+    /* The 10ms timeout is only needed by the timeout tests above; if it stays
+     * on the context, redisReconnect() re-applies it to the new socket and the
+     * TLS handshake in do_reconnect() must then finish every read within it,
+     * which is flaky on slow machines. */
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+    redisSetTimeout(c, tv);
+
     test("Reconnect properly reconnects after a timeout: ");
     do_reconnect(c, config);
     reply = redisCommand(c, "PING");
