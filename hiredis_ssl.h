@@ -59,7 +59,8 @@ typedef enum {
     REDIS_SSL_CTX_CLIENT_DEFAULT_CERT_FAILED,   /* Failed to set client default certificate directory */
     REDIS_SSL_CTX_PRIVATE_KEY_LOAD_FAILED,      /* Failed to load private key */
     REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED,     /* Failed to open system certificate store */
-    REDIS_SSL_CTX_OS_CERT_ADD_FAILED            /* Failed to add CA certificates obtained from system to the SSL context */
+    REDIS_SSL_CTX_OS_CERT_ADD_FAILED,           /* Failed to add CA certificates obtained from system to the SSL context */
+    REDIS_SSL_CTX_VERIFY_NAME_FAILED            /* Failed to set the expected peer certificate name for verification */
 } redisSSLContextError;
 
 /* Constants that mirror OpenSSL's verify modes. By default,
@@ -81,6 +82,21 @@ typedef struct {
     const char *private_key_filename;
     const char *server_name;
     int verify_mode;
+    /* Expected peer certificate identity: a single DNS name (SAN, with CN as a
+     * fallback per OpenSSL rules) or IP address literal that the peer
+     * certificate must carry, verified as part of the TLS handshake. When
+     * NULL, only CA chain validation is performed and ANY certificate issued
+     * by a trusted CA is accepted, regardless of the identity it carries.
+     * Requires verify_mode to include REDIS_SSL_VERIFY_PEER: without it the
+     * handshake completes regardless of the verification result, so a name
+     * could not be enforced. Use NULL, not an empty string, to skip
+     * verification. Anything that would leave the name unenforced -- an empty
+     * name, peer verification disabled, or a build without name verification
+     * support -- is rejected with REDIS_SSL_CTX_VERIFY_NAME_FAILED rather than
+     * silently accepting any identity.
+     * Note that server_name is used for SNI routing only and does NOT verify
+     * the peer's identity. */
+    const char *verify_name;
 } redisSSLOptions;
 
 /**
@@ -113,7 +129,9 @@ int redisInitOpenSSL(void);
  * be both specified or omitted.
  *
  * server_name is an optional and will be used as a server name indication
- * (SNI) TLS extension.
+ * (SNI) TLS extension. Note that it is NOT matched against the certificate
+ * the peer presents: to bind the connection to a specific peer identity, use
+ * redisCreateSSLContextWithOptions() with the verify_name option.
  *
  * If error is non-null, it will be populated in case the context creation fails
  * (returning a NULL).

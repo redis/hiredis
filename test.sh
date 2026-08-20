@@ -32,6 +32,13 @@ if [ "$TEST_SSL" = "1" ]; then
     SSL_CA_KEY=${tmpdir}/ca.key
     SSL_CERT=${tmpdir}/redis.crt
     SSL_KEY=${tmpdir}/redis.key
+    # DNS name carried in the server certificate's SAN, used to exercise peer
+    # name verification (redisSSLOptions.verify_name / --ssl-verify-name).
+    SSL_VERIFY_NAME=hiredis.test.example.com
+
+    cat > ${tmpdir}/ssl-ext.cnf <<EOF
+subjectAltName = DNS:${SSL_VERIFY_NAME}, IP:127.0.0.1
+EOF
 
     openssl genrsa -out ${tmpdir}/ca.key 4096
     openssl req \
@@ -51,10 +58,11 @@ if [ "$TEST_SSL" = "1" ]; then
             -CAkey ${SSL_CA_KEY} \
             -CAserial ${tmpdir}/ca.txt \
             -CAcreateserial \
+            -extfile ${tmpdir}/ssl-ext.cnf \
             -days 365 \
             -out ${SSL_CERT}
 
-    SSL_TEST_ARGS="--ssl-host 127.0.0.1 --ssl-port ${REDIS_SSL_PORT} --ssl-ca-cert ${SSL_CA_CERT} --ssl-cert ${SSL_CERT} --ssl-key ${SSL_KEY}"
+    SSL_TEST_ARGS="--ssl-host 127.0.0.1 --ssl-port ${REDIS_SSL_PORT} --ssl-ca-cert ${SSL_CA_CERT} --ssl-cert ${SSL_CERT} --ssl-key ${SSL_KEY} --ssl-verify-name ${SSL_VERIFY_NAME}"
 fi
 
 cleanup() {
