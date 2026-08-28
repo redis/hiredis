@@ -45,9 +45,12 @@ SET(hiredis_sources
     net.c
     read.c
     sds.c
-    sockcompat.c)
+    sockcompat.c
+    hiredis_exports.def)
 
 SET(hiredis_sources ${hiredis_sources})
+
+ADD_DEFINITIONS(-DHIREDIS_STATIC_DEFINE)
 
 IF(WIN32)
     ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DWIN32_LEAN_AND_MEAN)
@@ -59,7 +62,7 @@ set(hiredis_export_name hiredis CACHE STRING "Name of the exported target")
 set_target_properties(hiredis PROPERTIES EXPORT_NAME ${hiredis_export_name})
 
 SET_TARGET_PROPERTIES(hiredis
-    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+    PROPERTIES
     VERSION "${VERSION}"
     SOVERSION "${HIREDIS_MAJOR}")
 IF(MSVC)
@@ -74,7 +77,13 @@ ELSEIF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
     TARGET_LINK_LIBRARIES(hiredis PUBLIC socket)
 ENDIF()
 
-TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+TARGET_INCLUDE_DIRECTORIES(hiredis PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}> $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+
+INCLUDE(GenerateExportHeader)
+GENERATE_EXPORT_HEADER(hiredis
+    BASE_NAME HIREDIS
+    EXPORT_MACRO_NAME HIREDIS_API
+)
 
 CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
 
@@ -126,7 +135,7 @@ if (ENABLE_NUGET)
         DESTINATION build/native)
 endif()
 
-INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h sockcompat.h
+INSTALL(FILES hiredis.h read.h sds.h async.h alloc.h sockcompat.h ${CMAKE_CURRENT_BINARY_DIR}/hiredis_export.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hiredis)
 
 INSTALL(DIRECTORY adapters
