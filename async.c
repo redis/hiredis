@@ -480,7 +480,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
      * The type and number of elements (3 to 4) are specified at:
      * https://redis.io/docs/latest/develop/interact/pubsub/#format-of-pushed-messages */
     if ((reply->type == REDIS_REPLY_ARRAY && !(c->flags & REDIS_SUPPORTS_PUSH) && reply->elements >= 3) ||
-        reply->type == REDIS_REPLY_PUSH) {
+        (reply->type == REDIS_REPLY_PUSH && reply->elements >= 3)) {
         assert(reply->element[0]->type == REDIS_REPLY_STRING);
         stype = reply->element[0]->str;
         pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;

@@ -967,6 +967,67 @@ static void test_free_null(void) {
     test_cond(reply == NULL);
 }
 
+/* A RESP3 PUSH whose first element reads as "subscribe" but that only has
+ * one element (no channel name, no subscription count) is not something a
+ * conforming Redis server would ever send, but a proxy or a malicious peer
+ * could. __redisGetSubscribeCallback used to route any REDIS_REPLY_PUSH
+ * straight into element[1]/element[2] without checking reply->elements
+ * first, which reads past the end of the (in this case one-pointer) reply
+ * array. This drives that exact reply through a real redisAsyncContext and
+ * checks the process survives it instead of crashing or tripping ASan. */
+static void test_pubsub_short_push_no_oob(void) {
+    static const char short_push[] = ">1\r\n$9\r\nsubscribe\r\n";
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    redisFD lfd, peerfd = REDIS_INVALID_FD;
+    int port, i, got_sub = 0;
+    redisAsyncContext *ac;
+
+    test("Subscribe callback ignores an undersized PUSH instead of reading out of bounds: ");
+
+    lfd = socket(AF_INET, SOCK_STREAM, 0);
+    assert(lfd != REDIS_INVALID_FD);
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    assert(bind(lfd, (struct sockaddr *)&addr, sizeof(addr)) == 0);
+    assert(listen(lfd, 1) == 0);
+    assert(getsockname(lfd, (struct sockaddr *)&addr, &addrlen) == 0);
+    port = ntohs(addr.sin_port);
+
+    ac = redisAsyncConnect("127.0.0.1", port);
+    assert(ac != NULL && ac->err == 0);
+    redisPollAttach(ac);
+    redisAsyncCommand(ac, NULL, NULL, "SUBSCRIBE foo");
+
+    for (i = 0; i < 200 && !got_sub; i++) {
+        redisPollTick(ac, 0.05);
+        if (peerfd == REDIS_INVALID_FD) {
+            peerfd = accept(lfd, NULL, NULL);
+            continue;
+        }
+        char buf[64];
+        if (recv(peerfd, buf, sizeof(buf), 0) > 0) {
+            send(peerfd, short_push, sizeof(short_push) - 1, 0);
+            got_sub = 1;
+        }
+    }
+    assert(got_sub);
+
+    /* Keep polling past the short PUSH so a use-after-free or a corrupted
+     * heap from an out-of-bounds read would still have a chance to show up
+     * (either as a crash under ASan or as ac->err being set unexpectedly). */
+    for (i = 0; i < 20; i++)
+        redisPollTick(ac, 0.01);
+
+    test_cond(ac->err == 0);
+
+    redisAsyncFree(ac);
+    if (peerfd != REDIS_INVALID_FD) close(peerfd);
+    close(lfd);
+}
+
 static void *hi_malloc_fail(size_t size) {
     (void)size;
     return NULL;
@@ -2585,6 +2646,7 @@ int main(int argc, char **argv) {
     test_reply_reader();
     test_blocking_connection_errors();
     test_free_null();
+    test_pubsub_short_push_no_oob();
 
     printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);
     cfg.type = CONN_TCP;
