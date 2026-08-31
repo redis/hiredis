@@ -172,7 +172,7 @@ IF(ENABLE_SSL)
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(hiredis_ssl_sources
         ssl.c
-        hiredis_exports.def)
+        hiredis_ssl_exports.def)
     ADD_LIBRARY(hiredis_ssl ${hiredis_ssl_sources})
     ADD_LIBRARY(hiredis::hiredis_ssl ALIAS hiredis_ssl)
 
