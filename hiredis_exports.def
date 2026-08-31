@@ -1,4 +1,6 @@
 EXPORTS
+    __redisSetError
+    __redisAsyncDisconnect
     freeReplyObject
     hi_calloc
     hi_free
@@ -32,6 +34,8 @@ EXPORTS
     redisAsyncWrite
     redisBufferRead
     redisBufferWrite
+    redisCheckConnectDone
+    redisCheckSocketError
     redisCommand
     redisCommandArgv
     redisConnect
@@ -44,6 +48,11 @@ EXPORTS
     redisConnectUnixWithTimeout
     redisConnectWithOptions
     redisConnectWithTimeout
+    redisContextConnectBindTcp
+    redisContextConnectTcp
+    redisContextConnectUnix
+    redisContextSetTcpUserTimeout
+    redisContextSetTimeout
     redisEnableKeepAlive
     redisEnableKeepAliveWithInterval
     redisFormatCommand
@@ -55,6 +64,11 @@ EXPORTS
     redisFreeSdsCommand
     redisGetReply
     redisGetReplyFromReader
+    redisKeepAlive
+    redisNetClose
+    redisNetRead
+    redisNetWrite
+    redisProcessCallbacks
     redisReaderCreate
     redisReaderCreateWithFunctions
     redisReaderFeed
@@ -62,6 +76,7 @@ EXPORTS
     redisReaderGetReply
     redisReconnect
     redisSetPushCallback
+    redisSetTcpNoDelay
     redisSetTcpUserTimeout
     redisSetTimeout
     redisvAppendCommand

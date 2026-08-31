@@ -179,7 +179,8 @@ IF(ENABLE_SSL)
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(hiredis_ssl_sources
-        ssl.c)
+        ssl.c
+        hiredis_exports.def)
     ADD_LIBRARY(hiredis_ssl ${hiredis_ssl_sources})
     ADD_LIBRARY(hiredis::hiredis_ssl ALIAS hiredis_ssl)
 
@@ -189,7 +190,6 @@ IF(ENABLE_SSL)
 
     SET_TARGET_PROPERTIES(hiredis_ssl
         PROPERTIES
-        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
         VERSION "${VERSION}"
         SOVERSION "${HIREDIS_MAJOR}")
     IF(MSVC)
