@@ -115,13 +115,6 @@ static int redisMacOSAttach(redisAsyncContext *redisAsyncCtx, CFRunLoopRef runLo
     /* Setup redis stuff */
     redisRunLoop->context = redisAsyncCtx;
 
-    redisAsyncCtx->ev.addRead  = redisMacOSAddRead;
-    redisAsyncCtx->ev.delRead  = redisMacOSDelRead;
-    redisAsyncCtx->ev.addWrite = redisMacOSAddWrite;
-    redisAsyncCtx->ev.delWrite = redisMacOSDelWrite;
-    redisAsyncCtx->ev.cleanup  = redisMacOSCleanup;
-    redisAsyncCtx->ev.data     = redisRunLoop;
-
     /* Initialize and install read/write events */
     CFSocketContext socketCtx = { 0, redisAsyncCtx, NULL, NULL, NULL };
 
@@ -135,6 +128,15 @@ static int redisMacOSAttach(redisAsyncContext *redisAsyncCtx, CFRunLoopRef runLo
     if( !redisRunLoop->sourceRef ) return freeRedisRunLoop(redisRunLoop);
 
     CFRunLoopAddSource(runLoop, redisRunLoop->sourceRef, kCFRunLoopDefaultMode);
+
+    /* Publish hooks only after both CF objects exist so a failed attach
+     * cannot leave redisAsyncFree calling cleanup on freed memory. */
+    redisAsyncCtx->ev.addRead  = redisMacOSAddRead;
+    redisAsyncCtx->ev.delRead  = redisMacOSDelRead;
+    redisAsyncCtx->ev.addWrite = redisMacOSAddWrite;
+    redisAsyncCtx->ev.delWrite = redisMacOSDelWrite;
+    redisAsyncCtx->ev.cleanup  = redisMacOSCleanup;
+    redisAsyncCtx->ev.data     = redisRunLoop;
 
     return REDIS_OK;
 }
