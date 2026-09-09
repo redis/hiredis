@@ -1,0 +1,8 @@
+EXPORTS
+    redisCreateSSLContext
+    redisCreateSSLContextWithOptions
+    redisFreeSSLContext
+    redisInitOpenSSL
+    redisInitiateSSL
+    redisInitiateSSLWithContext
+    redisSSLContextGetError
