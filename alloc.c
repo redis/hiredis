@@ -27,6 +27,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+  
+/* turn of windows warnings for _strcmp etc. */
+#define _CRT_NONSTDC_NO_DEPRECATE
 
 #include "fmacros.h"
 #include "alloc.h"
