@@ -457,7 +457,7 @@ static int processBulkItem(redisReader *r) {
     void *obj = NULL;
     char *p, *s;
     long long len;
-    unsigned long bytelen;
+    unsigned long long bytelen;
     int success = 0;
 
     p = r->buf+r->pos;
@@ -486,8 +486,15 @@ static int processBulkItem(redisReader *r) {
                 obj = (void*)REDIS_REPLY_NIL;
             success = 1;
         } else {
-            /* Only continue when the buffer contains the entire bulk item. */
-            bytelen += len+2; /* include \r\n */
+            /* Only continue when the buffer contains the entire bulk item.
+             *
+             * `len` is the bulk length parsed from the (untrusted) header and
+             * can be as large as LLONG_MAX, so `len + 2` must not be evaluated
+             * in the signed `long long` domain (that is signed-integer-overflow
+             * UB). Compute it in the unsigned domain instead: the value still
+             * greatly exceeds any real buffer, so the bound check below simply
+             * classifies the item as "not fully buffered". */
+            bytelen += (unsigned long long)len + 2; /* include \r\n */
             if (r->pos+bytelen <= r->len) {
                 if ((cur->type == REDIS_REPLY_VERB && len < 4) ||
                     (cur->type == REDIS_REPLY_VERB && s[5] != ':'))
@@ -612,6 +619,16 @@ static int processAggregateItem(redisReader *r) {
                 }
 
                 elements *= 2;
+
+                /* Re-check the (now doubled) count against the caller-configured
+                 * limit: without this a MAP/ATTR header can slip up to
+                 * 2*maxelements past the guard above and drive an oversized
+                 * createArrayObject() allocation. */
+                if (r->maxelements > 0 && elements > r->maxelements) {
+                    __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
+                            "Multi-bulk length out of range");
+                    return REDIS_ERR;
+                }
             }
 
             if (r->fn && r->fn->createArray)
