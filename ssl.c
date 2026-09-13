@@ -261,7 +261,21 @@ static int redisLoadWinCertStore(SSL_CTX *ssl_ctx, const char *store_name,
         const unsigned char *encoded = win_ctx->pbCertEncoded;
         X509 *x509 = d2i_X509(NULL, &encoded, win_ctx->cbCertEncoded);
         if (x509) {
-            if ((1 != X509_STORE_add_cert(store, x509)) ||
+            int added = X509_STORE_add_cert(store, x509);
+            if (added != 1) {
+                /* The same certificate can live in both the Root and CA
+                 * stores. OpenSSL < 1.1.1 reports that as an error rather
+                 * than a no-op, but the certificate is already loaded. */
+                unsigned long e = ERR_peek_last_error();
+                if (ERR_GET_LIB(e) == ERR_LIB_X509 &&
+                    ERR_GET_REASON(e) == X509_R_CERT_ALREADY_IN_HASH_TABLE)
+                {
+                    ERR_clear_error();
+                    X509_free(x509);
+                    continue;
+                }
+            }
+            if ((1 != added) ||
                 (1 != SSL_CTX_add_client_CA(ssl_ctx, x509)))
             {
                 if (error) *error = REDIS_SSL_CTX_OS_CERT_ADD_FAILED;
