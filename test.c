@@ -13,6 +13,10 @@
 #include <limits.h>
 #include <math.h>
 
+#ifndef _WIN32
+#include <fcntl.h>
+#endif
+
 #include "hiredis.h"
 #include "async.h"
 #include "adapters/poll.h"
@@ -1079,6 +1083,101 @@ static void test_blocking_connection_errors(void) {
     c = redisConnectUnix((char*)"/tmp/idontexist.sock");
     test_cond(c->err == REDIS_ERR_IO); /* Don't care about the message... */
     redisFree(c);
+#endif
+}
+
+static void test_nonblocking_read_drains_error_queue(void) {
+    test("Nonblocking read clears a queued Linux socket error: ");
+
+#if defined(__linux__) && defined(IP_RECVERR) && defined(MSG_ERRQUEUE) && defined(MSG_DONTWAIT)
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_addr.s_addr = htonl(INADDR_LOOPBACK),
+    };
+    socklen_t addrlen = sizeof(addr);
+    struct pollfd pfd = {.events = POLLERR};
+    redisOptions options = {0};
+    redisContext *c;
+    char buf[1];
+    int error = 0;
+    int flags;
+    int on = 1;
+    int receiver;
+    int sender;
+    int ready;
+
+    receiver = socket(AF_INET, SOCK_DGRAM, 0);
+    assert(receiver != -1);
+    assert(bind(receiver, (struct sockaddr *)&addr, sizeof(addr)) == 0);
+    assert(getsockname(receiver, (struct sockaddr *)&addr, &addrlen) == 0);
+
+    sender = socket(AF_INET, SOCK_DGRAM, 0);
+    assert(sender != -1);
+    assert(setsockopt(sender, IPPROTO_IP, IP_RECVERR, &on, sizeof(on)) == 0);
+    assert(connect(sender, (struct sockaddr *)&addr, sizeof(addr)) == 0);
+    close(receiver);
+
+    flags = fcntl(sender, F_GETFL);
+    assert(flags != -1);
+    assert(fcntl(sender, F_SETFL, flags | O_NONBLOCK) == 0);
+
+    pfd.fd = sender;
+    assert(send(sender, "x", 1, 0) == 1);
+    do {
+        ready = poll(&pfd, 1, 1000);
+    } while (ready == -1 && errno == EINTR);
+    assert(ready == 1 && (pfd.revents & POLLERR));
+
+    addrlen = sizeof(error);
+    assert(getsockopt(sender, SOL_SOCKET, SO_ERROR, &error, &addrlen) == 0);
+    assert(error != 0);
+
+    pfd.revents = 0;
+    assert(poll(&pfd, 1, 0) == 1 && (pfd.revents & POLLERR));
+
+    options.type = REDIS_CONN_USERFD;
+    options.options = REDIS_OPT_NONBLOCK;
+    options.endpoint.fd = sender;
+    c = redisConnectWithOptions(&options);
+    assert(c != NULL);
+
+    ready = (int)redisNetRead(c, buf, sizeof(buf));
+    pfd.revents = 0;
+    test_cond(ready == 0 && c->err == 0 && poll(&pfd, 1, 0) == 0);
+
+    redisFree(c);
+#else
+    test_skipped();
+#endif
+}
+
+static void test_nonblocking_read_on_unix_socket(void) {
+    test("Nonblocking read waits on an idle Unix socket: ");
+
+#ifndef _WIN32
+    redisOptions options = {0};
+    redisContext *c;
+    char buf[1];
+    int fds[2];
+    int flags;
+
+    assert(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
+    flags = fcntl(fds[0], F_GETFL);
+    assert(flags != -1);
+    assert(fcntl(fds[0], F_SETFL, flags | O_NONBLOCK) == 0);
+
+    options.type = REDIS_CONN_USERFD;
+    options.options = REDIS_OPT_NONBLOCK;
+    options.endpoint.fd = fds[0];
+    c = redisConnectWithOptions(&options);
+    assert(c != NULL);
+
+    test_cond(redisNetRead(c, buf, sizeof(buf)) == 0 && c->err == 0);
+
+    redisFree(c);
+    close(fds[1]);
+#else
+    test_skipped();
 #endif
 }
 
@@ -2584,6 +2683,8 @@ int main(int argc, char **argv) {
     test_format_commands();
     test_reply_reader();
     test_blocking_connection_errors();
+    test_nonblocking_read_drains_error_queue();
+    test_nonblocking_read_on_unix_socket();
     test_free_null();
 
     printf("\nTesting against TCP connection (%s:%d):\n", cfg.tcp.host, cfg.tcp.port);

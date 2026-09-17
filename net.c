@@ -43,6 +43,11 @@
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef __linux__
+#include <sys/socket.h>
+#include <sys/uio.h>
+#endif
+
 #include "net.h"
 #include "sds.h"
 #include "sockcompat.h"
@@ -52,6 +57,51 @@
 void __redisSetError(redisContext *c, int type, const char *str);
 
 int redisContextUpdateCommandTimeout(redisContext *c, const struct timeval *timeout);
+
+#if defined(__linux__) && defined(MSG_ERRQUEUE) && defined(MSG_DONTWAIT)
+#define REDIS_ERRQUEUE_DRAIN_LIMIT 1024
+
+static int redisNetDrainErrorQueue(redisContext *c) {
+    struct sockaddr_storage addr;
+    socklen_t addrlen = sizeof(addr);
+    unsigned int attempts;
+    char data;
+    char control[512];
+
+    if (getsockname(c->fd, (struct sockaddr *)&addr, &addrlen) == -1) {
+        __redisSetError(c, REDIS_ERR_IO, strerror(errno));
+        return REDIS_ERR;
+    }
+    if (addr.ss_family != AF_INET && addr.ss_family != AF_INET6)
+        return REDIS_OK;
+
+    for (attempts = 0; attempts < REDIS_ERRQUEUE_DRAIN_LIMIT; attempts++) {
+        struct iovec iov = {
+            .iov_base = &data,
+            .iov_len = sizeof(data),
+        };
+        struct msghdr msg = {
+            .msg_iov = &iov,
+            .msg_iovlen = 1,
+            .msg_control = control,
+            .msg_controllen = sizeof(control),
+        };
+
+        if (recvmsg(c->fd, &msg, MSG_ERRQUEUE | MSG_DONTWAIT) >= 0)
+            continue;
+        if (errno == EINTR)
+            continue;
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return REDIS_OK;
+
+        __redisSetError(c, REDIS_ERR_IO, strerror(errno));
+        return REDIS_ERR;
+    }
+
+    __redisSetError(c, REDIS_ERR_IO, "Socket error queue did not drain");
+    return REDIS_ERR;
+}
+#endif
 
 void redisNetClose(redisContext *c) {
     if (c && c->fd != REDIS_INVALID_FD) {
@@ -63,7 +113,28 @@ void redisNetClose(redisContext *c) {
 ssize_t redisNetRead(redisContext *c, char *buf, size_t bufcap) {
     ssize_t nread = recv(c->fd, buf, bufcap, 0);
     if (nread == -1) {
-        if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
+        if (errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) {
+            int so_error = 0;
+            socklen_t errlen = sizeof(so_error);
+
+            if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &so_error, &errlen) == -1) {
+                __redisSetError(c, REDIS_ERR_IO, strerror(errno));
+                return -1;
+            }
+            if (so_error != 0) {
+                errno = so_error;
+                __redisSetError(c, REDIS_ERR_IO, strerror(errno));
+                return -1;
+            }
+
+#if defined(__linux__) && defined(MSG_ERRQUEUE) && defined(MSG_DONTWAIT)
+            if (redisNetDrainErrorQueue(c) != REDIS_OK)
+                return -1;
+#endif
+
+            /* Try again later */
+            return 0;
+        } else if (errno == EINTR) {
             /* Try again later */
             return 0;
         } else if(errno == ETIMEDOUT && (c->flags & REDIS_BLOCK)) {
