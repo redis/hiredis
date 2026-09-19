@@ -1177,8 +1177,14 @@ static void test_nonblocking_connect_error_queue(void) {
     event.events = EPOLLIN;
     event.data.fd = context->fd;
     assert(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, context->fd, &event) == 0);
-    assert(setsockopt(context->fd, SOL_SOCKET, SO_TIMESTAMPING,
-                      &timestamping, sizeof(timestamping)) == 0);
+    count = setsockopt(context->fd, SOL_SOCKET, SO_TIMESTAMPING,
+                       &timestamping, sizeof(timestamping));
+    if (count == -1 && errno == ENOPROTOOPT) {
+        test("Nonblocking connect error queue (SO_TIMESTAMPING unavailable): ");
+        test_skipped();
+        goto cleanup;
+    }
+    assert(count == 0);
 
     /* Timestamp records use the same sk_error_queue occupancy predicate as
      * queued ICMP errors, without requiring raw sockets or a network race. */
@@ -1229,6 +1235,7 @@ static void test_nonblocking_connect_error_queue(void) {
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS &&
               strcmp(reply->str, "PONG") == 0);
 
+cleanup:
     freeReplyObject(reply);
     close(epoll_fd);
     close(peer_fd);
