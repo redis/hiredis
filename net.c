@@ -380,6 +380,10 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
         goto connected;
     case EALREADY:
     case EWOULDBLOCK:
+#ifdef __linux__
+        if (c->connection_type == REDIS_CONN_TCP && !(c->flags & REDIS_BLOCK))
+            redisDrainSocketErrorQueue(c->fd);
+#endif
         *completed = 0;
         return REDIS_OK;
     default:
