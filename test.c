@@ -1209,10 +1209,12 @@ static void test_nonblocking_connect_error_queue(void) {
     assert(result == -1 && (errno == EAGAIN || errno == EWOULDBLOCK));
     assert(wait_for_epollerr(epoll_fd) & EPOLLERR);
 
+    context->flags |= REDIS_BLOCK;
     assert(redisCheckConnectDone(context, &completed) == REDIS_OK);
+    context->flags &= ~REDIS_BLOCK;
     assert(completed == 1);
     count = epoll_wait(epoll_fd, &event, 1, 0);
-    test("Successful nonblocking connect drains the error queue: ");
+    test("Successful connect drains the error queue in blocking mode: ");
     test_cond(count == 0);
 
     assert(send(peer_fd, pong, sizeof(pong) - 1, 0) ==

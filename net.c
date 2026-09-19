@@ -332,27 +332,44 @@ static int redisContextWaitReady(redisContext *c, long msec) {
     wfd.events = POLLOUT;
     end = msec >= 0 ? redisPollMillis() + msec : 0;
 
-    while ((res = poll(&wfd, 1, msec)) <= 0) {
+    for (;;) {
+        int completed = 0;
+
+        res = poll(&wfd, 1, msec);
         if (res < 0 && errno != EINTR) {
             __redisSetErrorFromErrno(c, REDIS_ERR_IO, "poll(2)");
             redisNetClose(c);
             return REDIS_ERR;
-        } else if (res == 0 || (msec >= 0 && redisPollMillis() >= end)) {
+        }
+
+        if (res > 0) {
+            if (redisCheckConnectDone(c, &completed) != REDIS_OK) {
+                redisCheckSocketError(c);
+                return REDIS_ERR;
+            }
+            if (completed)
+                return REDIS_OK;
+        }
+
+        if (res == 0) {
             errno = ETIMEDOUT;
             __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
             redisNetClose(c);
             return REDIS_ERR;
-        } else {
-            /* res < 0 && errno == EINTR, try again */
+        }
+
+        if (msec >= 0) {
+            long now = redisPollMillis();
+
+            if (now >= end) {
+                errno = ETIMEDOUT;
+                __redisSetErrorFromErrno(c, REDIS_ERR_IO, NULL);
+                redisNetClose(c);
+                return REDIS_ERR;
+            }
+            msec = end - now;
         }
     }
-
-    if (redisCheckConnectDone(c, &res) != REDIS_OK || res == 0) {
-        redisCheckSocketError(c);
-        return REDIS_ERR;
-    }
-
-    return REDIS_OK;
 }
 
 int redisCheckConnectDone(redisContext *c, int *completed) {
@@ -381,7 +398,7 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
     case EALREADY:
     case EWOULDBLOCK:
 #ifdef __linux__
-        if (c->connection_type == REDIS_CONN_TCP && !(c->flags & REDIS_BLOCK))
+        if (c->connection_type == REDIS_CONN_TCP)
             redisDrainSocketErrorQueue(c->fd);
 #endif
         *completed = 0;
@@ -393,7 +410,7 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
 connected:
     *completed = 1;
 #ifdef __linux__
-    if (c->connection_type == REDIS_CONN_TCP && !(c->flags & REDIS_BLOCK))
+    if (c->connection_type == REDIS_CONN_TCP)
         redisDrainSocketErrorQueue(c->fd);
 #endif
     return REDIS_OK;
