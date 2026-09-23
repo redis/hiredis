@@ -696,6 +696,12 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
     struct sockaddr_un *sa;
     long timeout_msec = -1;
 
+    /* Path plus terminator must fit in sun_path; strncpy omits NUL when full. */
+    if (strlen(path) >= sizeof(((struct sockaddr_un){0}).sun_path)) {
+        __redisSetError(c, REDIS_ERR_OTHER, "Unix socket path too long");
+        return REDIS_ERR;
+    }
+
     if (redisCreateSocket(c,AF_UNIX) < 0)
         return REDIS_ERR;
     if (redisSetBlocking(c,0) != REDIS_OK)
@@ -729,8 +735,9 @@ int redisContextConnectUnix(redisContext *c, const char *path, const struct time
         goto oom;
 
     c->addrlen = sizeof(struct sockaddr_un);
+    memset(sa, 0, sizeof(*sa));
     sa->sun_family = AF_UNIX;
-    strncpy(sa->sun_path, path, sizeof(sa->sun_path) - 1);
+    memcpy(sa->sun_path, path, strlen(path) + 1);
     if (connect(c->fd, (struct sockaddr*)sa, sizeof(*sa)) == -1) {
         if ((errno == EAGAIN || errno == EINPROGRESS) && !blocking) {
             /* This is ok. */

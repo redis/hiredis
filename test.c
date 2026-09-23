@@ -1089,6 +1089,17 @@ static void test_blocking_connection_errors(void) {
     c = redisConnectUnix((char*)"/tmp/idontexist.sock");
     test_cond(c->err == REDIS_ERR_IO); /* Don't care about the message... */
     redisFree(c);
+
+    test("Returns error when the unix socket path is too long: ");
+    {
+        char long_path[sizeof(((struct sockaddr_un){0}).sun_path) + 1];
+        memset(long_path, 'a', sizeof(long_path) - 1);
+        long_path[sizeof(long_path) - 1] = '\0';
+        c = redisConnectUnix(long_path);
+        test_cond(c != NULL && c->err == REDIS_ERR_OTHER &&
+                  strcmp(c->errstr, "Unix socket path too long") == 0);
+        redisFree(c);
+    }
 #endif
 }
 
