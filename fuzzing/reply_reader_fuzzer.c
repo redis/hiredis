@@ -32,9 +32,9 @@
  * bytes an attacker may control: everything a server sends arrives here before
  * any caller sees it.
  *
- * The first input byte selects a feed size so that replies are delivered in
- * fragments, exercising the incremental parser rather than only the case where
- * a whole reply lands in one read(). */
+ * The first input byte seeds a deterministic sequence of feed sizes so that
+ * replies are delivered in varied fragments, exercising the incremental
+ * parser rather than only the case where a whole reply lands in one read(). */
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -50,15 +50,25 @@
  * does the same so that findings are parser bugs. */
 #define FUZZ_MAX_ELEMENTS 1024
 
+/* Marsaglia's xorshift32. The state must be nonzero. */
+static uint32_t fuzzRandom(uint32_t *state) {
+    uint32_t x = *state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return *state = x;
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     redisReader *reader;
-    size_t chunk, offset = 0;
+    uint32_t state;
+    size_t offset = 0;
     void *reply;
 
     if (size < 2)
         return 0;
 
-    chunk = (size_t)data[0] + 1;
+    state = (uint32_t)data[0] + 1;
     data++;
     size--;
 
@@ -69,6 +79,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     reader->maxelements = FUZZ_MAX_ELEMENTS;
 
     while (offset < size) {
+        size_t chunk = 1 + (fuzzRandom(&state) % 256);
         size_t len = size - offset;
         if (len > chunk)
             len = chunk;
