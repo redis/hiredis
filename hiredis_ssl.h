@@ -119,7 +119,9 @@ int redisInitOpenSSL(void);
  * to initiate SSL connections.
  *
  * cacert_filename is an optional name of a CA certificate/bundle file to load
- * and use for validation.
+ * and use for validation. On Windows, this can also be "wincert" to load the
+ * Root system certificate store, or "wincert_with_ca" to load both the Root
+ * and CA system certificate stores.
  *
  * capath is an optional directory path where trusted CA certificate files are
  * stored in an OpenSSL-compatible structure.

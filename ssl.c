@@ -243,6 +243,56 @@ void redisFreeSSLContext(redisSSLContext *ctx)
     hi_free(ctx);
 }
 
+#ifdef _WIN32
+static int redisLoadWinCertStore(SSL_CTX *ssl_ctx, const char *store_name,
+                                 redisSSLContextError *error) {
+    HCERTSTORE win_store = CertOpenSystemStore(0, store_name);
+    PCCERT_CONTEXT win_ctx = NULL;
+    X509_STORE *store = SSL_CTX_get_cert_store(ssl_ctx);
+
+    if (!win_store) {
+        if (error) *error = REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED;
+        return REDIS_ERR;
+    }
+
+    while ((win_ctx = CertEnumCertificatesInStore(win_store, win_ctx)) != NULL) {
+        /* d2i_X509 advances the pointer it is given, so feed it a
+         * local copy instead of mutating the cert context. */
+        const unsigned char *encoded = win_ctx->pbCertEncoded;
+        X509 *x509 = d2i_X509(NULL, &encoded, win_ctx->cbCertEncoded);
+        if (x509) {
+            int added = X509_STORE_add_cert(store, x509);
+            if (added != 1) {
+                /* The same certificate can live in both the Root and CA
+                 * stores. OpenSSL < 1.1.1 reports that as an error rather
+                 * than a no-op, but the certificate is already loaded. */
+                unsigned long e = ERR_peek_last_error();
+                if (ERR_GET_LIB(e) == ERR_LIB_X509 &&
+                    ERR_GET_REASON(e) == X509_R_CERT_ALREADY_IN_HASH_TABLE)
+                {
+                    ERR_clear_error();
+                    X509_free(x509);
+                    continue;
+                }
+            }
+            if ((1 != added) ||
+                (1 != SSL_CTX_add_client_CA(ssl_ctx, x509)))
+            {
+                if (error) *error = REDIS_SSL_CTX_OS_CERT_ADD_FAILED;
+                X509_free(x509);
+                CertFreeCertificateContext(win_ctx);
+                CertCloseStore(win_store, 0);
+                return REDIS_ERR;
+            }
+            X509_free(x509);
+        }
+    }
+
+    CertCloseStore(win_store, 0);
+    return REDIS_OK;
+}
+#endif
+
 
 /**
  * redisSSLContext helper context initialization.
@@ -316,11 +366,6 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
     const char *private_key_filename = options->private_key_filename;
     const char *server_name = options->server_name;
 
-#ifdef _WIN32
-    HCERTSTORE win_store = NULL;
-    PCCERT_CONTEXT win_ctx = NULL;
-#endif
-
     redisSSLContext *ctx = hi_calloc(1, sizeof(redisSSLContext));
     if (ctx == NULL)
         goto error;
@@ -370,29 +415,18 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
 
     if (capath || cacert_filename) {
 #ifdef _WIN32
-        /* wincert is a filename sentinel. capath only callers pass NULL here. */
-        if (cacert_filename && 0 == strcmp(cacert_filename, "wincert")) {
-            win_store = CertOpenSystemStore(NULL, "Root");
-            if (!win_store) {
-                if (error) *error = REDIS_SSL_CTX_OS_CERTSTORE_OPEN_FAILED;
+        if (cacert_filename != NULL &&
+            (0 == strcmp(cacert_filename, "wincert") ||
+             0 == strcmp(cacert_filename, "wincert_with_ca")))
+        {
+            if (redisLoadWinCertStore(ctx->ssl_ctx, "Root", error) != REDIS_OK) {
                 goto error;
             }
-            X509_STORE* store = SSL_CTX_get_cert_store(ctx->ssl_ctx);
-            while (win_ctx = CertEnumCertificatesInStore(win_store, win_ctx)) {
-                X509* x509 = NULL;
-                x509 = d2i_X509(NULL, (const unsigned char**)&win_ctx->pbCertEncoded, win_ctx->cbCertEncoded);
-                if (x509) {
-                    if ((1 != X509_STORE_add_cert(store, x509)) ||
-                        (1 != SSL_CTX_add_client_CA(ctx->ssl_ctx, x509)))
-                    {
-                        if (error) *error = REDIS_SSL_CTX_OS_CERT_ADD_FAILED;
-                        goto error;
-                    }
-                    X509_free(x509);
-                }
+
+            if (0 == strcmp(cacert_filename, "wincert_with_ca") &&
+                redisLoadWinCertStore(ctx->ssl_ctx, "CA", error) != REDIS_OK) {
+                goto error;
             }
-            CertFreeCertificateContext(win_ctx);
-            CertCloseStore(win_store, 0);
         } else
 #endif
         if (!SSL_CTX_load_verify_locations(ctx->ssl_ctx, cacert_filename, capath)) {
@@ -423,10 +457,6 @@ redisSSLContext *redisCreateSSLContextWithOptions(redisSSLOptions *options, redi
     return ctx;
 
 error:
-#ifdef _WIN32
-    CertFreeCertificateContext(win_ctx);
-    CertCloseStore(win_store, 0);
-#endif
     redisFreeSSLContext(ctx);
     return NULL;
 }
@@ -704,4 +734,3 @@ redisContextFuncs redisContextSSLFuncs = {
     .read = redisSSLRead,
     .write = redisSSLWrite
 };
-
