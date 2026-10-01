@@ -762,6 +762,9 @@ void redisFree(redisContext *c) {
 }
 
 redisFD redisFreeKeepFd(redisContext *c) {
+    if (c == NULL)
+        return REDIS_INVALID_FD;
+
     redisFD fd = c->fd;
     c->fd = REDIS_INVALID_FD;
     redisFree(c);
@@ -769,6 +772,9 @@ redisFD redisFreeKeepFd(redisContext *c) {
 }
 
 int redisReconnect(redisContext *c) {
+    if (c == NULL)
+        return REDIS_ERR;
+
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
@@ -949,27 +955,42 @@ redisContext *redisConnectFd(redisFD fd) {
 
 /* Set read/write timeout on a blocking socket. */
 int redisSetTimeout(redisContext *c, const struct timeval tv) {
+    if (c == NULL)
+        return REDIS_ERR;
+
     if (c->flags & REDIS_BLOCK)
         return redisContextSetTimeout(c,tv);
     return REDIS_ERR;
 }
 
 int redisEnableKeepAliveWithInterval(redisContext *c, int interval) {
+    if (c == NULL)
+        return REDIS_ERR;
+
     return redisKeepAlive(c, interval);
 }
 
 /* Enable connection KeepAlive. */
 int redisEnableKeepAlive(redisContext *c) {
+    if (c == NULL)
+        return REDIS_ERR;
+
     return redisKeepAlive(c, REDIS_KEEPALIVE_INTERVAL);
 }
 
 /* Set the socket option TCP_USER_TIMEOUT. */
 int redisSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
+    if (c == NULL)
+        return REDIS_ERR;
+
     return redisContextSetTcpUserTimeout(c, timeout);
 }
 
 /* Set a user provided RESP3 PUSH handler and return any old one set. */
 redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn) {
+    if (c == NULL)
+        return NULL;
+
     redisPushFn *old = c->push_cb;
     c->push_cb = fn;
     return old;
@@ -983,6 +1004,9 @@ redisPushFn *redisSetPushCallback(redisContext *c, redisPushFn *fn) {
 int redisBufferRead(redisContext *c) {
     char buf[1024*16];
     int nread;
+
+    if (c == NULL)
+        return REDIS_ERR;
 
     /* Return early when the context has seen an error. */
     if (c->err)
@@ -1009,6 +1033,8 @@ int redisBufferRead(redisContext *c) {
  * c->funcs->write function.
  */
 int redisBufferWrite(redisContext *c, int *done) {
+    if (c == NULL)
+        return REDIS_ERR;
 
     /* Return early when the context has seen an error. */
     if (c->err)
@@ -1050,6 +1076,12 @@ static int redisHandledPushReply(redisContext *c, void *reply) {
 
 /* Get a reply from our reader or set an error in the context. */
 int redisGetReplyFromReader(redisContext *c, void **reply) {
+    if (c == NULL) {
+        if (reply != NULL)
+            *reply = NULL;
+        return REDIS_ERR;
+    }
+
     if (redisReaderGetReply(c->reader, reply) == REDIS_ERR) {
         __redisSetError(c,c->reader->err,c->reader->errstr);
         return REDIS_ERR;
@@ -1073,6 +1105,12 @@ static int redisNextInBandReplyFromReader(redisContext *c, void **reply) {
 int redisGetReply(redisContext *c, void **reply) {
     int wdone = 0;
     void *aux = NULL;
+
+    if (c == NULL) {
+        if (reply != NULL)
+            *reply = NULL;
+        return REDIS_ERR;
+    }
 
     /* Try to read pending replies */
     if (redisNextInBandReplyFromReader(c,&aux) == REDIS_ERR)
@@ -1115,6 +1153,9 @@ int redisGetReply(redisContext *c, void **reply) {
  */
 int __redisAppendCommand(redisContext *c, const char *cmd, size_t len) {
     sds newbuf;
+
+    if (c == NULL || cmd == NULL)
+        return REDIS_ERR;
 
     newbuf = sdscatlen(c->obuf,cmd,len);
     if (newbuf == NULL) {
@@ -1199,6 +1240,9 @@ int redisAppendCommandArgv(redisContext *c, int argc, const char **argv, const s
  */
 static void *__redisBlockForReply(redisContext *c) {
     void *reply;
+
+    if (c == NULL)
+        return NULL;
 
     if (c->flags & REDIS_BLOCK) {
         if (redisGetReply(c,&reply) != REDIS_OK)

@@ -789,6 +789,9 @@ void redisReaderFree(redisReader *r) {
 int redisReaderFeed(redisReader *r, const char *buf, size_t len) {
     sds newbuf;
 
+    if (r == NULL)
+        return REDIS_ERR;
+
     /* Return early when this reader is in an erroneous state. */
     if (r->err)
         return REDIS_ERR;
@@ -821,6 +824,9 @@ int redisReaderGetReply(redisReader *r, void **reply) {
     /* Default target pointer to NULL. */
     if (reply != NULL)
         *reply = NULL;
+
+    if (r == NULL)
+        return REDIS_ERR;
 
     /* Return early when this reader is in an erroneous state. */
     if (r->err)

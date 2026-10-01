@@ -972,9 +972,24 @@ static void test_free_null(void) {
     redisFree(redisCtx);
     test_cond(redisCtx == NULL);
 
+    test("Don't fail when redisFreeKeepFd is passed a NULL value: ");
+    test_cond(redisFreeKeepFd(NULL) == REDIS_INVALID_FD);
+
     test("Don't fail when freeReplyObject is passed a NULL value: ");
     freeReplyObject(reply);
     test_cond(reply == NULL);
+
+    test("Don't fail when redisReaderFeed/GetReply are passed a NULL reader: ");
+    test_cond(redisReaderFeed(NULL, "foo", 3) == REDIS_ERR &&
+              redisReaderGetReply(NULL, &reply) == REDIS_ERR &&
+              reply == NULL);
+
+    test("Don't fail when redisGetReply/redisBuffer* are passed a NULL context: ");
+    test_cond(redisGetReply(NULL, &reply) == REDIS_ERR &&
+              redisBufferRead(NULL) == REDIS_ERR &&
+              redisBufferWrite(NULL, NULL) == REDIS_ERR &&
+              redisReconnect(NULL) == REDIS_ERR &&
+              reply == NULL);
 }
 
 static void *hi_malloc_fail(size_t size) {

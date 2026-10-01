@@ -200,6 +200,10 @@ static int redisSetBlocking(redisContext *c, int blocking) {
 
 int redisKeepAlive(redisContext *c, int interval) {
     int val = 1;
+
+    if (c == NULL)
+        return REDIS_ERR;
+
     redisFD fd = c->fd;
 
     /* TCP_KEEPALIVE makes no sense with AF_UNIX connections */
@@ -254,6 +258,10 @@ int redisKeepAlive(redisContext *c, int interval) {
 
 int redisSetTcpNoDelay(redisContext *c) {
     int yes = 1;
+
+    if (c == NULL)
+        return REDIS_ERR;
+
     if (setsockopt(c->fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1) {
         __redisSetErrorFromErrno(c,REDIS_ERR_IO,"setsockopt(TCP_NODELAY)");
         redisNetClose(c);
@@ -264,6 +272,9 @@ int redisSetTcpNoDelay(redisContext *c) {
 
 int redisContextSetTcpUserTimeout(redisContext *c, unsigned int timeout) {
     int res;
+
+    if (c == NULL)
+        return REDIS_ERR;
 #ifdef TCP_USER_TIMEOUT
     res = setsockopt(c->fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout, sizeof(timeout));
 #else
@@ -441,6 +452,9 @@ int redisCheckSocketError(redisContext *c) {
 int redisContextSetTimeout(redisContext *c, const struct timeval tv) {
     const void *to_ptr = &tv;
     size_t to_sz = sizeof(tv);
+
+    if (c == NULL)
+        return REDIS_ERR;
 
     if (redisContextUpdateCommandTimeout(c, &tv) != REDIS_OK) {
         __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
