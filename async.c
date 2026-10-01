@@ -231,6 +231,9 @@ static int
 redisAsyncSetConnectCallbackImpl(redisAsyncContext *ac, redisConnectCallback *fn,
                                  redisConnectCallbackNC *fn_nc)
 {
+    if (ac == NULL)
+        return REDIS_ERR;
+
     /* If either are already set, this is an error */
     if (ac->onConnect || ac->onConnectNC)
         return REDIS_ERR;
@@ -258,6 +261,9 @@ int redisAsyncSetConnectCallbackNC(redisAsyncContext *ac, redisConnectCallbackNC
 }
 
 int redisAsyncSetDisconnectCallback(redisAsyncContext *ac, redisDisconnectCallback *fn) {
+    if (ac == NULL)
+        return REDIS_ERR;
+
     if (ac->onDisconnect == NULL) {
         ac->onDisconnect = fn;
         return REDIS_OK;
@@ -458,6 +464,9 @@ void __redisAsyncDisconnect(redisAsyncContext *ac) {
  * to redisProcessCallbacks(). Otherwise, we can only disconnect immediately
  * when there are no pending callbacks. */
 void redisAsyncDisconnect(redisAsyncContext *ac) {
+    if (ac == NULL)
+        return;
+
     redisContext *c = &(ac->c);
     c->flags |= REDIS_DISCONNECTING;
 
@@ -832,6 +841,9 @@ static const char *nextArgument(const char *start, const char **str, size_t *len
  * formatted command to the output buffer and registers the provided callback
  * function with the context. */
 static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void *privdata, const char *cmd, size_t len) {
+    if (ac == NULL || cmd == NULL)
+        return REDIS_ERR;
+
     redisContext *c = &(ac->c);
     redisCallback cb;
     struct dict *cbdict;
@@ -1009,12 +1021,18 @@ int redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
 }
 
 redisAsyncPushFn *redisAsyncSetPushCallback(redisAsyncContext *ac, redisAsyncPushFn *fn) {
+    if (ac == NULL)
+        return NULL;
+
     redisAsyncPushFn *old = ac->push_cb;
     ac->push_cb = fn;
     return old;
 }
 
 int redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {
+    if (ac == NULL)
+        return REDIS_ERR;
+
     if (!ac->c.command_timeout) {
         ac->c.command_timeout = hi_calloc(1, sizeof(tv));
         if (ac->c.command_timeout == NULL) {
