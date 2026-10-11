@@ -2606,7 +2606,7 @@ static void test_async_timeout_enqueue(int mode) {
     redisFD listener, peer;
     int size = 4096;
     int runtime_timeout = mode == 2 || mode == 3;
-    size_t payloadlen = (runtime_timeout ? 8 : 1) * 1024 * 1024;
+    size_t payloadlen = 1024 * 1024;
     char *payload = malloc(payloadlen);
     long long start, next_enqueue;
     if (mode == 0) {
@@ -2691,38 +2691,37 @@ static void test_async_timeout_enqueue(int mode) {
         /* Do not let an excessively delayed test pass the old 2.8s timer. */
         if (usec() - start >= 2600000) abort();
         timeoutEnqueueTick(c, &t);
+    } else if (runtime_timeout) {
+        /* Leave a reply pending after the first command has been written. */
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        t.queued++;
+        start = usec();
+        while (c->err == 0 && (!(c->c.flags & REDIS_CONNECTED) || sdslen(c->c.obuf)) &&
+               usec() - start < 2000000)
+            timeoutEnqueueTick(c, &t);
+        if (c->err != 0 || !(c->c.flags & REDIS_CONNECTED) || sdslen(c->c.obuf)) abort();
+
+        command_timeout.tv_sec = 0;
+        command_timeout.tv_usec = 200000;
+        if (redisAsyncSetTimeout(c, command_timeout) != REDIS_OK) abort();
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        t.queued++;
+        /* Pause write dispatch explicitly: kernel buffering varies by OS and
+         * an actual write would refresh the timer independently of the setter. */
+        c->ev.delWrite(c->ev.data);
+        start = usec();
+        while (c->err == 0 && usec() - start < 750000)
+            timeoutEnqueueTick(c, &t);
     } else {
         /* Saturate the socket so adding commands cannot make write progress. */
         if (redisAsyncCommand(c, timeoutEnqueueCallback, &t,
                           "SET key %b", payload, payloadlen) != REDIS_OK) abort();
         t.queued++;
-        if (runtime_timeout) {
-            size_t previous = 0;
-            int stable = 0;
-            start = usec();
-            while (c->err == 0 && stable < 20 && usec() - start < 2000000) {
-                timeoutEnqueueTick(c, &t);
-                size_t buffered = sdslen(c->c.obuf);
-                stable = buffered && buffered == previous ? stable + 1 : 0;
-                previous = buffered;
-            }
-            if (c->err != 0 || stable != 20) {
-                printf("runtime timeout setup: mode=%d err=%d stable=%d buffered=%zu elapsed_us=%lld\n",
-                       mode, c->err, stable, sdslen(c->c.obuf), usec() - start);
-                fflush(stdout);
-                abort();
-            }
-            command_timeout.tv_sec = 0;
-            command_timeout.tv_usec = 200000;
-            if (redisAsyncSetTimeout(c, command_timeout) != REDIS_OK) abort();
-            if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
-            t.queued++;
-        }
         start = usec();
         next_enqueue = start + 10000;
-        while (c->err == 0 && usec() - start < (runtime_timeout ? 750000 : 2000000)) {
+        while (c->err == 0 && usec() - start < 2000000) {
             timeoutEnqueueTick(c, &t);
-            if (!runtime_timeout && c->err == 0 && usec() >= next_enqueue) {
+            if (c->err == 0 && usec() >= next_enqueue) {
                 if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
                 t.queued++;
                 next_enqueue = usec() + 10000;
