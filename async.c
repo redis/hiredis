@@ -844,6 +844,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     const char *p;
     sds sname;
     int ret;
+    int pending = ac->replies.head != NULL || ac->sub.replies.head != NULL;
 
     /* Don't accept new commands when the connection is about to be closed. */
     if (c->flags & (REDIS_DISCONNECTING | REDIS_FREEING)) return REDIS_ERR;
@@ -957,8 +958,11 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
 
     __redisAppendCommand(c,cmd,len);
 
-    /* Always schedule a write when the write buffer is non-empty */
-    _EL_ADD_WRITE(ac);
+    /* Queueing more commands is not I/O progress: preserve their timeout. */
+    if (!pending)
+        refreshTimeout(ac);
+    if (ac->ev.addWrite)
+        ac->ev.addWrite(ac->ev.data);
 
     return REDIS_OK;
 oom:

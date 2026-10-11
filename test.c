@@ -2565,6 +2565,101 @@ static void test_async_polling(struct config config) {
 }
 /* End of Async polling_adapter driven tests */
 
+struct timeoutEnqueueTest {
+    int queued;
+    int timed_out;
+    int replies;
+};
+
+static void timeoutEnqueueCallback(redisAsyncContext *c, void *reply, void *data) {
+    struct timeoutEnqueueTest *t = data;
+    if (reply == NULL && c->err == REDIS_ERR_TIMEOUT)
+        t->timed_out++;
+    else
+        t->replies++;
+}
+
+static void test_async_timeout_enqueue(int after_idle) {
+    struct timeoutEnqueueTest t = {0};
+    struct sockaddr_in addr = {0};
+    socklen_t addrlen = sizeof(addr);
+    struct timeval connect_timeout = {1, 0};
+    struct timeval command_timeout = {0, 200000};
+    redisOptions options = {0};
+    redisAsyncContext *c;
+    redisFD listener, peer;
+    int size = 4096;
+    size_t payloadlen = 1024 * 1024;
+    char *payload = malloc(payloadlen);
+    long long start, next_enqueue;
+
+    if (after_idle) {
+        test("Async timeout is armed for new commands after an idle period: ");
+    } else {
+        test("Async command enqueue does not postpone a stalled connection timeout: ");
+    }
+    if (payload == NULL) abort();
+    memset(payload, 'x', payloadlen);
+
+    /* The local peer stops reading and replying for the timeout test. */
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener == REDIS_INVALID_FD) abort();
+    if (setsockopt(listener, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)) != 0) abort();
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(listener, (struct sockaddr *)&addr, sizeof(addr)) != 0) abort();
+    if (listen(listener, 1) != 0) abort();
+    if (getsockname(listener, (struct sockaddr *)&addr, &addrlen) != 0) abort();
+
+    REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", ntohs(addr.sin_port));
+    options.connect_timeout = &connect_timeout;
+    options.command_timeout = &command_timeout;
+    options.options = REDIS_OPT_NOAUTOFREE;
+    c = redisAsyncConnectWithOptions(&options);
+    if (c == NULL || c->err != 0) abort();
+    if (redisPollAttach(c) != REDIS_OK) abort();
+    if (setsockopt(c->c.fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)) != 0) abort();
+    peer = accept(listener, NULL, NULL);
+    if (peer == REDIS_INVALID_FD) abort();
+
+    if (after_idle) {
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        if (send(peer, "+PONG\r\n", 7, 0) != 7) abort();
+        start = usec();
+        while (c->err == 0 && t.replies == 0 && usec() - start < 2000000)
+            redisPollTick(c, 0.005);
+        if (c->err != 0 || t.replies != 1) abort();
+        t.replies = 0;
+        /* Let the previous command timer expire while the connection is idle. */
+        start = usec();
+        while (c->err == 0 && usec() - start < 300000)
+            redisPollTick(c, 0.005);
+        if (c->err != 0) abort();
+    }
+
+    /* Saturate the socket so adding commands cannot make write progress. */
+    if (redisAsyncCommand(c, timeoutEnqueueCallback, &t,
+                          "SET key %b", payload, payloadlen) != REDIS_OK) abort();
+    t.queued++;
+    start = usec();
+    next_enqueue = start + 10000;
+    while (c->err == 0 && usec() - start < 2000000) {
+        redisPollTick(c, 0.005);
+        if (c->err == 0 && usec() >= next_enqueue) {
+            if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+            t.queued++;
+            next_enqueue = usec() + 10000;
+        }
+    }
+    test_cond(c->err == REDIS_ERR_TIMEOUT && t.queued > 1 &&
+              t.timed_out == t.queued && t.replies == 0 && sdslen(c->c.obuf) > 0);
+
+    redisAsyncFree(c);
+    close(peer);
+    close(listener);
+    free(payload);
+}
+
 #ifdef HIREDIS_TEST_SSL
 /* Connect to the SSL port with a context bound to an expected peer name.
  * Returns the (possibly errored) context; the caller inspects c->err. */
@@ -2747,6 +2842,8 @@ int main(int argc, char **argv) {
     test_reply_reader();
     test_blocking_connection_errors();
     test_free_null();
+    test_async_timeout_enqueue(0);
+    test_async_timeout_enqueue(1);
 #ifdef __linux__
     test_nonblocking_connect_error_queue();
 #endif
