@@ -102,9 +102,16 @@ static void redisLibeventUpdate(void *privdata, short flag, int isRemove) {
     if (event_pending(e->ev, EV_TIMEOUT, &remaining)) {
         tv = &remaining;
         if (event_base_gettimeofday_cached(e->base, &now) == 0) {
-            evutil_timersub(&remaining, &now, &remaining);
-            if (remaining.tv_sec < 0)
-                evutil_timerclear(&remaining);
+            remaining.tv_sec -= now.tv_sec;
+            remaining.tv_usec -= now.tv_usec;
+            if (remaining.tv_usec < 0) {
+                remaining.tv_sec--;
+                remaining.tv_usec += 1000000;
+            }
+            if (remaining.tv_sec < 0) {
+                remaining.tv_sec = 0;
+                remaining.tv_usec = 0;
+            }
         } else {
             /* Keep a bounded timer if the clock cannot be read. */
             tv = &e->tv;

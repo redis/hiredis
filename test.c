@@ -2605,10 +2605,10 @@ static void test_async_timeout_enqueue(int mode) {
     redisAsyncContext *c;
     redisFD listener, peer;
     int size = 4096;
-    size_t payloadlen = 1024 * 1024;
+    int runtime_timeout = mode == 2 || mode == 3;
+    size_t payloadlen = (runtime_timeout ? 8 : 1) * 1024 * 1024;
     char *payload = malloc(payloadlen);
     long long start, next_enqueue;
-    int runtime_timeout = mode == 2 || mode == 3;
     if (mode == 0) {
         test("Async command enqueue does not postpone a stalled connection timeout: ");
     } else if (mode == 1) {
@@ -2620,6 +2620,7 @@ static void test_async_timeout_enqueue(int mode) {
     } else {
         test("Libevent write interest does not postpone a pending timeout: ");
     }
+    fflush(stdout);
     if (payload == NULL) abort();
     memset(payload, 'x', payloadlen);
 
@@ -2705,7 +2706,12 @@ static void test_async_timeout_enqueue(int mode) {
                 stable = buffered && buffered == previous ? stable + 1 : 0;
                 previous = buffered;
             }
-            if (c->err != 0 || stable != 20) abort();
+            if (c->err != 0 || stable != 20) {
+                printf("runtime timeout setup: mode=%d err=%d stable=%d buffered=%zu elapsed_us=%lld\n",
+                       mode, c->err, stable, sdslen(c->c.obuf), usec() - start);
+                fflush(stdout);
+                abort();
+            }
             command_timeout.tv_sec = 0;
             command_timeout.tv_usec = 200000;
             if (redisAsyncSetTimeout(c, command_timeout) != REDIS_OK) abort();
