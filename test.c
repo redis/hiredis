@@ -2569,6 +2569,13 @@ struct timeoutEnqueueTest {
     int queued;
     int timed_out;
     int replies;
+    int eof_callbacks;
+    int other_callbacks;
+    int disconnects;
+    int disconnect_status;
+    int disconnect_err;
+    int set_timeout_status;
+    int err_after_timeout;
 #ifdef HIREDIS_TEST_ASYNC
     struct event_base *loop;
 #endif
@@ -2578,8 +2585,19 @@ static void timeoutEnqueueCallback(redisAsyncContext *c, void *reply, void *data
     struct timeoutEnqueueTest *t = data;
     if (reply == NULL && c->err == REDIS_ERR_TIMEOUT)
         t->timed_out++;
+    else if (reply == NULL && c->err == REDIS_ERR_EOF)
+        t->eof_callbacks++;
+    else if (reply == NULL)
+        t->other_callbacks++;
     else
         t->replies++;
+}
+
+static void timeoutEnqueueDisconnectCallback(const redisAsyncContext *c, int status) {
+    struct timeoutEnqueueTest *t = c->data;
+    t->disconnects++;
+    t->disconnect_status = status;
+    t->disconnect_err = c->err;
 }
 
 static void timeoutEnqueueTick(redisAsyncContext *c, struct timeoutEnqueueTest *t) {
@@ -2617,6 +2635,10 @@ static void test_async_timeout_enqueue(int mode) {
         test("Async timeout can be enabled while commands are pending: ");
     } else if (mode == 3) {
         test("Async timeout can be shortened while commands are pending: ");
+    } else if (mode == 5) {
+        test("Async timeout can be changed after poll adapter cleanup: ");
+    } else if (mode == 6) {
+        test("Async timeout can be shortened during graceful disconnect: ");
     } else {
         test("Libevent write interest does not postpone a pending timeout: ");
     }
@@ -2635,9 +2657,9 @@ static void test_async_timeout_enqueue(int mode) {
     if (getsockname(listener, (struct sockaddr *)&addr, &addrlen) != 0) abort();
 
     REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", ntohs(addr.sin_port));
-    if (runtime_timeout) connect_timeout.tv_sec = 3;
-    if (mode == 3 || mode == 4) {
-        command_timeout.tv_sec = mode == 3 ? 3 : 2;
+    if (runtime_timeout || mode == 6) connect_timeout.tv_sec = 3;
+    if (mode == 3 || mode == 4 || mode == 5 || mode == 6) {
+        command_timeout.tv_sec = mode == 4 ? 2 : 3;
         command_timeout.tv_usec = 0;
     }
     options.connect_timeout = &connect_timeout;
@@ -2691,6 +2713,68 @@ static void test_async_timeout_enqueue(int mode) {
         /* Do not let an excessively delayed test pass the old 2.8s timer. */
         if (usec() - start >= 2600000) abort();
         timeoutEnqueueTick(c, &t);
+    } else if (mode == 5) {
+        struct timeval updated_timeout = {0, 200000};
+        int timeout_status;
+
+        /* Keep one command pending on an established connection, then let
+         * EOF clean up the poll adapter while NOAUTOFREE keeps c alive. */
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        t.queued++;
+        start = usec();
+        while (c->err == 0 && (!(c->c.flags & REDIS_CONNECTED) || sdslen(c->c.obuf)) &&
+               usec() - start < 2000000)
+            timeoutEnqueueTick(c, &t);
+        if (c->err != 0 || !(c->c.flags & REDIS_CONNECTED) || sdslen(c->c.obuf)) abort();
+
+        /* Send EOF without resetting a socket with unread request bytes. */
+#ifdef _WIN32
+        if (shutdown(peer, SD_SEND) != 0) abort();
+#else
+        if (shutdown(peer, SHUT_WR) != 0) abort();
+#endif
+        start = usec();
+        while (c->err == 0 && usec() - start < 2000000)
+            timeoutEnqueueTick(c, &t);
+        if (c->err != REDIS_ERR_EOF) abort();
+
+        timeout_status = redisAsyncSetTimeout(c, updated_timeout);
+        t.set_timeout_status = timeout_status;
+        t.err_after_timeout = c->err;
+
+        /* NOAUTOFREE leaves the pending callback for explicit destruction. */
+        redisAsyncFree(c);
+        c = NULL;
+    } else if (mode == 6) {
+        struct timeval updated_timeout = {0, 200000};
+        int timeout_status;
+
+        c->data = &t;
+        if (redisAsyncSetDisconnectCallback(c, timeoutEnqueueDisconnectCallback) != REDIS_OK) abort();
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        t.queued++;
+        start = usec();
+        while (c->err == 0 && (!(c->c.flags & REDIS_CONNECTED) || sdslen(c->c.obuf)) &&
+               usec() - start < 2000000)
+            timeoutEnqueueTick(c, &t);
+        if (c->err != 0 || !(c->c.flags & REDIS_CONNECTED) || sdslen(c->c.obuf)) abort();
+
+        /* Disconnect makes pending callbacks drain on error. Once requested,
+         * observe only stack state because the timeout tick may free c. */
+        redisAsyncDisconnect(c);
+        timeout_status = redisAsyncSetTimeout(c, updated_timeout);
+        t.set_timeout_status = timeout_status;
+        if (timeout_status != REDIS_OK) {
+            redisAsyncFree(c);
+            c = NULL;
+        } else {
+            start = usec();
+            while (t.disconnects == 0 && usec() - start < 750000)
+                timeoutEnqueueTick(c, &t);
+            if (t.disconnects == 0)
+                redisAsyncFree(c);
+            c = NULL;
+        }
     } else if (runtime_timeout) {
         /* Leave a reply pending after the first command has been written. */
         if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
@@ -2728,18 +2812,44 @@ static void test_async_timeout_enqueue(int mode) {
             }
         }
     }
-    test_cond(c->err == REDIS_ERR_TIMEOUT && t.queued > 1 &&
-              t.timed_out == t.queued && t.replies == 0 && sdslen(c->c.obuf) > 0);
-    if (c->err != REDIS_ERR_TIMEOUT || t.timed_out != t.queued ||
-        t.replies != 0 || sdslen(c->c.obuf) == 0)
-        printf("mode=%d elapsed_us=%lld err=%d queued=%d timeouts=%d replies=%d buffered=%zu\n",
-               mode, usec() - start, c->err, t.queued, t.timed_out, t.replies, sdslen(c->c.obuf));
+    if (mode == 5) {
+        test_cond(t.set_timeout_status == REDIS_OK && t.err_after_timeout == REDIS_ERR_EOF &&
+                  t.queued == 1 &&
+                  t.eof_callbacks == 1 && t.timed_out == 0 &&
+                  t.replies == 0 && t.other_callbacks == 0);
+        if (t.set_timeout_status != REDIS_OK || t.err_after_timeout != REDIS_ERR_EOF ||
+            t.queued != 1 ||
+            t.eof_callbacks != 1 || t.timed_out != 0 ||
+            t.replies != 0 || t.other_callbacks != 0)
+            printf("mode=%d elapsed_us=%lld timeout_status=%d err_after_timeout=%d queued=%d eof=%d timeouts=%d replies=%d other=%d\n",
+                   mode, usec() - start, t.set_timeout_status, t.err_after_timeout, t.queued, t.eof_callbacks, t.timed_out,
+                   t.replies, t.other_callbacks);
+    } else if (mode == 6) {
+        test_cond(t.set_timeout_status == REDIS_OK && t.queued == 1 && t.disconnects == 1 &&
+                  t.disconnect_status == REDIS_ERR && t.disconnect_err == REDIS_ERR_TIMEOUT &&
+                  t.timed_out == 1 && t.replies == 0 && t.eof_callbacks == 0 &&
+                  t.other_callbacks == 0);
+        if (t.set_timeout_status != REDIS_OK || t.queued != 1 || t.disconnects != 1 ||
+            t.disconnect_status != REDIS_ERR || t.disconnect_err != REDIS_ERR_TIMEOUT ||
+            t.timed_out != 1 || t.replies != 0 || t.eof_callbacks != 0 ||
+            t.other_callbacks != 0)
+            printf("mode=%d elapsed_us=%lld timeout_status=%d queued=%d disconnects=%d disconnect_status=%d disconnect_err=%d timeouts=%d replies=%d eof=%d other=%d\n",
+                   mode, usec() - start, t.set_timeout_status, t.queued, t.disconnects, t.disconnect_status,
+                   t.disconnect_err, t.timed_out, t.replies, t.eof_callbacks, t.other_callbacks);
+    } else {
+        test_cond(c->err == REDIS_ERR_TIMEOUT && t.queued > 1 &&
+                  t.timed_out == t.queued && t.replies == 0 && sdslen(c->c.obuf) > 0);
+        if (c->err != REDIS_ERR_TIMEOUT || t.timed_out != t.queued ||
+            t.replies != 0 || sdslen(c->c.obuf) == 0)
+            printf("mode=%d elapsed_us=%lld err=%d queued=%d timeouts=%d replies=%d buffered=%zu\n",
+                   mode, usec() - start, c->err, t.queued, t.timed_out, t.replies, sdslen(c->c.obuf));
 
-    redisAsyncFree(c);
+        redisAsyncFree(c);
+    }
 #ifdef HIREDIS_TEST_ASYNC
     if (t.loop != NULL) event_base_free(t.loop);
 #endif
-    close(peer);
+    if (peer != REDIS_INVALID_FD) close(peer);
     close(listener);
     free(payload);
 }
@@ -2933,6 +3043,8 @@ int main(int argc, char **argv) {
 #ifdef HIREDIS_TEST_ASYNC
     test_async_timeout_enqueue(4);
 #endif
+    test_async_timeout_enqueue(5);
+    test_async_timeout_enqueue(6);
 #ifdef __linux__
     test_nonblocking_connect_error_queue();
 #endif

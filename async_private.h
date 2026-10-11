@@ -49,6 +49,7 @@
         if ((ctx)->ev.delWrite) (ctx)->ev.delWrite((ctx)->ev.data); \
     } while(0)
 #define _EL_CLEANUP(ctx) do { \
+        ctx->ev.scheduleTimer = NULL; \
         if ((ctx)->ev.cleanup) (ctx)->ev.cleanup((ctx)->ev.data); \
         ctx->ev.cleanup = NULL; \
     } while(0)
