@@ -2606,7 +2606,7 @@ static void test_async_timeout_enqueue(int after_idle) {
     if (listener == REDIS_INVALID_FD) abort();
     if (setsockopt(listener, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)) != 0) abort();
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_addr.s_addr = htonl(0x7f000001); /* 127.0.0.1 */
     if (bind(listener, (struct sockaddr *)&addr, sizeof(addr)) != 0) abort();
     if (listen(listener, 1) != 0) abort();
     if (getsockname(listener, (struct sockaddr *)&addr, &addrlen) != 0) abort();
