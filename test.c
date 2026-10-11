@@ -2569,6 +2569,9 @@ struct timeoutEnqueueTest {
     int queued;
     int timed_out;
     int replies;
+#ifdef HIREDIS_TEST_ASYNC
+    struct event_base *loop;
+#endif
 };
 
 static void timeoutEnqueueCallback(redisAsyncContext *c, void *reply, void *data) {
@@ -2579,7 +2582,20 @@ static void timeoutEnqueueCallback(redisAsyncContext *c, void *reply, void *data
         t->replies++;
 }
 
-static void test_async_timeout_enqueue(int after_idle) {
+static void timeoutEnqueueTick(redisAsyncContext *c, struct timeoutEnqueueTest *t) {
+#ifdef HIREDIS_TEST_ASYNC
+    if (t->loop != NULL) {
+        event_base_loop(t->loop, EVLOOP_NONBLOCK);
+        millisleep(5);
+        return;
+    }
+#else
+    (void)t;
+#endif
+    redisPollTick(c, 0.005);
+}
+
+static void test_async_timeout_enqueue(int mode) {
     struct timeoutEnqueueTest t = {0};
     struct sockaddr_in addr = {0};
     socklen_t addrlen = sizeof(addr);
@@ -2592,11 +2608,17 @@ static void test_async_timeout_enqueue(int after_idle) {
     size_t payloadlen = 1024 * 1024;
     char *payload = malloc(payloadlen);
     long long start, next_enqueue;
-
-    if (after_idle) {
-        test("Async timeout is armed for new commands after an idle period: ");
-    } else {
+    int runtime_timeout = mode == 2 || mode == 3;
+    if (mode == 0) {
         test("Async command enqueue does not postpone a stalled connection timeout: ");
+    } else if (mode == 1) {
+        test("Async timeout is armed for new commands after an idle period: ");
+    } else if (mode == 2) {
+        test("Async timeout can be enabled while commands are pending: ");
+    } else if (mode == 3) {
+        test("Async timeout can be shortened while commands are pending: ");
+    } else {
+        test("Libevent write interest does not postpone a pending timeout: ");
     }
     if (payload == NULL) abort();
     memset(payload, 'x', payloadlen);
@@ -2612,49 +2634,106 @@ static void test_async_timeout_enqueue(int after_idle) {
     if (getsockname(listener, (struct sockaddr *)&addr, &addrlen) != 0) abort();
 
     REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", ntohs(addr.sin_port));
+    if (runtime_timeout) connect_timeout.tv_sec = 3;
+    if (mode == 3 || mode == 4) {
+        command_timeout.tv_sec = mode == 3 ? 3 : 2;
+        command_timeout.tv_usec = 0;
+    }
     options.connect_timeout = &connect_timeout;
-    options.command_timeout = &command_timeout;
+    options.command_timeout = mode == 2 ? NULL : &command_timeout;
     options.options = REDIS_OPT_NOAUTOFREE;
     c = redisAsyncConnectWithOptions(&options);
     if (c == NULL || c->err != 0) abort();
+#ifdef HIREDIS_TEST_ASYNC
+    if (mode == 4) {
+        t.loop = event_base_new();
+        if (t.loop == NULL || redisLibeventAttach(c, t.loop) != REDIS_OK) abort();
+    } else
+#endif
     if (redisPollAttach(c) != REDIS_OK) abort();
     if (setsockopt(c->c.fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)) != 0) abort();
     peer = accept(listener, NULL, NULL);
     if (peer == REDIS_INVALID_FD) abort();
 
-    if (after_idle) {
+    if (mode == 1) {
         if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
         if (send(peer, "+PONG\r\n", 7, 0) != 7) abort();
         start = usec();
         while (c->err == 0 && t.replies == 0 && usec() - start < 2000000)
-            redisPollTick(c, 0.005);
+            timeoutEnqueueTick(c, &t);
         if (c->err != 0 || t.replies != 1) abort();
         t.replies = 0;
         /* Let the previous command timer expire while the connection is idle. */
         start = usec();
         while (c->err == 0 && usec() - start < 300000)
-            redisPollTick(c, 0.005);
+            timeoutEnqueueTick(c, &t);
         if (c->err != 0) abort();
     }
 
-    /* Saturate the socket so adding commands cannot make write progress. */
-    if (redisAsyncCommand(c, timeoutEnqueueCallback, &t,
+    if (mode == 4) {
+        /* First drain hiredis's output so write interest is disabled. */
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        t.queued++;
+        start = usec();
+        while (c->err == 0 && (!(c->c.flags & REDIS_CONNECTED) || sdslen(c->c.obuf)) &&
+               usec() - start < 2000000)
+            timeoutEnqueueTick(c, &t);
+        if (c->err != 0 || sdslen(c->c.obuf)) abort();
+
+        /* Queue another command without dispatching I/O. The original timer
+         * must expire before the newly enabled write event can run. */
+        start = usec();
+        millisleep(800);
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        t.queued++;
+        millisleep(1500);
+        /* Do not let an excessively delayed test pass the old 2.8s timer. */
+        if (usec() - start >= 2600000) abort();
+        timeoutEnqueueTick(c, &t);
+    } else {
+        /* Saturate the socket so adding commands cannot make write progress. */
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t,
                           "SET key %b", payload, payloadlen) != REDIS_OK) abort();
-    t.queued++;
-    start = usec();
-    next_enqueue = start + 10000;
-    while (c->err == 0 && usec() - start < 2000000) {
-        redisPollTick(c, 0.005);
-        if (c->err == 0 && usec() >= next_enqueue) {
+        t.queued++;
+        if (runtime_timeout) {
+            size_t previous = 0;
+            int stable = 0;
+            start = usec();
+            while (c->err == 0 && stable < 20 && usec() - start < 2000000) {
+                timeoutEnqueueTick(c, &t);
+                size_t buffered = sdslen(c->c.obuf);
+                stable = buffered && buffered == previous ? stable + 1 : 0;
+                previous = buffered;
+            }
+            if (c->err != 0 || stable != 20) abort();
+            command_timeout.tv_sec = 0;
+            command_timeout.tv_usec = 200000;
+            if (redisAsyncSetTimeout(c, command_timeout) != REDIS_OK) abort();
             if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
             t.queued++;
-            next_enqueue = usec() + 10000;
+        }
+        start = usec();
+        next_enqueue = start + 10000;
+        while (c->err == 0 && usec() - start < (runtime_timeout ? 750000 : 2000000)) {
+            timeoutEnqueueTick(c, &t);
+            if (!runtime_timeout && c->err == 0 && usec() >= next_enqueue) {
+                if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+                t.queued++;
+                next_enqueue = usec() + 10000;
+            }
         }
     }
     test_cond(c->err == REDIS_ERR_TIMEOUT && t.queued > 1 &&
               t.timed_out == t.queued && t.replies == 0 && sdslen(c->c.obuf) > 0);
+    if (c->err != REDIS_ERR_TIMEOUT || t.timed_out != t.queued ||
+        t.replies != 0 || sdslen(c->c.obuf) == 0)
+        printf("mode=%d elapsed_us=%lld err=%d queued=%d timeouts=%d replies=%d buffered=%zu\n",
+               mode, usec() - start, c->err, t.queued, t.timed_out, t.replies, sdslen(c->c.obuf));
 
     redisAsyncFree(c);
+#ifdef HIREDIS_TEST_ASYNC
+    if (t.loop != NULL) event_base_free(t.loop);
+#endif
     close(peer);
     close(listener);
     free(payload);
@@ -2844,6 +2923,11 @@ int main(int argc, char **argv) {
     test_free_null();
     test_async_timeout_enqueue(0);
     test_async_timeout_enqueue(1);
+    test_async_timeout_enqueue(2);
+    test_async_timeout_enqueue(3);
+#ifdef HIREDIS_TEST_ASYNC
+    test_async_timeout_enqueue(4);
+#endif
 #ifdef __linux__
     test_nonblocking_connect_error_queue();
 #endif

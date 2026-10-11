@@ -81,7 +81,8 @@ static void redisLibeventHandler(evutil_socket_t fd, short event, void *arg) {
 
 static void redisLibeventUpdate(void *privdata, short flag, int isRemove) {
     redisLibeventEvents *e = (redisLibeventEvents *)privdata;
-    const struct timeval *tv = e->tv.tv_sec || e->tv.tv_usec ? &e->tv : NULL;
+    struct timeval remaining, now;
+    const struct timeval *tv = NULL;
 
     if (isRemove) {
         if ((e->flags & flag) == 0) {
@@ -94,6 +95,19 @@ static void redisLibeventUpdate(void *privdata, short flag, int isRemove) {
             return;
         } else {
             e->flags |= flag;
+        }
+    }
+
+    /* Changing I/O interest must preserve the timer's existing deadline. */
+    if (event_pending(e->ev, EV_TIMEOUT, &remaining)) {
+        tv = &remaining;
+        if (event_base_gettimeofday_cached(e->base, &now) == 0) {
+            evutil_timersub(&remaining, &now, &remaining);
+            if (remaining.tv_sec < 0)
+                evutil_timerclear(&remaining);
+        } else {
+            /* Keep a bounded timer if the clock cannot be read. */
+            tv = &e->tv;
         }
     }
 
@@ -137,10 +151,8 @@ static void redisLibeventCleanup(void *privdata) {
 
 static void redisLibeventSetTimeout(void *privdata, struct timeval tv) {
     redisLibeventEvents *e = (redisLibeventEvents *)privdata;
-    short flags = e->flags;
-    e->flags = 0;
     e->tv = tv;
-    redisLibeventUpdate(e, flags, 0);
+    event_add(e->ev, &e->tv);
 }
 
 static int redisLibeventAttach(redisAsyncContext *ac, struct event_base *base) {

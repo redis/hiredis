@@ -1032,6 +1032,9 @@ int redisAsyncSetTimeout(redisAsyncContext *ac, struct timeval tv) {
         tv.tv_usec != ac->c.command_timeout->tv_usec)
     {
         *ac->c.command_timeout = tv;
+        if ((ac->c.flags & REDIS_CONNECTED) &&
+            (ac->replies.head != NULL || ac->sub.replies.head != NULL))
+            refreshTimeout(ac);
     }
 
     return REDIS_OK;
