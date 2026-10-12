@@ -2734,9 +2734,16 @@ static void test_async_timeout_enqueue(int mode) {
         if (shutdown(peer, SHUT_WR) != 0) abort();
 #endif
         start = usec();
-        while (c->err == 0 && usec() - start < 2000000)
-            timeoutEnqueueTick(c, &t);
-        if (c->err != REDIS_ERR_EOF) abort();
+        /* Drive EOF through the async read handler: this test covers adapter
+         * cleanup, independently of platform-specific poll hangup events. */
+        while (c->err == 0 && usec() - start < 2000000) {
+            redisAsyncHandleRead(c);
+            if (c->err == 0) millisleep(5);
+        }
+        if (c->err != REDIS_ERR_EOF) {
+            fprintf(stderr, "mode=%d expected EOF, err=%d (%s)\n", mode, c->err, c->errstr);
+            abort();
+        }
 
         timeout_status = redisAsyncSetTimeout(c, updated_timeout);
         t.set_timeout_status = timeout_status;
