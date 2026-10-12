@@ -2639,6 +2639,8 @@ static void test_async_timeout_enqueue(int mode) {
         test("Async timeout can be changed after poll adapter cleanup: ");
     } else if (mode == 6) {
         test("Async timeout can be shortened during graceful disconnect: ");
+    } else if (mode == 7) {
+        test("Async connect timeout is armed after late adapter attachment: ");
     } else {
         test("Libevent write interest does not postpone a pending timeout: ");
     }
@@ -2658,6 +2660,10 @@ static void test_async_timeout_enqueue(int mode) {
 
     REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", ntohs(addr.sin_port));
     if (runtime_timeout || mode == 6) connect_timeout.tv_sec = 3;
+    if (mode == 7) {
+        connect_timeout.tv_sec = 0;
+        connect_timeout.tv_usec = 200000;
+    }
     if (mode == 3 || mode == 4 || mode == 5 || mode == 6) {
         command_timeout.tv_sec = mode == 4 ? 2 : 3;
         command_timeout.tv_usec = 0;
@@ -2667,6 +2673,10 @@ static void test_async_timeout_enqueue(int mode) {
     options.options = REDIS_OPT_NOAUTOFREE;
     c = redisAsyncConnectWithOptions(&options);
     if (c == NULL || c->err != 0) abort();
+    if (mode == 7) {
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        t.queued++;
+    }
 #ifdef HIREDIS_TEST_ASYNC
     if (mode == 4) {
         t.loop = event_base_new();
@@ -2782,6 +2792,16 @@ static void test_async_timeout_enqueue(int mode) {
                 redisAsyncFree(c);
             c = NULL;
         }
+    } else if (mode == 7) {
+        if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
+        t.queued++;
+        /* Poll needs a read interest to dispatch timers, but the peer never
+         * sends data. No I/O or connect callback may arm a missed timer. */
+        c->ev.addRead(c->ev.data);
+        c->ev.delWrite(c->ev.data);
+        start = usec();
+        while (c->err == 0 && usec() - start < 750000)
+            timeoutEnqueueTick(c, &t);
     } else if (runtime_timeout) {
         /* Leave a reply pending after the first command has been written. */
         if (redisAsyncCommand(c, timeoutEnqueueCallback, &t, "PING") != REDIS_OK) abort();
@@ -3052,6 +3072,7 @@ int main(int argc, char **argv) {
 #endif
     test_async_timeout_enqueue(5);
     test_async_timeout_enqueue(6);
+    test_async_timeout_enqueue(7);
 #ifdef __linux__
     test_nonblocking_connect_error_queue();
 #endif

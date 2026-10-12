@@ -779,6 +779,8 @@ void redisAsyncHandleTimeout(redisAsyncContext *ac) {
     /* must not be called from a callback */
     assert(!(c->flags & REDIS_IN_CALLBACK));
 
+    c->flags &= ~REDIS_ASYNC_TIMER_ARMED;
+
     if ((c->flags & REDIS_CONNECTED)) {
         if (ac->replies.head == NULL && ac->sub.replies.head == NULL) {
             /* Nothing to do - just an idle timeout */
@@ -959,7 +961,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     __redisAppendCommand(c,cmd,len);
 
     /* Queueing more commands is not I/O progress: preserve their timeout. */
-    if (!pending)
+    if (!pending || !(c->flags & REDIS_ASYNC_TIMER_ARMED))
         refreshTimeout(ac);
     if (ac->ev.addWrite)
         ac->ev.addWrite(ac->ev.data);

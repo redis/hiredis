@@ -32,6 +32,8 @@
 #ifndef __HIREDIS_ASYNC_PRIVATE_H
 #define __HIREDIS_ASYNC_PRIVATE_H
 
+#define REDIS_ASYNC_TIMER_ARMED 0x2000
+
 #define _EL_ADD_READ(ctx)                                         \
     do {                                                          \
         refreshTimeout(ctx);                                      \
@@ -50,6 +52,7 @@
     } while(0)
 #define _EL_CLEANUP(ctx) do { \
         ctx->ev.scheduleTimer = NULL; \
+        (ctx)->c.flags &= ~REDIS_ASYNC_TIMER_ARMED; \
         if ((ctx)->ev.cleanup) (ctx)->ev.cleanup((ctx)->ev.data); \
         ctx->ev.cleanup = NULL; \
     } while(0)
@@ -60,6 +63,7 @@ static inline void refreshTimeout(redisAsyncContext *ctx) {
 
     #define REDIS_EL_TIMER(ac, tvp) \
         if ((ac)->ev.scheduleTimer && REDIS_TIMER_ISSET(tvp)) { \
+            (ac)->c.flags |= REDIS_ASYNC_TIMER_ARMED; \
             (ac)->ev.scheduleTimer((ac)->ev.data, *(tvp)); \
         }
 
