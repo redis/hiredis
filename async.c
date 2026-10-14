@@ -483,7 +483,7 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
         reply->type == REDIS_REPLY_PUSH) {
         assert(reply->element[0]->type == REDIS_REPLY_STRING);
         stype = reply->element[0]->str;
-        pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;
+        pvariant = (tolower((unsigned char)stype[0]) == 'p') ? 1 : 0;
 
         if (pvariant)
             callbacks = ac->sub.patterns;
@@ -558,7 +558,7 @@ static int redisIsSubscribeReply(redisReply *reply) {
     }
 
     /* Get the string/len moving past 'p' if needed */
-    off = tolower(reply->element[0]->str[0]) == 'p';
+    off = tolower((unsigned char)reply->element[0]->str[0]) == 'p';
     str = reply->element[0]->str + off;
     len = reply->element[0]->len - off;
 
@@ -858,7 +858,7 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
     p = nextArgument(cmd,&cstr,&clen);
     assert(p != NULL);
     hasnext = (p[0] == '$');
-    pvariant = (tolower(cstr[0]) == 'p') ? 1 : 0;
+    pvariant = (tolower((unsigned char)cstr[0]) == 'p') ? 1 : 0;
     cstr += pvariant;
     clen -= pvariant;
 
