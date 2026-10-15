@@ -396,7 +396,8 @@ static int processLineItem(redisReader *r) {
         } else if (cur->type == REDIS_REPLY_BOOL) {
             int bval;
 
-            if (len != 1 || !strchr("tTfF", p[0])) {
+            if (len != 1 ||
+                (p[0] != 't' && p[0] != 'T' && p[0] != 'f' && p[0] != 'F')) {
                 __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                         "Bad bool value");
                 return REDIS_ERR;
