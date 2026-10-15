@@ -66,8 +66,16 @@
 /* Default max unused reader buffer. */
 #define REDIS_READER_MAX_BUF (1024*16)
 
-/* Default multi-bulk element limit */
-#define REDIS_READER_MAX_ARRAY_ELEMENTS ((1LL<<32) - 1)
+/* Default multi-bulk element limit.
+ *
+ * This bounds the memory a single untrusted aggregate reply can force us to
+ * pre-allocate: createArrayObject() does one hi_calloc(elements, sizeof(ptr)),
+ * so a hostile MAP/ARRAY header could otherwise make a ~12-byte packet request
+ * tens of GB before any element data has arrived (amplification -> OOM/DoS).
+ * The default caps one aggregate at 2^28 elements (~2 GiB of pointers), which
+ * still lets a legitimate 100,000,000-element list through. Applications that
+ * need larger replies can raise reader->maxelements after redisReaderCreate(). */
+#define REDIS_READER_MAX_ARRAY_ELEMENTS ((1LL<<28) - 1)
 
 /* Default maximum depth of nested aggregate replies. */
 #define REDIS_READER_MAX_REPLY_DEPTH 1024
