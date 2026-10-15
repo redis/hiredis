@@ -1,0 +1,24 @@
+name: Autolabeler
+
+on:
+  # pull_request_target so fork PRs can be labeled too; safe because no
+  # pull request code is checked out or run
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  auto_label:
+    permissions:
+      # Job-level permissions replace the workflow-level map, and the
+      # action reads its config through the contents API
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      # Applies the `autolabeler` rules from release-drafter-config.yml
+      - uses: release-drafter/release-drafter/autolabeler@v7
+        with:
+          config-name: release-drafter-config.yml

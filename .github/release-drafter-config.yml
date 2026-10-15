@@ -1,42 +1,80 @@
-name-template: '$NEXT_MAJOR_VERSION'
-tag-template: 'v$NEXT_MAJOR_VERSION'
-autolabeler:
-  - label: 'maintenance'
-    files:
-      - '*.md'
-      - '.github/*'
-  - label: 'bug'
-    branch:
-      - '/bug-.+'
-  - label: 'maintenance'
-    branch:
-      - '/maintenance-.+'
-  - label: 'feature'
-    branch:
-      - '/feature-.+'
-categories:
-  - title: 'Breaking Changes'
-    labels:
-      - 'breakingchange'
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
 
+# Applied to pull requests by .github/workflows/autolabeler.yml
+autolabeler:
+  - labels: ['maintenance']
+    files:
+      - '**/*.md'
+      - '.github/**'
+      - '.agents/**'
+      - '.claude/**'
+      - '.mcp.json'
+      - '.gitignore'
+      - '.gitmodules'
+      - '.travis.yml'
+      - 'appveyor.yml'
+    branch:
+      - '/^(maintenance|chore|ci|docs)[-\/].+/'
+  - labels: ['bug']
+    branch:
+      - '/^(bug|fix)[-\/].+/'
+  - labels: ['feature']
+    branch:
+      - '/^(feature|feat)[-\/].+/'
+
+# Categories are exclusive: a pull request is listed once, in the first
+# matching section (e.g. a feature that touches README.md is not repeated
+# under Maintenance).
+categories:
+  - type: 'pre-exclude'
+    when:
+      label: 'skip-changelog'
+
+  # ABI breaks bump the SONAME, which hiredis ships as a minor release
+  - title: '💥 Breaking Changes'
+    semver-increment: 'minor'
+    exclusive: true
+    when:
+      labels:
+        - 'abi-break'
+        - 'ignore-abi-check'
+        - 'breakingchange'
   - title: '🧪 Experimental Features'
-    labels:
-      - 'experimental'
+    semver-increment: 'minor'
+    exclusive: true
+    when:
+      label: 'experimental'
   - title: '🚀 New Features'
-    labels:
-      - 'feature'
-      - 'enhancement'
+    semver-increment: 'minor'
+    exclusive: true
+    when:
+      labels:
+        - 'feature'
+        - 'enhancement'
+        - 'performance'
   - title: '🐛 Bug Fixes'
-    labels:
-      - 'fix'
-      - 'bugfix'
-      - 'bug'
-      - 'BUG'
+    exclusive: true
+    when:
+      labels:
+        - 'fix'
+        - 'bugfix'
+        - 'bug'
+        - 'BUG'
+        - 'portability'
+        - 'windows-compatibility'
   - title: '🧰 Maintenance'
-    label: 'maintenance'
+    exclusive: true
+    when:
+      label: 'maintenance'
+  # No `when`: collects otherwise uncategorized pull requests
+  - title: '📝 Other Changes'
+
+  - type: 'version-resolver'
+    semver-increment: 'patch'
+
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
-exclude-labels:
-  - 'skip-changelog'
+change-title-escapes: '\<*_&'
 template: |
   ## Changes
 
