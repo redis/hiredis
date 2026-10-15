@@ -1,5 +1,8 @@
-name-template: 'v$RESOLVED_VERSION'
+name-template: '$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
+# Only consider releases and drafts that target master, so patch drafts of
+# the release/vX.Y.X maintenance branches are never picked up or overwritten.
+filter-by-commitish: true
 
 # Applied to pull requests by .github/workflows/autolabeler.yml
 autolabeler:
@@ -70,8 +73,10 @@ categories:
   # No `when`: collects otherwise uncategorized pull requests
   - title: '📝 Other Changes'
 
+  # master always drafts the next minor; patch releases are drafted on the
+  # release/vX.Y.X maintenance branches
   - type: 'version-resolver'
-    semver-increment: 'patch'
+    semver-increment: 'minor'
 
 change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
 change-title-escapes: '\<*_&'
