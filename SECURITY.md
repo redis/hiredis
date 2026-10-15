@@ -6,8 +6,8 @@ Hiredis officially supports Unix-like systems (Linux, macOS, BSD) only.
 
 **Windows is not an officially supported platform.** Windows compatibility code has been contributed by
 the community and is provided on a best-effort basis. There are known incompatibilities on Windows,
-including security vulnerabilities (for example, integer truncation caused by differing type sizes on
-64-bit Windows). Known Windows-specific issues are tracked under the
+including security vulnerabilities.
+Known Windows-specific issues are tracked under the
 [`windows-compatibility`](https://github.com/redis/hiredis/issues?q=is%3Aissue%20label%3Awindows-compatibility)
 label.
 

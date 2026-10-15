@@ -30,7 +30,7 @@ systems (Linux, macOS, BSD). Windows compatibility code has been contributed by 
 the years and is provided on a best-effort basis only.
 
 There are known incompatibilities when building and running hiredis on Windows, including
-security vulnerabilities (for example, integer truncation caused by differing type sizes on 64-bit Windows).
+security vulnerabilities.
 Use hiredis on Windows at your own risk. Known Windows-specific issues are tracked under the
 [`windows-compatibility`](https://github.com/redis/hiredis/issues?q=is%3Aissue%20label%3Awindows-compatibility)
 label.
