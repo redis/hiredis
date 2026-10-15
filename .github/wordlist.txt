@@ -49,6 +49,7 @@ libev
 libevent
 localhost
 Lua
+macOS
 michael
 minimalistic
 namespace
