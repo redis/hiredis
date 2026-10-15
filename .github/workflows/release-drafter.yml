@@ -2,8 +2,10 @@ name: Release Drafter
 
 on:
   push:
+    # draft a new patch release when changes land on this maintenance branch
     branches:
-      - master
+      - release/v1.5.X
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +17,8 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     steps:
-      # Drafts the next release notes as pull requests are merged into master
+      # Drafts the next patch release for the release/v1.5.X maintenance branch
       - uses: release-drafter/release-drafter@v7
         with:
           config-name: release-drafter-config.yml
+          commitish: release/v1.5.X
