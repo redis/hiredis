@@ -12,6 +12,9 @@ permissions:
 jobs:
   auto_label:
     permissions:
+      # Job-level permissions replace the workflow-level map, and the
+      # action reads its config through the contents API
+      contents: read
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
