@@ -109,7 +109,7 @@ static size_t chrtos(char *buf, size_t size, char byte) {
     case '\a': len = snprintf(buf,size,"\"\\a\""); break;
     case '\b': len = snprintf(buf,size,"\"\\b\""); break;
     default:
-        if (isprint(byte))
+        if (isprint((unsigned char)byte))
             len = snprintf(buf,size,"\"%c\"",byte);
         else
             len = snprintf(buf,size,"\"\\x%02x\"",(unsigned char)byte);
