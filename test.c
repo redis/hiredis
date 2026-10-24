@@ -1592,6 +1592,14 @@ static void test_blocking_connection_timeouts(struct config config) {
     test_cond(reply != NULL && reply->type == REDIS_REPLY_STATUS && strcmp(reply->str, "PONG") == 0);
     freeReplyObject(reply);
 
+    test("Reconnect preserves the reader limits: ");
+    c->reader->maxbuf = 0;
+    c->reader->maxelements = 42;
+    c->reader->maxdepth = 7;
+    do_reconnect(c, config);
+    test_cond(c->reader->maxbuf == 0 && c->reader->maxelements == 42 &&
+              c->reader->maxdepth == 7);
+
     disconnect(c, 0);
 }
 
