@@ -781,6 +781,16 @@ int redisReconnect(redisContext *c) {
         c->funcs->close(c);
     }
 
+    /* Keep any reader limits the user configured on the old reader. */
+    size_t maxbuf = REDIS_READER_MAX_BUF;
+    long long maxelements = REDIS_READER_MAX_ARRAY_ELEMENTS;
+    int maxdepth = REDIS_READER_MAX_REPLY_DEPTH;
+    if (c->reader != NULL) {
+        maxbuf = c->reader->maxbuf;
+        maxelements = c->reader->maxelements;
+        maxdepth = c->reader->maxdepth;
+    }
+
     sdsfree(c->obuf);
     redisReaderFree(c->reader);
 
@@ -791,6 +801,10 @@ int redisReconnect(redisContext *c) {
         __redisSetError(c, REDIS_ERR_OOM, "Out of memory");
         return REDIS_ERR;
     }
+
+    c->reader->maxbuf = maxbuf;
+    c->reader->maxelements = maxelements;
+    c->reader->maxdepth = maxdepth;
 
     int ret = REDIS_ERR;
     if (c->connection_type == REDIS_CONN_TCP) {
