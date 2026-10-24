@@ -28,6 +28,10 @@
 #include "adapters/poll.h"
 #ifdef HIREDIS_TEST_SSL
 #include "hiredis_ssl.h"
+#include <openssl/err.h>
+#ifndef _WIN32
+#include <fcntl.h>
+#endif
 #endif
 #ifdef HIREDIS_TEST_ASYNC
 #include "adapters/libevent.h"
@@ -1641,6 +1645,41 @@ static void test_blocking_io_errors(struct config config) {
     redisFree(c);
 }
 
+#if defined(HIREDIS_TEST_SSL) && !defined(_WIN32)
+/* A stale entry on the thread's OpenSSL error queue (left by an earlier
+ * connection, or by unrelated code) must not turn a non-blocking read that
+ * simply has no data yet into an I/O error. */
+static void test_ssl_stale_error_queue(struct config config) {
+    redisContext *c;
+    redisReply *reply;
+
+    c = do_connect(config);
+
+    /* Round-trip once so any pending TLS 1.3 session tickets are consumed;
+     * processing them would clear the error queue on its own. */
+    reply = redisCommand(c, "PING");
+    assert(reply != NULL);
+    freeReplyObject(reply);
+
+    /* Switch the established connection to non-blocking mode. */
+    int flags = fcntl(c->fd, F_GETFL);
+    assert(flags != -1 && fcntl(c->fd, F_SETFL, flags | O_NONBLOCK) != -1);
+    c->flags &= ~REDIS_BLOCK;
+
+    test("Stale OpenSSL error does not fail a non-blocking SSL read: ");
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    ERR_raise(ERR_LIB_USER, 1);
+#else
+    ERR_put_error(ERR_LIB_USER, 0, 1, __FILE__, __LINE__);
+#endif
+    int rv = redisBufferRead(c);
+    test_cond(rv == REDIS_OK && c->err == 0);
+
+    ERR_clear_error();
+    redisFree(c);
+}
+#endif
+
 static void test_invalid_timeout_errors(struct config config) {
     redisContext *c = NULL;
 
@@ -2794,6 +2833,9 @@ int main(int argc, char **argv) {
 
         if (cfg.ssl.verify_name)
             test_ssl_verify_name(cfg);
+#ifndef _WIN32
+        test_ssl_stale_error_queue(cfg);
+#endif
 
         redisFreeSSLContext(_ssl_ctx);
         _ssl_ctx = NULL;

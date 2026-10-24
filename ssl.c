@@ -575,6 +575,11 @@ static void redisSSLFree(void *privctx){
 static ssize_t redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
     redisSSL *rssl = c->privctx;
 
+    /* SSL_get_error() only reports WANT_READ/WANT_WRITE reliably when the
+     * thread's error queue was empty before the I/O call, so drop any stale
+     * entries (e.g. from an earlier connection on this thread) first. */
+    ERR_clear_error();
+
     int nread = SSL_read(rssl->ssl, buf, bufcap);
     if (nread > 0) {
         return nread;
@@ -618,6 +623,10 @@ static ssize_t redisSSLWrite(redisContext *c) {
     redisSSL *rssl = c->privctx;
 
     size_t len = rssl->lastLen ? rssl->lastLen : sdslen(c->obuf);
+
+    /* See redisSSLRead(). */
+    ERR_clear_error();
+
     int rv = SSL_write(rssl->ssl, c->obuf, len);
 
     if (rv > 0) {
