@@ -72,12 +72,6 @@ class RedisQtAdapter : public QObject {
         RedisQtAdapter(QObject * parent = 0)
             : QObject(parent), m_ctx(0), m_read(0), m_write(0) { }
 
-        ~RedisQtAdapter() {
-            if (m_ctx != 0) {
-                m_ctx->ev.data = NULL;
-            }
-        }
-
         int setContext(redisAsyncContext * ac) {
             if (ac->ev.data != NULL) {
                 return REDIS_ERR;
