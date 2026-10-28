@@ -955,10 +955,17 @@ static int __redisAsyncCommand(redisAsyncContext *ac, redisCallbackFn *fn, void 
         }
     }
 
+    /* We know the previous write was partial if there is data in the output
+     * buffer. So, we wait for a write event to write to the socket. Otherwise,
+     * we can directly write data to the socket. */
+    int pending_write = (sdslen(c->obuf) != 0);
+
     __redisAppendCommand(c,cmd,len);
 
-    /* Always schedule a write when the write buffer is non-empty */
-    _EL_ADD_WRITE(ac);
+    if (!pending_write)
+        redisAsyncWrite(ac);
+    else
+        _EL_ADD_WRITE(ac);
 
     return REDIS_OK;
 oom:
