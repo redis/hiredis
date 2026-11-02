@@ -457,7 +457,7 @@ static int processBulkItem(redisReader *r) {
     void *obj = NULL;
     char *p, *s;
     long long len;
-    unsigned long bytelen;
+    size_t bytelen;
     int success = 0;
 
     p = r->buf+r->pos;
@@ -486,9 +486,13 @@ static int processBulkItem(redisReader *r) {
                 obj = (void*)REDIS_REPLY_NIL;
             success = 1;
         } else {
-            /* Only continue when the buffer contains the entire bulk item. */
-            bytelen += len+2; /* include \r\n */
-            if (r->pos+bytelen <= r->len) {
+            /* Only continue when the buffer contains the entire bulk item.
+             * len is non-negative and fits in a size_t after the range check
+             * above, so measure the bytes that follow the length line and
+             * compare against len without overflowing bytelen. */
+            size_t remaining = (r->len - r->pos) - bytelen;
+            if (remaining >= 2 && (size_t)len <= remaining - 2) {
+                bytelen += (size_t)len + 2; /* include \r\n */
                 if ((cur->type == REDIS_REPLY_VERB && len < 4) ||
                     (cur->type == REDIS_REPLY_VERB && s[5] != ':'))
                 {
