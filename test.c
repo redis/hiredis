@@ -648,6 +648,21 @@ static void test_reply_reader(void) {
     redisReaderFree(reader);
 #endif
 
+    test("Bulk length near SIZE_MAX does not wrap around: ");
+    {
+        unsigned long long huge = (unsigned long long)SIZE_MAX < (unsigned long long)LLONG_MAX ?
+            (unsigned long long)SIZE_MAX : (unsigned long long)LLONG_MAX;
+        char huge_bulk_reply[100];
+        snprintf(huge_bulk_reply, sizeof(huge_bulk_reply), "$%llu\r\nX", huge);
+        reader = redisReaderCreate();
+        redisReaderFeed(reader, huge_bulk_reply, strlen(huge_bulk_reply));
+        ret = redisReaderGetReply(reader,&reply);
+        /* The bulk string is incomplete, so no reply must be returned yet. */
+        test_cond(ret == REDIS_OK && reply == NULL);
+        freeReplyObject(reply);
+        redisReaderFree(reader);
+    }
+
     test("Works with NULL functions for reply: ");
     reader = redisReaderCreate();
     reader->fn = NULL;
