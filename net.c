@@ -145,7 +145,7 @@ static int redisCreateSocket(redisContext *c, int type) {
     int flags = SOCK_STREAM;
 
 #ifdef SOCK_CLOEXEC
-    if (c->flags & REDIS_OPT_SET_SOCK_CLOEXEC) {
+    if (c->flags & REDIS_SET_SOCK_CLOEXEC) {
         flags |= SOCK_CLOEXEC;
     }
 #endif
@@ -570,7 +570,7 @@ addrretry: {
         int sock_type = p->ai_socktype;
 
 #ifdef SOCK_CLOEXEC
-        if (c->flags & REDIS_OPT_SET_SOCK_CLOEXEC) {
+        if (c->flags & REDIS_SET_SOCK_CLOEXEC) {
             sock_type |= SOCK_CLOEXEC;
         }
 #endif
