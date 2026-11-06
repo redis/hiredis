@@ -6,6 +6,7 @@
 #ifndef _WIN32
 #include <strings.h>
 #include <sys/time.h>
+#include <fcntl.h>
 #endif
 #include <assert.h>
 #include <signal.h>
@@ -441,6 +442,44 @@ static void test_tcp_options(struct config cfg) {
 
     redisFree(c);
 }
+
+#ifdef SOCK_CLOEXEC
+/* REDIS_OPT_REUSEADDR and REDIS_OPT_SET_SOCK_CLOEXEC must not leak into
+ * each other through the context flags. */
+static void test_tcp_socket_flags(struct config cfg) {
+    redisContext *c;
+    redisOptions options = {0};
+    struct sockaddr_storage local;
+    socklen_t locallen = sizeof(local);
+    char source[128];
+    int reuse = 0;
+    socklen_t reuselen = sizeof(reuse);
+
+    REDIS_OPTIONS_SET_TCP(&options, cfg.tcp.host, cfg.tcp.port);
+    options.options = REDIS_OPT_REUSEADDR;
+    c = redisConnectWithOptions(&options);
+    assert(c != NULL && c->err == 0);
+    test("REDIS_OPT_REUSEADDR does not set FD_CLOEXEC: ");
+    test_cond(!(fcntl(c->fd, F_GETFD) & FD_CLOEXEC));
+    /* Bind the next connection to the local address of this one, which is
+     * assigned to this host even when the server is remote. */
+    assert(getsockname(c->fd, (struct sockaddr *)&local, &locallen) == 0);
+    assert(getnameinfo((struct sockaddr *)&local, locallen, source, sizeof(source),
+                       NULL, 0, NI_NUMERICHOST) == 0);
+    redisFree(c);
+
+    options.options = REDIS_OPT_SET_SOCK_CLOEXEC;
+    options.endpoint.tcp.source_addr = source;
+    c = redisConnectWithOptions(&options);
+    assert(c != NULL && c->err == 0);
+    test("REDIS_OPT_SET_SOCK_CLOEXEC sets FD_CLOEXEC: ");
+    test_cond(fcntl(c->fd, F_GETFD) & FD_CLOEXEC);
+    test("REDIS_OPT_SET_SOCK_CLOEXEC does not set SO_REUSEADDR: ");
+    test_cond(getsockopt(c->fd, SOL_SOCKET, SO_REUSEADDR, &reuse, &reuselen) == 0 &&
+              reuse == 0);
+    redisFree(c);
+}
+#endif
 
 static void test_unix_keepalive(struct config cfg) {
     redisContext *c;
@@ -2759,6 +2798,9 @@ int main(int argc, char **argv) {
     test_invalid_timeout_errors(cfg);
     test_append_formatted_commands(cfg);
     test_tcp_options(cfg);
+#ifdef SOCK_CLOEXEC
+    test_tcp_socket_flags(cfg);
+#endif
     if (throughput) test_throughput(cfg);
 
     printf("\nTesting against Unix socket connection (%s): ", cfg.unix_sock.path);
