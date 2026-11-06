@@ -449,6 +449,9 @@ static void test_tcp_options(struct config cfg) {
 static void test_tcp_socket_flags(struct config cfg) {
     redisContext *c;
     redisOptions options = {0};
+    struct sockaddr_storage local;
+    socklen_t locallen = sizeof(local);
+    char source[128];
     int reuse = 0;
     socklen_t reuselen = sizeof(reuse);
 
@@ -458,10 +461,15 @@ static void test_tcp_socket_flags(struct config cfg) {
     assert(c != NULL && c->err == 0);
     test("REDIS_OPT_REUSEADDR does not set FD_CLOEXEC: ");
     test_cond(!(fcntl(c->fd, F_GETFD) & FD_CLOEXEC));
+    /* Bind the next connection to the local address of this one, which is
+     * assigned to this host even when the server is remote. */
+    assert(getsockname(c->fd, (struct sockaddr *)&local, &locallen) == 0);
+    assert(getnameinfo((struct sockaddr *)&local, locallen, source, sizeof(source),
+                       NULL, 0, NI_NUMERICHOST) == 0);
     redisFree(c);
 
     options.options = REDIS_OPT_SET_SOCK_CLOEXEC;
-    options.endpoint.tcp.source_addr = cfg.tcp.host;
+    options.endpoint.tcp.source_addr = source;
     c = redisConnectWithOptions(&options);
     assert(c != NULL && c->err == 0);
     test("REDIS_OPT_SET_SOCK_CLOEXEC sets FD_CLOEXEC: ");
