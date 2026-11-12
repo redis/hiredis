@@ -97,6 +97,11 @@ typedef intptr_t ssize_t;
 #define REDIS_PREFER_IPV4 0x800
 #define REDIS_PREFER_IPV6 0x1000
 
+/* Flag that is set when we should create sockets with SOCK_CLOEXEC.
+ * Must not reuse a REDIS_OPT_* value: REDIS_OPT_SET_SOCK_CLOEXEC is 0x80,
+ * which already means REDIS_REUSEADDR in c->flags. */
+#define REDIS_SET_SOCK_CLOEXEC 0x2000
+
 #define REDIS_KEEPALIVE_INTERVAL 15 /* seconds */
 
 /* number of times we retry to connect in the case of EADDRNOTAVAIL and
