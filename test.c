@@ -12,6 +12,9 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#ifndef _WIN32
+#include <fcntl.h>
+#endif
 
 #ifdef __linux__
 #include <arpa/inet.h>
@@ -1035,6 +1038,74 @@ static void test_allocator_injection(void) {
 }
 
 #define HIREDIS_BAD_DOMAIN "idontexist-noreally.com"
+
+#ifndef _WIN32
+#ifndef __linux__
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
+
+static int cloexec_set(redisFD fd) {
+    int flags = fcntl(fd, F_GETFD);
+    assert(flags != -1);
+    return !!(flags & FD_CLOEXEC);
+}
+
+static int reuseaddr_set(redisFD fd) {
+    int val = 0;
+    socklen_t len = sizeof(val);
+    assert(getsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, &len) == 0);
+    return val;
+}
+
+static void test_sock_option_flag_collision(void) {
+    struct sockaddr_in address = {0};
+    redisOptions options;
+    redisContext *c;
+    socklen_t address_length = sizeof(address);
+    int listener_fd;
+
+    listener_fd = socket(AF_INET, SOCK_STREAM, 0);
+    assert(listener_fd != -1);
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = 0;
+    assert(bind(listener_fd, (struct sockaddr *)&address, sizeof(address)) == 0);
+    assert(listen(listener_fd, 2) == 0);
+    assert(getsockname(listener_fd, (struct sockaddr *)&address,
+                       &address_length) == 0);
+
+    memset(&options, 0, sizeof(options));
+    REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", ntohs(address.sin_port));
+    options.options = REDIS_OPT_REUSEADDR;
+    c = redisConnectWithOptions(&options);
+    assert(c != NULL && c->fd != REDIS_INVALID_FD);
+    test("REDIS_OPT_REUSEADDR does not set SOCK_CLOEXEC: ");
+    test_cond(cloexec_set(c->fd) == 0);
+    redisFree(c);
+
+    memset(&options, 0, sizeof(options));
+    REDIS_OPTIONS_SET_TCP(&options, "127.0.0.1", ntohs(address.sin_port));
+    options.endpoint.tcp.source_addr = "127.0.0.1";
+    options.options = REDIS_OPT_SET_SOCK_CLOEXEC;
+    c = redisConnectWithOptions(&options);
+    assert(c != NULL && c->fd != REDIS_INVALID_FD);
+    /* net.c only applies SOCK_CLOEXEC when that macro is defined. */
+#ifdef SOCK_CLOEXEC
+    test("REDIS_OPT_SET_SOCK_CLOEXEC sets SOCK_CLOEXEC without SO_REUSEADDR: ");
+    test_cond(cloexec_set(c->fd) == 1 && reuseaddr_set(c->fd) == 0);
+#else
+    test("REDIS_OPT_SET_SOCK_CLOEXEC is a no-op without SOCK_CLOEXEC and does not set SO_REUSEADDR: ");
+    test_cond(reuseaddr_set(c->fd) == 0);
+#endif
+    redisFree(c);
+
+    close(listener_fd);
+}
+#endif
+
 static void test_blocking_connection_errors(void) {
     struct addrinfo hints = {.ai_family = AF_INET};
     struct addrinfo *ai_tmp = NULL;
@@ -2746,6 +2817,9 @@ int main(int argc, char **argv) {
     test_format_commands();
     test_reply_reader();
     test_blocking_connection_errors();
+#ifndef _WIN32
+    test_sock_option_flag_collision();
+#endif
     test_free_null();
 #ifdef __linux__
     test_nonblocking_connect_error_queue();
