@@ -1092,8 +1092,14 @@ static void test_sock_option_flag_collision(void) {
     options.options = REDIS_OPT_SET_SOCK_CLOEXEC;
     c = redisConnectWithOptions(&options);
     assert(c != NULL && c->fd != REDIS_INVALID_FD);
+    /* net.c only applies SOCK_CLOEXEC when that macro is defined. */
+#ifdef SOCK_CLOEXEC
     test("REDIS_OPT_SET_SOCK_CLOEXEC sets SOCK_CLOEXEC without SO_REUSEADDR: ");
     test_cond(cloexec_set(c->fd) == 1 && reuseaddr_set(c->fd) == 0);
+#else
+    test("REDIS_OPT_SET_SOCK_CLOEXEC is a no-op without SOCK_CLOEXEC and does not set SO_REUSEADDR: ");
+    test_cond(reuseaddr_set(c->fd) == 0);
+#endif
     redisFree(c);
 
     close(listener_fd);
