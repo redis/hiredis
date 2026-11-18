@@ -394,6 +394,20 @@ int redisCheckConnectDone(redisContext *c, int *completed) {
     }
     switch (error) {
     case EISCONN:
+#ifdef __APPLE__
+        {
+            /* Since macOS 26.7 / 15.8.1 (and on macOS 27), retrying connect()
+             * on a socket whose connect was refused answers EISCONN, with the
+             * refusal still pending in SO_ERROR. */
+            int so_error = 0;
+            socklen_t optlen = sizeof(so_error);
+            if (getsockopt(c->fd, SOL_SOCKET, SO_ERROR, &so_error, &optlen) == 0 &&
+                so_error != 0) {
+                errno = so_error;
+                return REDIS_ERR;
+            }
+        }
+#endif
         goto connected;
     case EALREADY:
     case EWOULDBLOCK:
