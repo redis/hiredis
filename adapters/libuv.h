@@ -145,13 +145,6 @@ static int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
         return REDIS_ERR;
     }
 
-    ac->ev.addRead        = redisLibuvAddRead;
-    ac->ev.delRead        = redisLibuvDelRead;
-    ac->ev.addWrite       = redisLibuvAddWrite;
-    ac->ev.delWrite       = redisLibuvDelWrite;
-    ac->ev.cleanup        = redisLibuvCleanup;
-    ac->ev.scheduleTimer  = redisLibuvSetTimeout;
-
     redisLibuvEvents* p = (redisLibuvEvents*)hi_malloc(sizeof(*p));
     if (p == NULL)
         return REDIS_ERR;
@@ -162,6 +155,13 @@ static int redisLibuvAttach(redisAsyncContext* ac, uv_loop_t* loop) {
         hi_free(p);
         return REDIS_ERR;
     }
+
+    ac->ev.addRead        = redisLibuvAddRead;
+    ac->ev.delRead        = redisLibuvDelRead;
+    ac->ev.addWrite       = redisLibuvAddWrite;
+    ac->ev.delWrite       = redisLibuvDelWrite;
+    ac->ev.cleanup        = redisLibuvCleanup;
+    ac->ev.scheduleTimer  = redisLibuvSetTimeout;
 
     ac->ev.data    = p;
     p->handle.data = p;
