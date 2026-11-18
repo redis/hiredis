@@ -867,6 +867,15 @@ static void test_reply_reader(void) {
     freeReplyObject(reply);
     redisReaderFree(reader);
 
+    test("Set error on RESP3 bool with NUL byte value: ");
+    reader = redisReaderCreate();
+    redisReaderFeed(reader, "#\x00\r\n",4);
+    ret = redisReaderGetReply(reader,&reply);
+    test_cond(ret == REDIS_ERR &&
+              strcasecmp(reader->errstr,"Bad bool value") == 0);
+    freeReplyObject(reply);
+    redisReaderFree(reader);
+
     test("Can parse RESP3 map: ");
     reader = redisReaderCreate();
     redisReaderFeed(reader, "%2\r\n+first\r\n:123\r\n$6\r\nsecond\r\n#t\r\n",34);
