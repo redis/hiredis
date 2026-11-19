@@ -47,7 +47,7 @@ typedef intptr_t ssize_t;
 
 #define HIREDIS_MAJOR 1
 #define HIREDIS_MINOR 5
-#define HIREDIS_PATCH 0
+#define HIREDIS_PATCH 1
 #define HIREDIS_SONAME 1.5.0
 
 /* Connection type can be blocking or non-blocking and is set in the
