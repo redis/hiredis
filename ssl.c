@@ -572,6 +572,25 @@ static void redisSSLFree(void *privctx){
     hi_free(rsc);
 }
 
+/* Report a failed SSL_read()/SSL_write(). For SSL_ERROR_SSL the reason is on
+ * the OpenSSL error queue, not in errno: no system call failed, so errno is
+ * typically 0 and an errno based message would read "Success". This matters
+ * most for non-blocking contexts, where the handshake is completed by the
+ * first reads/writes and e.g. a certificate verification failure is reported
+ * here rather than by redisSSLConnect(). Anything else falls back to errno. */
+static void redisSSLSetIOError(redisContext *c, int sslerr) {
+    if (sslerr == SSL_ERROR_SSL) {
+        const char *reason = ERR_reason_error_string(ERR_peek_last_error());
+        if (reason) {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "SSL error: %s", reason);
+            __redisSetError(c, REDIS_ERR_IO, msg);
+            return;
+        }
+    }
+    __redisSetError(c, REDIS_ERR_IO, NULL);
+}
+
 static ssize_t redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
     redisSSL *rssl = c->privctx;
 
@@ -608,7 +627,7 @@ static ssize_t redisSSLRead(redisContext *c, char *buf, size_t bufcap) {
         if (maybeCheckWant(rssl, err)) {
             return 0;
         } else {
-            __redisSetError(c, REDIS_ERR_IO, NULL);
+            redisSSLSetIOError(c, err);
             return -1;
         }
     }
@@ -629,7 +648,7 @@ static ssize_t redisSSLWrite(redisContext *c) {
         if ((c->flags & REDIS_BLOCK) == 0 && maybeCheckWant(rssl, err)) {
             return 0;
         } else {
-            __redisSetError(c, REDIS_ERR_IO, NULL);
+            redisSSLSetIOError(c, err);
             return -1;
         }
     }
