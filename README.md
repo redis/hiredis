@@ -698,7 +698,9 @@ initialize OpenSSL and create a context. You can do that in two ways:
 
 1. Work directly with the OpenSSL API to initialize the library's global context
    and create `SSL_CTX *` and `SSL *` contexts. With an `SSL *` object you can
-   call `redisInitiateSSL()`.
+   call `redisInitiateSSL()`. In this case Hiredis does not configure
+   certificate verification for you: set the expected peer name on your own
+   `SSL *` object (e.g. with `SSL_set1_host()`) before handing it over.
 2. Work with a set of Hiredis-provided wrappers around OpenSSL, create a
    `redisSSLContext` object to hold configuration and use
    `redisInitiateSSLWithContext()` to initiate the SSL/TLS handshake.
@@ -722,13 +724,16 @@ redisSSLContextError ssl_error = REDIS_SSL_CTX_NONE;
 redisInitOpenSSL();
 
 /* Create SSL context */
-ssl_context = redisCreateSSLContext(
-    "cacertbundle.crt",     /* File name of trusted CA/ca bundle file, optional */
-    "/path/to/certs",       /* Path of trusted certificates, optional */
-    "client_cert.pem",      /* File name of client certificate file, optional */
-    "client_key.pem",       /* File name of client private key, optional */
-    "redis.mydomain.com",   /* Server name to request (SNI), optional */
-    &ssl_error);
+redisSSLOptions ssl_options = {
+    .cacert_filename = "cacertbundle.crt",      /* File name of trusted CA/ca bundle file, optional */
+    .capath = "/path/to/certs",                 /* Path of trusted certificates, optional */
+    .cert_filename = "client_cert.pem",         /* File name of client certificate file, optional */
+    .private_key_filename = "client_key.pem",   /* File name of client private key, optional */
+    .server_name = "redis.mydomain.com",        /* Server name to request (SNI), optional */
+    .verify_mode = REDIS_SSL_VERIFY_PEER,       /* Verify the peer certificate */
+    .verify_name = "redis.mydomain.com",        /* DNS name or IP the peer certificate must carry */
+};
+ssl_context = redisCreateSSLContextWithOptions(&ssl_options, &ssl_error);
 
 if(ssl_context == NULL || ssl_error != REDIS_SSL_CTX_NONE) {
     /* Handle error and abort... */
@@ -741,7 +746,7 @@ if(ssl_context == NULL || ssl_error != REDIS_SSL_CTX_NONE) {
 }
 
 /* Create Redis context and establish connection */
-c = redisConnect("localhost", 6443);
+c = redisConnect("redis.mydomain.com", 6443);
 if (c == NULL || c->err) {
     /* Handle error and abort... */
 }
@@ -751,6 +756,22 @@ if (redisInitiateSSLWithContext(c, ssl_context) != REDIS_OK) {
     /* Handle error, in c->err / c->errstr */
 }
 ```
+
+#### Verifying the server's identity
+
+Set `verify_name` to the DNS name or IP address you are connecting to. The
+handshake then fails unless the server certificate carries that identity, in
+addition to chaining to a trusted CA.
+
+* Without `verify_name`, **any** certificate issued by a trusted CA is
+  accepted, whatever name it carries. This is also what the older
+  `redisCreateSSLContext()` wrapper does: it has no way to set `verify_name`.
+* `server_name` only selects which certificate the server presents (SNI). It
+  is not checked against that certificate.
+* `verify_name` requires `verify_mode` to include `REDIS_SSL_VERIFY_PEER`, and
+  context creation fails with `REDIS_SSL_CTX_VERIFY_NAME_FAILED` otherwise.
+* The expected name belongs to the `redisSSLContext`, so use one context per
+  server name (for example, one per node when connecting to several hosts).
 
 ## RESP3 PUSH replies
 Redis 6.0 introduced PUSH replies with the reply-type `>`.  These messages are generated spontaneously and can arrive at any time, so must be handled using callbacks.

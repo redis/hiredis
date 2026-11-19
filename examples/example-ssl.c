@@ -26,7 +26,18 @@ int main(int argc, char **argv) {
     const char *ca = argc > 4 ? argv[5] : NULL;
 
     redisInitOpenSSL();
-    ssl = redisCreateSSLContext(ca, NULL, cert, key, NULL, &ssl_error);
+    /* verify_name binds the connection to the server we mean to reach: the
+     * peer certificate must carry this DNS name or IP address, in addition to
+     * chaining to a trusted CA. Without it, any certificate issued by a
+     * trusted CA is accepted, whatever identity it carries. */
+    redisSSLOptions ssl_options = {
+        .cacert_filename = ca,
+        .cert_filename = cert,
+        .private_key_filename = key,
+        .verify_mode = REDIS_SSL_VERIFY_PEER,
+        .verify_name = hostname,
+    };
+    ssl = redisCreateSSLContextWithOptions(&ssl_options, &ssl_error);
     if (!ssl || ssl_error != REDIS_SSL_CTX_NONE) {
         printf("SSL Context error: %s\n", redisSSLContextGetError(ssl_error));
         exit(1);
