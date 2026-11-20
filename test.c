@@ -786,6 +786,11 @@ static void test_reply_reader(void) {
             {",-2.25\r\n", -2.25}, {",1e308\r\n", 1e308}, {",5e-324\r\n", 5e-324},
             {",2.2250738585072014e-308\r\n", 2.2250738585072014e-308},
             {",1.7976931348623157e308\r\n", 1.7976931348623157e308},
+            /* explicit '+' sign, allowed by the RESP3 grammar */
+            {",+1.5\r\n", 1.5}, {",+0\r\n", 0.0}, {",+3E+2\r\n", 300.0},
+            /* underflow rounds to (signed) zero, as strtod does */
+            {",1e-400\r\n", 0.0}, {",-1e-400\r\n", -0.0},
+            {",2e-324\r\n", 0.0},
         };
         size_t i; int ok = 1;
         for (i = 0; i < sizeof(dcases)/sizeof(dcases[0]); i++) {
@@ -807,7 +812,8 @@ static void test_reply_reader(void) {
     {
         static const char *bad[] = {
             ",\r\n", ",1.2.3\r\n", ",1e\r\n", ",+\r\n", ",.\r\n",
-            ",1,5\r\n", ",abc\r\n", ",3.14x\r\n",
+            ",1,5\r\n", ",abc\r\n", ",3.14x\r\n", ",+-1\r\n",
+            ",++1\r\n", ",+inf\r\n", ",1e400\r\n", ",-1e400\r\n",
         };
         size_t i; int ok = 1;
         for (i = 0; i < sizeof(bad)/sizeof(bad[0]); i++) {
