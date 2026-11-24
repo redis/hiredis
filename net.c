@@ -104,8 +104,13 @@ ssize_t redisNetRead(redisContext *c, char *buf, size_t bufcap) {
 
 ssize_t redisNetWrite(redisContext *c) {
     ssize_t nwritten;
+    int flags = 0;
 
-    nwritten = send(c->fd, c->obuf, sdslen(c->obuf), 0);
+#ifdef MSG_NOSIGNAL
+    /* Report a broken pipe as an I/O error without raising SIGPIPE. */
+    flags |= MSG_NOSIGNAL;
+#endif
+    nwritten = send(c->fd, c->obuf, sdslen(c->obuf), flags);
     if (nwritten < 0) {
         if ((errno == EWOULDBLOCK && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again */
