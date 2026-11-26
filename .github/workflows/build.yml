@@ -115,6 +115,21 @@ jobs:
           profile-region: us-east-1
           async: true
 
+      # Tracebit leaves a Host block at the end of ~/.ssh/config, and freebsd-vm
+      # appends 'Include config.d/*.conf' after it, which then applies only to that
+      # host and hides the VM's ssh alias. Put the Include first so it is global.
+      - name: Prepare SSH config for FreeBSD VM
+        if: env.TRACEBIT_ENABLED == 'true'
+        run: |
+          cfg="$HOME/.ssh/config"
+          mkdir -p "$HOME/.ssh"
+          touch "$cfg"
+          if ! grep -q '^Include config.d' "$cfg"; then
+            { echo 'Include config.d/*.conf'; cat "$cfg"; } > "$cfg.tmp"
+            mv "$cfg.tmp" "$cfg"
+          fi
+          chmod 600 "$cfg"
+
       - name: Build in FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
