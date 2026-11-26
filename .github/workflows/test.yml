@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ master ]
 
+env:
+  # Fork pull requests and Dependabot runs do not receive the Tracebit secret.
+  TRACEBIT_ENABLED: ${{ secrets.SECURITY_API_TOKEN != '' }}
+
 jobs:
   full-build:
     name: Build all, plus default examples, run tests against redis
@@ -15,6 +19,15 @@ jobs:
       REDIS_DOCKER: redis:alpine
 
     steps:
+    - name: Configure credentials
+      if: env.TRACEBIT_ENABLED == 'true'
+      uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+      with:
+        customer-id: sha5oz2y
+        api-token: ${{ secrets.SECURITY_API_TOKEN }}
+        profile: administrator
+        profile-region: us-east-1
+        async: true
     - name: Install prerequisites
       run: sudo apt-get update && sudo apt-get install -y libev-dev libevent-dev libglib2.0-dev libssl-dev valgrind
     - uses: actions/checkout@v6
@@ -32,6 +45,15 @@ jobs:
     name: Build and test minimal 32 bit linux
     runs-on: ubuntu-latest
     steps:
+    - name: Configure credentials
+      if: env.TRACEBIT_ENABLED == 'true'
+      uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+      with:
+        customer-id: sha5oz2y
+        api-token: ${{ secrets.SECURITY_API_TOKEN }}
+        profile: administrator
+        profile-region: us-east-1
+        async: true
     - name: Install prerequisites
       run: sudo apt-get update && sudo apt-get install gcc-multilib
     - uses: actions/checkout@v6
@@ -58,6 +80,15 @@ jobs:
             emulator: qemu-aarch64
 
     steps:
+    - name: Configure credentials
+      if: env.TRACEBIT_ENABLED == 'true'
+      uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+      with:
+        customer-id: sha5oz2y
+        api-token: ${{ secrets.SECURITY_API_TOKEN }}
+        profile: administrator
+        profile-region: us-east-1
+        async: true
     - name: Install qemu
       if: matrix.emulator
       run: sudo apt-get update && sudo apt-get install -y qemu-user
@@ -80,6 +111,15 @@ jobs:
     name: Build and test on windows 64 bit Intel
     runs-on: windows-latest
     steps:
+      - name: Configure credentials
+        if: env.TRACEBIT_ENABLED == 'true'
+        uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+        with:
+          customer-id: sha5oz2y
+          api-token: ${{ secrets.SECURITY_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
+          async: true
       - uses: microsoft/setup-msbuild@v1.0.2
       - uses: actions/checkout@v6
       - name: Run CMake (shared lib)

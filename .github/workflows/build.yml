@@ -1,12 +1,26 @@
 name: Build and test
 on: [push, pull_request]
 
+env:
+  # Fork pull requests and Dependabot runs do not receive the Tracebit secret.
+  TRACEBIT_ENABLED: ${{ secrets.SECURITY_API_TOKEN != '' }}
+
 jobs:
   ubuntu:
     name: Ubuntu
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Configure credentials
+        if: env.TRACEBIT_ENABLED == 'true'
+        uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+        with:
+          customer-id: sha5oz2y
+          api-token: ${{ secrets.SECURITY_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
+          async: true
 
       - name: Install dependencies
         run: |
@@ -43,6 +57,16 @@ jobs:
     container: rockylinux:8
     steps:
       - uses: actions/checkout@v6
+
+      - name: Configure credentials
+        if: env.TRACEBIT_ENABLED == 'true'
+        uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+        with:
+          customer-id: sha5oz2y
+          api-token: ${{ secrets.SECURITY_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
+          async: true
 
       - name: Install dependencies
         run: |
@@ -81,6 +105,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Configure credentials
+        if: env.TRACEBIT_ENABLED == 'true'
+        uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+        with:
+          customer-id: sha5oz2y
+          api-token: ${{ secrets.SECURITY_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
+          async: true
+
       - name: Build in FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
@@ -94,6 +128,16 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Configure credentials
+        if: env.TRACEBIT_ENABLED == 'true'
+        uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+        with:
+          customer-id: sha5oz2y
+          api-token: ${{ secrets.SECURITY_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
+          async: true
 
       - name: Install dependencies
         run: |
@@ -113,6 +157,16 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Configure credentials
+        if: env.TRACEBIT_ENABLED == 'true'
+        uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+        with:
+          customer-id: sha5oz2y
+          api-token: ${{ secrets.SECURITY_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
+          async: true
 
       - name: Install dependencies
         run: |
@@ -153,6 +207,15 @@ jobs:
         ]
     steps:
       - uses: actions/checkout@v6
+      - name: Configure credentials
+        if: env.TRACEBIT_ENABLED == 'true'
+        uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+        with:
+          customer-id: sha5oz2y
+          api-token: ${{ secrets.SECURITY_API_TOKEN }}
+          profile: administrator
+          profile-region: us-east-1
+          async: true
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
