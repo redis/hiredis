@@ -105,9 +105,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # This job builds and tests inside the FreeBSD VM, so plant the canaries there
+      # rather than on this host: HOME points into the workspace (synced into the VM)
+      # and 'prepare' moves the files into the guest $HOME. This also keeps
+      # Tracebit's Host block out of ~/.ssh/config, which freebsd-vm uses.
       - name: Configure credentials
         if: env.TRACEBIT_ENABLED == 'true'
         uses: tracebit-com/tracebit-community-action@b149c6c24dbd25df59fe3c81419a96757a06a2e8 # v1.4.0
+        env:
+          HOME: ${{ github.workspace }}/.tracebit-home
         with:
           customer-id: sha5oz2y
           api-token: ${{ secrets.SECURITY_API_TOKEN }}
@@ -115,25 +121,21 @@ jobs:
           profile-region: us-east-1
           async: true
 
-      # Tracebit leaves a Host block at the end of ~/.ssh/config, and freebsd-vm
-      # appends 'Include config.d/*.conf' after it, which then applies only to that
-      # host and hides the VM's ssh alias. Put the Include first so it is global.
-      - name: Prepare SSH config for FreeBSD VM
-        if: env.TRACEBIT_ENABLED == 'true'
-        run: |
-          cfg="$HOME/.ssh/config"
-          mkdir -p "$HOME/.ssh"
-          touch "$cfg"
-          if ! grep -q '^Include config.d' "$cfg"; then
-            { echo 'Include config.d/*.conf'; cat "$cfg"; } > "$cfg.tmp"
-            mv "$cfg.tmp" "$cfg"
-          fi
-          chmod 600 "$cfg"
-
       - name: Build in FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
-          prepare: pkg install -y gmake cmake
+          envs: '__AWS__* __NPM__* __PYPI__*'
+          prepare: |
+            if [ -d .tracebit-home ]; then
+              if [ -f .tracebit-home/.ssh/config ]; then
+                mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+                { echo; sed "s#$GITHUB_WORKSPACE/.tracebit-home#$HOME#g" .tracebit-home/.ssh/config; } >> "$HOME/.ssh/config"
+                rm .tracebit-home/.ssh/config
+              fi
+              cp -Rp .tracebit-home/. "$HOME/"
+              rm -rf .tracebit-home
+            fi
+            pkg install -y gmake cmake
           run: |
             mkdir build && cd build && cmake .. && make && cd ..
             gmake
