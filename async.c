@@ -503,8 +503,8 @@ static int __redisGetSubscribeCallback(redisAsyncContext *ac, redisReply *reply,
 
         /* If this is an subscribe reply decrease pending counter. */
         if (strcasecmp(stype+pvariant,"subscribe") == 0) {
-            assert(cb != NULL);
-            cb->pending_subs -= 1;
+            if (cb != NULL)
+                cb->pending_subs -= 1;
 
         } else if (strcasecmp(stype+pvariant,"unsubscribe") == 0) {
             if (cb == NULL)

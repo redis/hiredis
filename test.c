@@ -25,6 +25,7 @@
 
 #include "hiredis.h"
 #include "async.h"
+#include "async_private.h"
 #include "adapters/poll.h"
 #ifdef HIREDIS_TEST_SSL
 #include "hiredis_ssl.h"
@@ -1349,6 +1350,53 @@ redisOptions get_redis_tcp_options(struct config config) {
     redisOptions options = {0};
     REDIS_OPTIONS_SET_TCP(&options, config.tcp.host, config.tcp.port);
     return options;
+}
+
+static void unexpected_subscribe_cb(redisAsyncContext *ac, void *reply, void *privdata) {
+    int *calls = privdata;
+    (void)ac;
+    if (reply != NULL)
+        (*calls)++;
+}
+
+static void test_unexpected_subscribe_replies(void) {
+    const char *commands[] = {"subscribe", "psubscribe"};
+    const char prefixes[] = {'*', '>'};
+    size_t i, j;
+
+    for (i = 0; i < sizeof(commands) / sizeof(commands[0]); i++) {
+        for (j = 0; j < sizeof(prefixes); j++) {
+            redisOptions options = {0};
+            redisAsyncContext *ac;
+            char response[128];
+            int calls = 0, len;
+
+            options.type = REDIS_CONN_USERFD;
+            options.endpoint.fd = REDIS_INVALID_FD;
+            ac = redisAsyncConnectWithOptions(&options);
+            assert(ac != NULL && ac->err == 0);
+            assert(redisAsyncCommand(ac, unexpected_subscribe_cb, &calls,
+                                     "%s known", commands[i]) == REDIS_OK);
+
+            printf("Testing %s confirmations in RESP%d\n", commands[i], j == 0 ? 2 : 3);
+            test("Unknown subscription confirmation is ignored: ");
+            len = snprintf(response, sizeof(response),
+                           "%c3\r\n$%zu\r\n%s\r\n$7\r\nunknown\r\n:1\r\n",
+                           prefixes[j], strlen(commands[i]), commands[i]);
+            assert(redisReaderFeed(ac->c.reader, response, len) == REDIS_OK);
+            redisProcessCallbacks(ac);
+            test_cond(calls == 0 && ac->err == 0);
+
+            test("Expected subscription confirmation still invokes its callback: ");
+            len = snprintf(response, sizeof(response),
+                           "%c3\r\n$%zu\r\n%s\r\n$5\r\nknown\r\n:1\r\n",
+                           prefixes[j], strlen(commands[i]), commands[i]);
+            assert(redisReaderFeed(ac->c.reader, response, len) == REDIS_OK);
+            redisProcessCallbacks(ac);
+            test_cond(calls == 1 && ac->err == 0);
+            redisAsyncFree(ac);
+        }
+    }
 }
 
 static void test_resp3_push_options(struct config config) {
@@ -2747,6 +2795,7 @@ int main(int argc, char **argv) {
     test_reply_reader();
     test_blocking_connection_errors();
     test_free_null();
+    test_unexpected_subscribe_replies();
 #ifdef __linux__
     test_nonblocking_connect_error_queue();
 #endif
