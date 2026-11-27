@@ -336,12 +336,19 @@ static int processLineItem(redisReader *r) {
             } else {
                 /* RESP3 allows only finite values besides the inf/nan tokens
                  * handled above, so run ffc with NO_INFNAN; the full-consume +
-                 * isfinite checks then mirror the strtod path's eptr/isfinite. */
+                 * isfinite checks then mirror the strtod path's eptr/isfinite.
+                 * The RESP3 grammar allows an explicit '+' sign, which ffc
+                 * only accepts with ALLOW_LEADING_PLUS. ffc reports both
+                 * overflow and underflow as OUT_OF_RANGE; like strtod, an
+                 * underflow still yields a (zero or subnormal) finite value,
+                 * while an overflow yields an infinity that isfinite rejects. */
                 ffc_parse_options o = ffc_parse_options_default();
-                o.format |= FFC_FORMAT_FLAG_NO_INFNAN;
+                o.format |= FFC_FORMAT_FLAG_NO_INFNAN |
+                            FFC_FORMAT_FLAG_ALLOW_LEADING_PLUS;
                 ffc_result res = ffc_from_chars_double_options(buf, buf + len, &d, o);
-                if (res.outcome != FFC_OUTCOME_OK || res.ptr != buf + len ||
-                    !isfinite(d)) {
+                if ((res.outcome != FFC_OUTCOME_OK &&
+                     res.outcome != FFC_OUTCOME_OUT_OF_RANGE) ||
+                    res.ptr != buf + len || !isfinite(d)) {
                     __redisReaderSetError(r,REDIS_ERR_PROTOCOL,
                             "Bad double value");
                     return REDIS_ERR;
