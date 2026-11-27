@@ -45,7 +45,8 @@ SET(hiredis_sources
     net.c
     read.c
     sds.c
-    sockcompat.c)
+    sockcompat.c
+    hiredis_exports.def)
 
 SET(hiredis_sources ${hiredis_sources})
 
@@ -59,7 +60,7 @@ set(hiredis_export_name hiredis CACHE STRING "Name of the exported target")
 set_target_properties(hiredis PROPERTIES EXPORT_NAME ${hiredis_export_name})
 
 SET_TARGET_PROPERTIES(hiredis
-    PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE
+    PROPERTIES
     VERSION "${VERSION}"
     SOVERSION "${HIREDIS_MAJOR}")
 IF(MSVC)
@@ -170,7 +171,8 @@ IF(ENABLE_SSL)
     ENDIF()
     FIND_PACKAGE(OpenSSL REQUIRED)
     SET(hiredis_ssl_sources
-        ssl.c)
+        ssl.c
+        hiredis_ssl_exports.def)
     ADD_LIBRARY(hiredis_ssl ${hiredis_ssl_sources})
     ADD_LIBRARY(hiredis::hiredis_ssl ALIAS hiredis_ssl)
 
@@ -180,7 +182,6 @@ IF(ENABLE_SSL)
 
     SET_TARGET_PROPERTIES(hiredis_ssl
         PROPERTIES
-        WINDOWS_EXPORT_ALL_SYMBOLS TRUE
         VERSION "${VERSION}"
         SOVERSION "${HIREDIS_MAJOR}")
     IF(MSVC)
